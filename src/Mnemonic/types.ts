@@ -207,6 +207,33 @@ export type StorageLike = {
      * Optional property for enumeration support.
      */
     readonly length?: number;
+
+    /**
+     * Subscribe to notifications when data changes externally.
+     *
+     * localStorage has built-in cross-tab notification via the browser's
+     * native `storage` event (used by the `listenCrossTab` hook option).
+     * Non-localStorage backends (IndexedDB, custom stores, etc.) lack this
+     * built-in mechanism. Implementing `onExternalChange` allows those
+     * adapters to provide equivalent cross-tab synchronization through
+     * their own transport (e.g., BroadcastChannel).
+     *
+     * The callback accepts an optional `changedKeys` parameter:
+     * - `callback()` or `callback(undefined)` triggers a blanket reload
+     *   of all actively subscribed keys.
+     * - `callback(["ns.key1", "ns.key2"])` reloads only the specified
+     *   fully-qualified keys, which is more efficient when the adapter
+     *   knows exactly which keys changed.
+     * - `callback([])` is a no-op.
+     *
+     * On a blanket reload the provider re-reads all actively subscribed
+     * keys from the storage backend and emits change notifications for
+     * any whose values differ from the cache.
+     *
+     * @param callback - Invoked when external data changes
+     * @returns An unsubscribe function that removes the callback
+     */
+    onExternalChange?: (callback: (changedKeys?: string[]) => void) => (() => void);
 };
 
 /**

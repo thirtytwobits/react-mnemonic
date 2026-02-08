@@ -434,3 +434,343 @@ describe("MnemonicProvider – DevTools", () => {
         expect(devtools.getStore()).toBe(capturedStore!);
     });
 });
+
+// ---------------------------------------------------------------------------
+// onExternalChange / reloadFromStorage
+// ---------------------------------------------------------------------------
+
+/** Creates a mock storage that implements onExternalChange. */
+function createMockStorageWithExternalChange(): StorageLike & {
+    store: Map<string, string>;
+    triggerExternalChange: (changedKeys?: string[]) => void;
+} {
+    const store = new Map<string, string>();
+    const listeners = new Set<(changedKeys?: string[]) => void>();
+    return {
+        store,
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+            store.set(key, value);
+        },
+        removeItem: (key: string) => {
+            store.delete(key);
+        },
+        get length() {
+            return store.size;
+        },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        onExternalChange(callback: (changedKeys?: string[]) => void) {
+            listeners.add(callback);
+            return () => {
+                listeners.delete(callback);
+            };
+        },
+        triggerExternalChange(changedKeys?: string[]) {
+            for (const fn of listeners) fn(changedKeys);
+        },
+    };
+}
+
+describe("reloadFromStorage via onExternalChange", () => {
+    it("detects a value added externally", () => {
+        const storage = createMockStorageWithExternalChange();
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // Subscribe a listener to a key
+        const listener = vi.fn();
+        store!.subscribeRaw("key1", listener);
+        expect(store!.getRawSnapshot("key1")).toBeNull();
+
+        // Externally add a value to the underlying store
+        storage.store.set("ns.key1", "external-value");
+        storage.triggerExternalChange();
+
+        expect(listener).toHaveBeenCalled();
+        expect(store!.getRawSnapshot("key1")).toBe("external-value");
+    });
+
+    it("detects a value removed externally", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.key1", "original");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listener = vi.fn();
+        store!.subscribeRaw("key1", listener);
+        expect(store!.getRawSnapshot("key1")).toBe("original");
+
+        // Externally remove the value
+        storage.store.delete("ns.key1");
+        storage.triggerExternalChange();
+
+        expect(listener).toHaveBeenCalled();
+        expect(store!.getRawSnapshot("key1")).toBeNull();
+    });
+
+    it("does not emit for unchanged keys", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.key1", "stable");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listener = vi.fn();
+        store!.subscribeRaw("key1", listener);
+        // Prime the cache
+        store!.getRawSnapshot("key1");
+
+        // Trigger without changing the underlying value
+        storage.triggerExternalChange();
+
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("handles multiple keys with mixed changes", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        storage.store.set("ns.b", "2");
+        storage.store.set("ns.c", "3");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        const listenerB = vi.fn();
+        const listenerC = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        store!.subscribeRaw("b", listenerB);
+        store!.subscribeRaw("c", listenerC);
+        // Prime cache
+        store!.getRawSnapshot("a");
+        store!.getRawSnapshot("b");
+        store!.getRawSnapshot("c");
+
+        // Change a and c, leave b unchanged
+        storage.store.set("ns.a", "100");
+        storage.store.set("ns.c", "300");
+        storage.triggerExternalChange();
+
+        expect(listenerA).toHaveBeenCalled();
+        expect(listenerB).not.toHaveBeenCalled();
+        expect(listenerC).toHaveBeenCalled();
+        expect(store!.getRawSnapshot("a")).toBe("100");
+        expect(store!.getRawSnapshot("b")).toBe("2");
+        expect(store!.getRawSnapshot("c")).toBe("300");
+    });
+
+    it("evicts unsubscribed cached keys so next read is fresh", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.cached", "old");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // Prime the cache for "cached" key but do NOT subscribe a listener
+        expect(store!.getRawSnapshot("cached")).toBe("old");
+
+        // Mutate the underlying storage and trigger
+        storage.store.set("ns.cached", "new");
+        storage.triggerExternalChange();
+
+        // The cache was evicted, so readThrough picks up the new value
+        expect(store!.getRawSnapshot("cached")).toBe("new");
+    });
+
+    it("provider works normally when storage has no onExternalChange", () => {
+        const storage = createMockStorage();
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+        store!.setRaw("k", "v");
+        expect(store!.getRawSnapshot("k")).toBe("v");
+    });
+
+    it("unsubscribes onExternalChange on unmount", () => {
+        const storage = createMockStorageWithExternalChange();
+        const onStore = vi.fn();
+        const { unmount } = render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // After unmount, triggerExternalChange should not throw
+        unmount();
+        expect(() => storage.triggerExternalChange()).not.toThrow();
+    });
+
+    it("granular: only specified keys are refreshed", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        storage.store.set("ns.b", "2");
+        storage.store.set("ns.c", "3");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        const listenerB = vi.fn();
+        const listenerC = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        store!.subscribeRaw("b", listenerB);
+        store!.subscribeRaw("c", listenerC);
+        // Prime cache
+        store!.getRawSnapshot("a");
+        store!.getRawSnapshot("b");
+        store!.getRawSnapshot("c");
+
+        // Change a and c, leave b unchanged
+        storage.store.set("ns.a", "100");
+        storage.store.set("ns.c", "300");
+        storage.triggerExternalChange(["ns.a", "ns.c"]);
+
+        expect(listenerA).toHaveBeenCalled();
+        expect(listenerB).not.toHaveBeenCalled();
+        expect(listenerC).toHaveBeenCalled();
+        expect(store!.getRawSnapshot("a")).toBe("100");
+        expect(store!.getRawSnapshot("b")).toBe("2");
+        expect(store!.getRawSnapshot("c")).toBe("300");
+    });
+
+    it("granular: keys outside namespace are ignored", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        store!.getRawSnapshot("a");
+
+        // Trigger with key outside our namespace
+        storage.triggerExternalChange(["other.x"]);
+
+        expect(listenerA).not.toHaveBeenCalled();
+    });
+
+    it("granular: cached-but-unsubscribed key is evicted", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.cached", "old");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // Prime the cache without subscribing
+        expect(store!.getRawSnapshot("cached")).toBe("old");
+
+        // Mutate underlying storage and trigger granular
+        storage.store.set("ns.cached", "new");
+        storage.triggerExternalChange(["ns.cached"]);
+
+        // Cache was evicted, so readThrough picks up fresh value
+        expect(store!.getRawSnapshot("cached")).toBe("new");
+    });
+
+    it("granular: empty array is a no-op", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        store!.getRawSnapshot("a");
+
+        // Change the underlying value but trigger with empty array
+        storage.store.set("ns.a", "999");
+        storage.triggerExternalChange([]);
+
+        expect(listenerA).not.toHaveBeenCalled();
+        // Cache still has old value because nothing was reloaded
+        expect(store!.getRawSnapshot("a")).toBe("1");
+    });
+
+    it("blanket reload via explicit undefined", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        store!.getRawSnapshot("a");
+
+        storage.store.set("ns.a", "updated");
+        storage.triggerExternalChange(undefined);
+
+        expect(listenerA).toHaveBeenCalled();
+        expect(store!.getRawSnapshot("a")).toBe("updated");
+    });
+});

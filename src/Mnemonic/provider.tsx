@@ -10,7 +10,7 @@
  * (or a custom storage backend) and implements the React external store contract.
  */
 
-import { createContext, useContext, useMemo, ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
 import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
 
 /**
@@ -177,6 +177,12 @@ function defaultBrowserStorage(): StorageLike | undefined {
  * @see {@link MnemonicProviderOptions} - Configuration options
  * @see {@link useMnemonic} - Low-level hook for accessing the store
  */
+
+/** Internal store type with reload capability, not exposed to consumers. */
+type MnemonicInternal = Mnemonic & {
+    reloadFromStorage: (changedKeys?: string[]) => void;
+};
+
 export function MnemonicProvider({
     children,
     namespace,
@@ -188,7 +194,7 @@ export function MnemonicProvider({
     storage?: StorageLike;
     enableDevTools?: boolean;
 }) {
-    const store = useMemo<Mnemonic>(() => {
+    const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
 
@@ -355,6 +361,76 @@ export function MnemonicProvider({
         };
 
         /**
+         * Re-reads keys from the underlying storage, updating the cache and
+         * emitting change notifications for any keys whose values differ.
+         *
+         * @param changedKeys - Optional array of fully-qualified storage keys
+         *   that changed. When undefined, performs a blanket reload of all
+         *   actively subscribed keys. When an empty array, does nothing.
+         *
+         * Called by the onExternalChange subscription when the storage adapter
+         * signals that data has changed externally (e.g., from another tab).
+         */
+        const reloadFromStorage = (changedKeys?: string[]) => {
+            if (!st) return;
+
+            // Empty array → explicit no-op
+            if (changedKeys !== undefined && changedKeys.length === 0) return;
+
+            if (changedKeys !== undefined) {
+                // Granular path: only reload the specified keys
+                for (const fk of changedKeys) {
+                    // Skip keys outside our namespace
+                    if (!fk.startsWith(prefix)) continue;
+                    const key = fk.slice(prefix.length);
+
+                    const listenerSet = listeners.get(key);
+                    if (listenerSet && listenerSet.size > 0) {
+                        // Subscribed: re-read and diff
+                        let fresh: string | null;
+                        try {
+                            fresh = st.getItem(fk);
+                        } catch {
+                            fresh = null;
+                        }
+                        const cached = cache.get(key) ?? null;
+                        if (fresh !== cached) {
+                            cache.set(key, fresh);
+                            emit(key);
+                        }
+                    } else if (cache.has(key)) {
+                        // Cached but not subscribed: evict so next read is fresh
+                        cache.delete(key);
+                    }
+                }
+                return;
+            }
+
+            // Blanket path: re-read all subscribed keys
+            for (const [key, listenerSet] of listeners) {
+                if (listenerSet.size === 0) continue;
+                let fresh: string | null;
+                try {
+                    fresh = st.getItem(fullKey(key));
+                } catch {
+                    fresh = null;
+                }
+                const cached = cache.get(key) ?? null;
+                if (fresh !== cached) {
+                    cache.set(key, fresh);
+                    emit(key);
+                }
+            }
+
+            // Evict unsubscribed cache entries so next readThrough re-reads
+            for (const key of cache.keys()) {
+                if (!listeners.has(key) || listeners.get(key)!.size === 0) {
+                    cache.delete(key);
+                }
+            }
+        };
+
+        /**
          * The Mnemonic store API object.
          * Implements the contract expected by useSyncExternalStore.
          */
@@ -366,6 +442,7 @@ export function MnemonicProvider({
             removeRaw,
             keys,
             dump,
+            reloadFromStorage,
         };
 
         /**
@@ -433,6 +510,12 @@ export function MnemonicProvider({
 
         return store;
     }, [namespace, storage, enableDevTools]);
+
+    // Subscribe to external storage changes (e.g., cross-tab BroadcastChannel)
+    useEffect(() => {
+        if (!storage?.onExternalChange) return;
+        return storage.onExternalChange((changedKeys) => store.reloadFromStorage(changedKeys));
+    }, [storage, store]);
 
     return <MnemonicContext.Provider value={store}>{children}</MnemonicContext.Provider>;
 }

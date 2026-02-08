@@ -4,3 +4,5 @@ dist
 storybook-static
 coverage
 .vitest
+.last-run*
+*.tsbuildinfo

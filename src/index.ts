@@ -10,4 +10,4 @@ export {
   BooleanCodec,
   createCodec,
 } from "./Mnemonic/codecs";
-export type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions } from "./Mnemonic/types";
+export type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, StorageLike } from "./Mnemonic/types";
