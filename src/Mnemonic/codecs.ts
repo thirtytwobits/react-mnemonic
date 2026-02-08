@@ -55,6 +55,68 @@ export class CodecError extends Error {
 }
 
 /**
+ * Custom error class for validation failures.
+ *
+ * Thrown (or synthesized) when a decoded value fails the `validate` type guard
+ * provided to `useMnemonicKey`. Consumers can throw `ValidationError` directly
+ * from their `validate` function to provide richer failure details (message,
+ * cause), or return `false` and let the library synthesize one automatically.
+ *
+ * When a `defaultValue` factory function is provided, the `ValidationError`
+ * instance is passed as the `error` argument so the factory can inspect the
+ * failure reason.
+ *
+ * @example
+ * ```typescript
+ * // Throwing from a validate function for detailed error info
+ * validate: (val): val is User => {
+ *   if (typeof val !== 'object' || val === null) {
+ *     throw new ValidationError('Expected an object');
+ *   }
+ *   if (typeof (val as any).name !== 'string') {
+ *     throw new ValidationError('Missing or invalid name field');
+ *   }
+ *   return true;
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Handling in a defaultValue factory
+ * defaultValue: (error) => {
+ *   if (error instanceof ValidationError) {
+ *     console.warn('Stored data invalid:', error.message);
+ *   }
+ *   return { name: 'Guest' };
+ * }
+ * ```
+ */
+export class ValidationError extends Error {
+    /**
+     * The underlying error that caused the validation failure, if any.
+     *
+     * When the library wraps a non-`ValidationError` thrown by a `validate`
+     * function, the original error is preserved here.
+     */
+    readonly cause?: unknown;
+
+    /**
+     * Creates a new ValidationError.
+     *
+     * @param message - Human-readable description of the validation failure
+     * @param cause - Optional underlying error that caused this failure
+     */
+    constructor(message: string, cause?: unknown) {
+        super(message);
+        this.name = "ValidationError";
+        this.cause = cause;
+
+        // Required for proper instanceof behavior when targeting ES5
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}
+
+/**
  * JSON codec for encoding and decoding JSON-serializable values.
  *
  * This is the default codec used by `useMnemonicKey` when no codec is specified.

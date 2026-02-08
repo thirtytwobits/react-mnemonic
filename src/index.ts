@@ -9,5 +9,7 @@ export {
   NumberCodec,
   BooleanCodec,
   createCodec,
+  CodecError,
+  ValidationError,
 } from "./Mnemonic/codecs";
 export type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, StorageLike } from "./Mnemonic/types";

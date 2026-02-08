@@ -212,6 +212,12 @@ export function MnemonicProvider({
          */
         const listeners = new Map<string, Set<Listener>>();
 
+        /** Whether a QuotaExceededError has already been logged since the last successful write. */
+        let quotaErrorLogged = false;
+
+        /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
+        let accessErrorLogged = false;
+
         /**
          * Converts an unprefixed key to a fully-qualified storage key.
          *
@@ -233,6 +239,26 @@ export function MnemonicProvider({
         };
 
         /**
+         * Logs a storage-access DOMException once, squelching repeats until
+         * a successful storage operation resets the flag. Ignores
+         * QuotaExceededError (handled separately in writeRaw) and silently
+         * swallows all non-DOMException errors.
+         */
+        const logAccessError = (err: unknown): void => {
+            if (
+                !accessErrorLogged &&
+                err instanceof DOMException &&
+                err.name !== "QuotaExceededError"
+            ) {
+                console.error(
+                    `[Mnemonic] Storage access error (${err.name}): ${err.message}. ` +
+                        "Data is cached in memory but may not persist.",
+                );
+                accessErrorLogged = true;
+            }
+        };
+
+        /**
          * Read-through cache accessor.
          * Returns cached value if available, otherwise reads from storage and caches.
          *
@@ -248,8 +274,10 @@ export function MnemonicProvider({
             try {
                 const raw = st.getItem(fullKey(key));
                 cache.set(key, raw);
+                accessErrorLogged = false;
                 return raw;
-            } catch {
+            } catch (err) {
+                logAccessError(err);
                 cache.set(key, null);
                 return null;
             }
@@ -267,8 +295,21 @@ export function MnemonicProvider({
             if (st) {
                 try {
                     st.setItem(fullKey(key), raw);
-                } catch {
-                    // ignore storage failures (quota exceeded, etc.)
+                    quotaErrorLogged = false;
+                    accessErrorLogged = false;
+                } catch (err) {
+                    if (
+                        !quotaErrorLogged &&
+                        err instanceof DOMException &&
+                        err.name === "QuotaExceededError"
+                    ) {
+                        console.error(
+                            `[Mnemonic] Storage quota exceeded writing key "${key}". ` +
+                                "Data is cached in memory but will not persist.",
+                        );
+                        quotaErrorLogged = true;
+                    }
+                    logAccessError(err);
                 }
             }
             emit(key);
@@ -285,7 +326,10 @@ export function MnemonicProvider({
             if (st) {
                 try {
                     st.removeItem(fullKey(key));
-                } catch {}
+                    accessErrorLogged = false;
+                } catch (err) {
+                    logAccessError(err);
+                }
             }
             emit(key);
         };
@@ -341,7 +385,10 @@ export function MnemonicProvider({
                     if (!k) continue;
                     if (k.startsWith(prefix)) out.push(k.slice(prefix.length));
                 }
-            } catch {}
+                accessErrorLogged = false;
+            } catch (err) {
+                logAccessError(err);
+            }
             return out;
         };
 
@@ -390,7 +437,9 @@ export function MnemonicProvider({
                         let fresh: string | null;
                         try {
                             fresh = st.getItem(fk);
-                        } catch {
+                            accessErrorLogged = false;
+                        } catch (err) {
+                            logAccessError(err);
                             fresh = null;
                         }
                         const cached = cache.get(key) ?? null;
@@ -412,7 +461,9 @@ export function MnemonicProvider({
                 let fresh: string | null;
                 try {
                     fresh = st.getItem(fullKey(key));
-                } catch {
+                    accessErrorLogged = false;
+                } catch (err) {
+                    logAccessError(err);
                     fresh = null;
                 }
                 const cached = cache.get(key) ?? null;

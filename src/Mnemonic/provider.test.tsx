@@ -266,6 +266,58 @@ describe("MnemonicProvider – storage edge cases", () => {
         expect(storage.store.has("ns.k")).toBe(false);
     });
 
+    it("logs QuotaExceededError once then squelches until a write succeeds", () => {
+        const storage = createMockStorage();
+        let shouldThrow = true;
+        const origSetItem = storage.setItem.bind(storage);
+        storage.setItem = (key: string, value: string) => {
+            if (shouldThrow) {
+                const err = new DOMException("quota exceeded", "QuotaExceededError");
+                throw err;
+            }
+            origSetItem(key, value);
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // First write: should log
+        store!.setRaw("k", "v1");
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage quota exceeded");
+
+        // Second write while still failing: squelched
+        store!.setRaw("k", "v2");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        // Third write while still failing: still squelched
+        store!.setRaw("k", "v3");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        // Successful write resets the flag
+        shouldThrow = false;
+        store!.setRaw("k", "v4");
+        expect(spy).toHaveBeenCalledTimes(1); // no error on success
+
+        // Back to failing: should log again
+        shouldThrow = true;
+        store!.setRaw("k", "v5");
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        // Squelched again
+        store!.setRaw("k", "v6");
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        spy.mockRestore();
+    });
+
     it("handles storage.removeItem throwing", () => {
         const storage = createMockStorage();
         storage.store.set("ns.k", "v");
@@ -284,6 +336,222 @@ describe("MnemonicProvider – storage edge cases", () => {
         // Should not throw; cache is updated even though storage removal fails
         store!.removeRaw("k");
         expect(store!.getRawSnapshot("k")).toBeNull();
+    });
+});
+
+describe("MnemonicProvider – DOMException/SecurityError logging", () => {
+    it("logs SecurityError once from getItem, squelches repeats", () => {
+        const storage = createMockStorage();
+        storage.getItem = () => {
+            throw new DOMException("access denied", "SecurityError");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // First read: should log
+        store!.getRawSnapshot("a");
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (SecurityError)");
+
+        // Second read: squelched
+        store!.getRawSnapshot("b");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
+    });
+
+    it("successful storage access resets the access error flag", () => {
+        const storage = createMockStorage();
+        let shouldThrow = true;
+        const origGetItem = storage.getItem.bind(storage);
+        const origSetItem = storage.setItem.bind(storage);
+        storage.getItem = (key: string) => {
+            if (shouldThrow) {
+                throw new DOMException("access denied", "SecurityError");
+            }
+            return origGetItem(key);
+        };
+        storage.setItem = (key: string, value: string) => {
+            if (shouldThrow) {
+                throw new DOMException("access denied", "SecurityError");
+            }
+            origSetItem(key, value);
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // First failure: logs
+        store!.getRawSnapshot("a");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        // Successful write resets the flag
+        shouldThrow = false;
+        store!.setRaw("b", "val");
+
+        // Back to failing: should log again (flag was reset)
+        shouldThrow = true;
+        store!.getRawSnapshot("c");
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        spy.mockRestore();
+    });
+
+    it("non-DOMException errors are silently suppressed", () => {
+        const storage = createMockStorage();
+        storage.getItem = () => {
+            throw new TypeError("some internal error");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        store!.getRawSnapshot("a");
+        store!.getRawSnapshot("b");
+        expect(spy).not.toHaveBeenCalled();
+
+        spy.mockRestore();
+    });
+
+    it("accessErrorLogged and quotaErrorLogged are independent flags", () => {
+        const storage = createMockStorage();
+        storage.getItem = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+        storage.setItem = () => {
+            throw new DOMException("full", "QuotaExceededError");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        // Trigger SecurityError via read
+        store!.getRawSnapshot("a");
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (SecurityError)");
+
+        // Trigger QuotaExceededError via write
+        store!.setRaw("b", "val");
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(spy.mock.calls[1]![0]).toContain("Storage quota exceeded");
+
+        // Both are now squelched
+        store!.getRawSnapshot("c");
+        store!.setRaw("d", "val2");
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        spy.mockRestore();
+    });
+
+    it("logs DOMException from removeItem once", () => {
+        const storage = createMockStorage();
+        storage.removeItem = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        store!.removeRaw("a");
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (SecurityError)");
+
+        // Squelched
+        store!.removeRaw("b");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
+    });
+
+    it("logs DOMException from keys() enumeration once", () => {
+        const storage = createMockStorage();
+        storage.store.set("ns.a", "1"); // Ensure length > 0
+        storage.key = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        store!.keys();
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (SecurityError)");
+
+        // Squelched
+        store!.keys();
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
+    });
+
+    it("writeRaw logs non-quota DOMException via accessError path", () => {
+        const storage = createMockStorage();
+        storage.setItem = () => {
+            throw new DOMException("not allowed", "NotAllowedError");
+        };
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        store!.setRaw("k", "v");
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (NotAllowedError)");
+
+        // Squelched
+        store!.setRaw("k2", "v2");
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
     });
 });
 

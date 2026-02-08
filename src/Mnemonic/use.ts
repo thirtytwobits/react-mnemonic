@@ -11,7 +11,7 @@
 
 import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback } from "react";
 import { useMnemonic } from "./provider";
-import { JSONCodec } from "./codecs";
+import { JSONCodec, CodecError, ValidationError } from "./codecs";
 import type { UseMnemonicKeyOptions } from "./types";
 
 /**
@@ -166,9 +166,14 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
     /**
      * Helper to get the fallback/default value.
      * Handles both static values and factory functions.
+     * Factory functions receive an optional error describing why the fallback
+     * is being used (CodecError, ValidationError, or undefined for nominal).
      */
     const getFallback = useCallback(
-        () => (typeof defaultValue === "function" ? (defaultValue as () => T)() : defaultValue),
+        (error?: CodecError | ValidationError) =>
+            typeof defaultValue === "function"
+                ? (defaultValue as (error?: CodecError | ValidationError) => T)(error)
+                : defaultValue,
         [defaultValue],
     );
 
@@ -185,21 +190,43 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
     /**
      * Decode the raw string into a typed value.
      * Falls back to default if:
-     * - No value exists in storage
-     * - Decoding fails
-     * - Validation fails (if provided)
+     * - No value exists in storage (nominal, error=undefined)
+     * - Decoding fails (error=CodecError)
+     * - Validation fails (error=ValidationError)
      */
     const value: T = useMemo(() => {
         if (raw == null) return getFallback();
+
+        // --- Decode ---
+        let decoded: T;
         try {
-            const decoded = codec.decode(raw);
-            if (validate && !validate(decoded)) return getFallback();
-            return decoded;
-        } catch {
-            return getFallback();
+            decoded = codec.decode(raw);
+        } catch (err) {
+            const codecErr =
+                err instanceof CodecError
+                    ? err
+                    : new CodecError(`Codec decode failed for key "${key}"`, err);
+            return getFallback(codecErr);
         }
-        // validate/codec/getFallback affect decoding semantics
-    }, [raw, codec, validate, getFallback]);
+
+        // --- Validate ---
+        if (validate) {
+            try {
+                if (!validate(decoded)) {
+                    return getFallback(new ValidationError(`Validation failed for key "${key}"`));
+                }
+            } catch (err) {
+                const valErr =
+                    err instanceof ValidationError
+                        ? err
+                        : new ValidationError(`Validation threw for key "${key}"`, err);
+                return getFallback(valErr);
+            }
+        }
+
+        return decoded;
+        // validate/codec/getFallback/key affect decoding semantics
+    }, [raw, codec, validate, getFallback, key]);
 
     /**
      * Track previous value for onChange callback.
@@ -278,11 +305,39 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 if (rawCurrent == null) {
                     currentValue = getFallback();
                 } else {
+                    // --- Decode ---
+                    let decoded: T | undefined;
+                    let decodeError: CodecError | undefined;
                     try {
-                        const decoded = codec.decode(rawCurrent);
-                        currentValue = (validate && !validate(decoded)) ? getFallback() : decoded;
-                    } catch {
-                        currentValue = getFallback();
+                        decoded = codec.decode(rawCurrent);
+                    } catch (err) {
+                        decodeError =
+                            err instanceof CodecError
+                                ? err
+                                : new CodecError(`Codec decode failed for key "${key}"`, err);
+                    }
+
+                    if (decodeError) {
+                        currentValue = getFallback(decodeError);
+                    } else if (validate) {
+                        // --- Validate ---
+                        try {
+                            if (!validate(decoded!)) {
+                                currentValue = getFallback(
+                                    new ValidationError(`Validation failed for key "${key}"`),
+                                );
+                            } else {
+                                currentValue = decoded!;
+                            }
+                        } catch (err) {
+                            const valErr =
+                                err instanceof ValidationError
+                                    ? err
+                                    : new ValidationError(`Validation threw for key "${key}"`, err);
+                            currentValue = getFallback(valErr);
+                        }
+                    } else {
+                        currentValue = decoded!;
                     }
                 }
             }
@@ -292,8 +347,10 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             let encoded: string;
             try {
                 encoded = codec.encode(nextVal);
-            } catch {
-                console.warn(`[Mnemonic] Failed to encode value for key "${key}". Not persisted.`);
+            } catch (err) {
+                if (err instanceof CodecError) {
+                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
+                }
                 return;
             }
 
@@ -316,8 +373,10 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             let encoded: string;
             try {
                 encoded = codec.encode(v);
-            } catch {
-                console.warn(`[Mnemonic] Failed to encode defaultValue for key "${key}". Not persisted.`);
+            } catch (err) {
+                if (err instanceof CodecError) {
+                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
+                }
                 return;
             }
             api.setRaw(key, encoded);

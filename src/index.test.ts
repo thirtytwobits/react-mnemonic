@@ -10,6 +10,8 @@ import {
     NumberCodec,
     BooleanCodec,
     createCodec,
+    CodecError,
+    ValidationError,
 } from "./index";
 import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions } from "./index";
 
@@ -51,6 +53,18 @@ describe("Public API exports", () => {
     it("exports createCodec", () => {
         expect(createCodec).toBeDefined();
         expect(typeof createCodec).toBe("function");
+    });
+
+    it("exports CodecError", () => {
+        expect(CodecError).toBeDefined();
+        expect(typeof CodecError).toBe("function");
+        expect(new CodecError("test")).toBeInstanceOf(Error);
+    });
+
+    it("exports ValidationError", () => {
+        expect(ValidationError).toBeDefined();
+        expect(typeof ValidationError).toBe("function");
+        expect(new ValidationError("test")).toBeInstanceOf(Error);
     });
 
     it("type exports are usable (Codec)", () => {

@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import { describe, it, expect } from "vitest";
-import { CodecError, JSONCodec, StringCodec, NumberCodec, BooleanCodec, createCodec } from "./codecs";
+import { CodecError, ValidationError, JSONCodec, StringCodec, NumberCodec, BooleanCodec, createCodec } from "./codecs";
 
 // ---------------------------------------------------------------------------
 // CodecError
@@ -33,6 +33,38 @@ describe("CodecError", () => {
 
     it("defaults cause to undefined when not provided", () => {
         expect(new CodecError("x").cause).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// ValidationError
+// ---------------------------------------------------------------------------
+describe("ValidationError", () => {
+    it("creates an error with a message", () => {
+        const err = new ValidationError("boom");
+        expect(err.message).toBe("boom");
+    });
+
+    it("stores an optional cause", () => {
+        const cause = new TypeError("inner");
+        const err = new ValidationError("outer", cause);
+        expect(err.cause).toBe(cause);
+    });
+
+    it("has name ValidationError", () => {
+        expect(new ValidationError("x").name).toBe("ValidationError");
+    });
+
+    it("is an instance of Error", () => {
+        expect(new ValidationError("x")).toBeInstanceOf(Error);
+    });
+
+    it("is an instance of ValidationError (prototype chain)", () => {
+        expect(new ValidationError("x")).toBeInstanceOf(ValidationError);
+    });
+
+    it("defaults cause to undefined when not provided", () => {
+        expect(new ValidationError("x").cause).toBeUndefined();
     });
 });
 

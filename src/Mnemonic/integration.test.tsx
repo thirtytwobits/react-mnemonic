@@ -519,7 +519,7 @@ describe("cross-tab sync – data flow integration", () => {
             );
         });
 
-        // NumberCodec throws for "not-a-number", fallback to default
+        // NumberCodec throws CodecError for "not-a-number", fallback to default
         expect(result.current.value).toBe(0);
     });
 

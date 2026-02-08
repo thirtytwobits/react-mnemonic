@@ -8,6 +8,8 @@
  * library for type-safe, persistent state management in React applications.
  */
 
+import type { CodecError, ValidationError } from "./codecs";
+
 /**
  * Codec for encoding and decoding values to and from storage.
  *
@@ -151,6 +153,29 @@ export interface MnemonicProviderOptions {
  * Defines the minimum contract required for a storage backend. Compatible with
  * browser Storage API (localStorage, sessionStorage) and custom implementations
  * for testing or alternative storage solutions.
+ *
+ * @remarks
+ * **Error handling contract**
+ *
+ * The library wraps every storage call in a try/catch. Errors are handled as
+ * follows:
+ *
+ * - **`DOMException` with `name === "QuotaExceededError"`** — Logged once via
+ *   `console.error` with the prefix `[Mnemonic] Storage quota exceeded`.
+ *   Squelched until a write succeeds, then the flag resets.
+ *
+ * - **Other `DOMException` errors (including `SecurityError`)** — Logged once
+ *   via `console.error` with the prefix `[Mnemonic] Storage access error`.
+ *   Squelched until any storage operation succeeds, then the flag resets.
+ *
+ * - **All other error types** — Silently suppressed.
+ *
+ * Custom `StorageLike` implementations are encouraged to throw `DOMException`
+ * for storage access failures so the library can surface diagnostics. Throwing
+ * non-`DOMException` errors is safe but results in silent suppression.
+ *
+ * In all error cases the library falls back to its in-memory cache, so
+ * components continue to function when the storage backend is unavailable.
  *
  * @example
  * ```typescript
@@ -377,21 +402,58 @@ export type Mnemonic = {
  */
 export type UseMnemonicKeyOptions<T> = {
     /**
-     * Default value to use when no stored value exists.
+     * Default value to use when no stored value exists, or when decoding/validation fails.
      *
      * Can be a literal value or a factory function that returns the default.
-     * The factory function is called each time a default is needed.
+     * Factory functions receive an optional error argument describing why the
+     * fallback is being used:
+     *
+     * - `undefined` — Nominal path: no value exists in storage for this key.
+     * - `CodecError` — The stored value could not be decoded by the codec.
+     * - `ValidationError` — The decoded value failed the `validate` check.
+     *
+     * Static (non-function) default values ignore the error entirely.
+     *
+     * @remarks
+     * If a factory function is defined inline, it creates a new reference on
+     * every render, which forces internal memoization to recompute. For best
+     * performance, define the factory at module level or wrap it in `useCallback`:
+     *
+     * ```typescript
+     * // Module-level (stable reference, preferred)
+     * const getDefault = (error?: CodecError | ValidationError) => {
+     *     if (error) console.warn('Fallback:', error.message);
+     *     return { count: 0 };
+     * };
+     *
+     * // Or with useCallback inside a component
+     * const getDefault = useCallback(
+     *     (error?: CodecError | ValidationError) => ({ count: 0 }),
+     *     [],
+     * );
+     * ```
      *
      * @example
      * ```typescript
      * // Static default
      * defaultValue: { count: 0 }
      *
-     * // Dynamic default with factory function
+     * // Factory with no error handling (works the same as before)
      * defaultValue: () => ({ timestamp: Date.now() })
+     *
+     * // Error-aware factory
+     * defaultValue: (error) => {
+     *     if (error instanceof CodecError) {
+     *         console.error('Corrupt data:', error.message);
+     *     }
+     *     if (error instanceof ValidationError) {
+     *         console.warn('Invalid data:', error.message);
+     *     }
+     *     return { count: 0 };
+     * }
      * ```
      */
-    defaultValue: T | (() => T);
+    defaultValue: T | ((error?: CodecError | ValidationError) => T);
 
     /**
      * Codec for encoding and decoding values to/from storage.
@@ -422,25 +484,48 @@ export type UseMnemonicKeyOptions<T> = {
      * Optional validation function for decoded values.
      *
      * If provided, this type guard validates the decoded value before
-     * it's returned to the component. If validation fails, the default
-     * value is used instead.
+     * it's returned to the component. If validation fails (returns `false`
+     * or throws), the default value is used instead.
      *
-     * This is useful for ensuring runtime type safety when storage
-     * might contain stale or corrupted data.
+     * There are two ways to signal a validation failure:
+     *
+     * 1. **Return `false`** — The library synthesizes a `ValidationError`
+     *    with a generic message and passes it to the `defaultValue` factory.
+     *
+     * 2. **Throw a `ValidationError`** — Provides richer error details
+     *    (custom message, cause). The thrown error is passed directly to the
+     *    `defaultValue` factory.
+     *
+     * If validate throws a non-`ValidationError`, the library wraps it in a
+     * `ValidationError` with the original error as `cause`.
      *
      * @param value - The value decoded from storage
      * @returns True if the value is valid and has type T
      *
      * @example
      * ```typescript
+     * // Simple boolean validation (return false for invalid)
      * validate: (val): val is UserProfile => {
      *   return (
      *     typeof val === 'object' &&
      *     val !== null &&
      *     typeof val.id === 'string' &&
-     *     typeof val.name === 'string' &&
-     *     typeof val.email === 'string'
+     *     typeof val.name === 'string'
      *   );
+     * }
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Rich validation with thrown ValidationError
+     * validate: (val): val is UserProfile => {
+     *   if (typeof val !== 'object' || val === null) {
+     *     throw new ValidationError('Expected an object');
+     *   }
+     *   if (typeof (val as any).name !== 'string') {
+     *     throw new ValidationError('Missing or invalid "name" field');
+     *   }
+     *   return true;
      * }
      * ```
      */

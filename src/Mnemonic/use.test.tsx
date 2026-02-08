@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
-import { StringCodec, NumberCodec, BooleanCodec, createCodec, CodecError } from "./codecs";
+import { StringCodec, NumberCodec, BooleanCodec, createCodec, CodecError, ValidationError } from "./codecs";
 import type { StorageLike, Codec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -200,12 +200,12 @@ describe("useMnemonicKey – codecs", () => {
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("count", { defaultValue: 0, codec: NumberCodec }),
         );
-        // NumberCodec throws for "not-a-number", so fallback
+        // NumberCodec throws CodecError for "not-a-number", so fallback
         expect(result.current.value).toBe(0);
     });
 
     it("handles encode failure gracefully", () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         const BadCodec: Codec<string> = {
             encode: () => {
                 throw new CodecError("encode fail");
@@ -220,8 +220,8 @@ describe("useMnemonicKey – codecs", () => {
         });
         // Value should not have changed since encode failed
         expect(result.current.value).toBe("x");
-        expect(warnSpy).toHaveBeenCalled();
-        warnSpy.mockRestore();
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockRestore();
     });
 });
 
@@ -521,7 +521,7 @@ describe("useMnemonicKey – reset encode failure", () => {
     });
 
     it("handles encode failure during reset gracefully", () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         const BadCodec: Codec<string> = {
             encode: () => {
                 throw new CodecError("encode fail");
@@ -534,8 +534,144 @@ describe("useMnemonicKey – reset encode failure", () => {
         act(() => {
             result.current.reset();
         });
-        // Should warn but not throw
-        expect(warnSpy).toHaveBeenCalled();
-        warnSpy.mockRestore();
+        // Should log error but not throw
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockRestore();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Error-aware defaultValue factory
+// ---------------------------------------------------------------------------
+
+describe("useMnemonicKey – error-aware defaultValue factory", () => {
+    let storage: ReturnType<typeof createMockStorage>;
+
+    beforeEach(() => {
+        storage = createMockStorage();
+    });
+
+    it("factory receives undefined on nominal path (no stored value)", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 42);
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("count", { defaultValue: factory }),
+        );
+        expect(factory).toHaveBeenCalledWith(undefined);
+    });
+
+    it("factory receives CodecError when decode fails", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
+        storage.store.set("ns.count", "not-a-number");
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("count", { defaultValue: factory, codec: NumberCodec }),
+        );
+        expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
+    });
+
+    it("factory receives ValidationError when validation returns false", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
+        storage.store.set("ns.num", JSON.stringify(-5));
+        renderHook(storage, "ns", () =>
+            useMnemonicKey<number>("num", {
+                defaultValue: factory,
+                validate: (v): v is number => typeof v === "number" && v >= 0,
+            }),
+        );
+        expect(factory).toHaveBeenCalledWith(expect.any(ValidationError));
+    });
+
+    it("non-CodecError from codec.decode is wrapped in CodecError", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => "default");
+        const BadJsonCodec: Codec<string> = {
+            encode: (v) => JSON.stringify(v),
+            decode: () => {
+                throw new SyntaxError("bad json");
+            },
+        };
+        storage.store.set("ns.val", "corrupt");
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("val", { defaultValue: factory, codec: BadJsonCodec }),
+        );
+        expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
+        const passedError = factory.mock.calls[0]![0] as CodecError;
+        expect(passedError.cause).toBeInstanceOf(SyntaxError);
+    });
+
+    it("validate throwing ValidationError passes it through to factory", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
+        const customError = new ValidationError("age must be positive");
+        storage.store.set("ns.num", JSON.stringify(-5));
+        renderHook(storage, "ns", () =>
+            useMnemonicKey<number>("num", {
+                defaultValue: factory,
+                validate: (v): v is number => {
+                    if (typeof v !== "number" || v < 0) throw customError;
+                    return true;
+                },
+            }),
+        );
+        expect(factory).toHaveBeenCalledWith(customError);
+    });
+
+    it("validate throwing non-ValidationError wraps in ValidationError", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
+        storage.store.set("ns.num", JSON.stringify(42));
+        renderHook(storage, "ns", () =>
+            useMnemonicKey<number>("num", {
+                defaultValue: factory,
+                validate: (_v): _v is number => {
+                    throw new TypeError("unexpected");
+                },
+            }),
+        );
+        expect(factory).toHaveBeenCalledWith(expect.any(ValidationError));
+        const passedError = factory.mock.calls[0]![0] as ValidationError;
+        expect(passedError.cause).toBeInstanceOf(TypeError);
+    });
+
+    it("updater passes CodecError to factory when decode fails", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => 10);
+        storage.store.set("ns.val", "corrupt");
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey<number>("val", { defaultValue: factory, codec: NumberCodec }),
+        );
+        // Initial render calls factory with CodecError; clear to isolate updater call
+        factory.mockClear();
+        act(() => {
+            result.current.set((cur) => cur + 5);
+        });
+        // The updater reads corrupt raw, decode fails, factory called with CodecError
+        expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
+        expect(result.current.value).toBe(15);
+    });
+
+    it("reset calls factory with no error argument (nominal)", () => {
+        const factory = vi.fn((_error?: CodecError | ValidationError) => "default");
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("val", { defaultValue: factory, codec: StringCodec }),
+        );
+        factory.mockClear();
+        act(() => {
+            result.current.reset();
+        });
+        expect(factory).toHaveBeenCalledWith(undefined);
+    });
+
+    it("static defaultValue ignores errors and returns value regardless", () => {
+        storage.store.set("ns.count", "not-a-number");
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("count", { defaultValue: 99, codec: NumberCodec }),
+        );
+        expect(result.current.value).toBe(99);
+    });
+
+    it("decode errors do not trigger console.error", () => {
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        storage.store.set("ns.count", "not-a-number");
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("count", { defaultValue: 0, codec: NumberCodec }),
+        );
+        expect(errorSpy).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
     });
 });
