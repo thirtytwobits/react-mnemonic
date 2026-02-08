@@ -1,7 +1,7 @@
 {
   "name": "react-mnemonic",
   "version": "0.1.0",
-  "description": "React + TypeScript Mnemonic components",
+  "description": "Persistent, type-safe state management for React",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -29,11 +29,15 @@
   },
   "keywords": [
     "react",
+    "react-hooks",
+    "persistent-state",
+    "localstorage",
+    "state-management",
     "typescript",
-    "mnemonic",
-    "component-library"
+    "codec",
+    "cross-tab"
   ],
-  "author": "",
+  "author": "Scott Dixon",
   "license": "MIT",
   "peerDependencies": {
     "react": ">=18",

@@ -32,7 +32,7 @@ export function App() {
         <MnemonicProvider namespace="demo" enableDevTools>
             <ThemeRoot>
                 <header className="app-header">
-                    <img src="/thinking.png" alt="react-mnemonic logo" className="app-logo" />
+                    <img src="/MNE.svg" alt="react-mnemonic logo" className="app-logo" />
                     <div>
                         <h1 className="app-title">react-mnemonic</h1>
                         <p className="app-subtitle">Persistent state management for React</p>

@@ -49,6 +49,10 @@
         --color-panel-bg: #16213e;
         --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
+
+    :root:not([data-theme]) .app-logo {
+        filter: none;
+    }
 }
 
 /* Explicit dark override */
@@ -70,6 +74,10 @@
     --color-handle-hover: #718096;
     --color-panel-bg: #16213e;
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .app-logo {
+    filter: none;
 }
 
 /* ============================================================
@@ -117,7 +125,8 @@ code {
 .app-logo {
     width: 48px;
     height: 48px;
-    border-radius: 8px;
+    filter: brightness(0);
+    transition: filter 0.2s;
 }
 
 .app-title {
