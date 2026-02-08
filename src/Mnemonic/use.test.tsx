@@ -406,6 +406,29 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("light"); // falls back to default
     });
 
+    it("handles localStorage.clear() events (key is null)", () => {
+        storage.store.set("ns.theme", "dark");
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                codec: StringCodec,
+                listenCrossTab: true,
+            }),
+        );
+        expect(result.current.value).toBe("dark");
+
+        act(() => {
+            window.dispatchEvent(
+                new StorageEvent("storage", {
+                    key: null,
+                    newValue: null,
+                }),
+            );
+        });
+
+        expect(result.current.value).toBe("light");
+    });
+
     it("ignores storage events for different keys", () => {
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {

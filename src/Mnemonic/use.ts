@@ -269,6 +269,11 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         const storageKey = api.prefix + key;
 
         const handler = (e: StorageEvent) => {
+            // localStorage.clear() in another tab emits `key === null`.
+            if (e.key === null) {
+                api.removeRaw(key);
+                return;
+            }
             if (e.key !== storageKey) return;
             // Another tab removed the key:
             if (e.newValue == null) {

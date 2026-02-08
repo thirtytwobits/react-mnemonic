@@ -4,6 +4,8 @@
         "module": "ESNext",
         "lib": ["DOM", "DOM.Iterable", "ES2020"],
         "jsx": "react-jsx",
+        "rootDir": "src",
+        "outDir": "build-ts",
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "noImplicitReturns": true,

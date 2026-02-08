@@ -64,7 +64,6 @@ export interface Codec<T> {
  * <MnemonicProvider
  *   namespace="myApp"
  *   storage={localStorage}
- *   enableSync={true}
  *   enableDevTools={process.env.NODE_ENV === 'development'}
  * >
  *   <App />
@@ -85,7 +84,7 @@ export interface MnemonicProviderOptions {
      * namespace: "myApp"
      * ```
      */
-    namespace?: string;
+    namespace: string;
 
     /**
      * Storage backend to use for persistence.
@@ -108,22 +107,7 @@ export interface MnemonicProviderOptions {
      * }
      * ```
      */
-    storage?: Storage;
-
-    /**
-     * Enable cross-tab synchronization via storage events.
-     *
-     * When enabled, changes made in one browser tab will automatically
-     * propagate to other tabs with the same origin. This uses the browser's
-     * `storage` event for localStorage changes.
-     *
-     * @default true
-     *
-     * @remarks
-     * Only applicable when using localStorage. SessionStorage does not
-     * support cross-tab communication.
-     */
-    enableSync?: boolean;
+    storage?: StorageLike;
 
     /**
      * Enable DevTools debugging interface.

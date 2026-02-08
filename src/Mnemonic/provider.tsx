@@ -66,7 +66,7 @@ export interface MnemonicProviderProps extends MnemonicProviderOptions {
     /**
      * React children to render within the provider.
      */
-    children: React.ReactNode;
+    children: ReactNode;
 }
 
 /**
@@ -188,12 +188,7 @@ export function MnemonicProvider({
     namespace,
     storage,
     enableDevTools = false,
-}: {
-    children: ReactNode;
-    namespace: string;
-    storage?: StorageLike;
-    enableDevTools?: boolean;
-}) {
+}: MnemonicProviderProps) {
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
