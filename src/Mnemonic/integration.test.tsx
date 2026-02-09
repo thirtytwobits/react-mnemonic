@@ -32,6 +32,10 @@ function createMockStorage(): StorageLike & { store: Map<string, string> } {
     };
 }
 
+function env(payload: string, version = 0): string {
+    return JSON.stringify({ version, payload });
+}
+
 /**
  * Renders a hook inside a MnemonicProvider and captures both the hook result
  * and the underlying store API for direct manipulation.
@@ -91,10 +95,10 @@ describe("useSyncExternalStore – snapshot stability", () => {
             useMnemonicKey("key", { defaultValue: "x" }),
         );
         const snap1 = store.current.getRawSnapshot("key");
-        store.current.setRaw("key", "changed");
+        store.current.setRaw("key", env("changed"));
         const snap2 = store.current.getRawSnapshot("key");
         expect(snap1).not.toBe(snap2);
-        expect(snap2).toBe("changed");
+        expect(snap2).toBe(env("changed"));
     });
 
     it("decoded value is referentially stable when raw does not change", () => {
@@ -151,7 +155,7 @@ describe("useSyncExternalStore – external mutations", () => {
         const initialRenders = renderCount;
 
         act(() => {
-            storeApi.setRaw("count", JSON.stringify(42));
+            storeApi.setRaw("count", env(JSON.stringify(42)));
         });
 
         expect(renderCount).toBeGreaterThan(initialRenders);
@@ -164,14 +168,14 @@ describe("useSyncExternalStore – external mutations", () => {
         expect(result.current.value).toBe("init");
 
         act(() => {
-            store.current.setRaw("val", "external");
+            store.current.setRaw("val", env("external"));
         });
 
         expect(result.current.value).toBe("external");
     });
 
     it("component falls back to default after direct removeRaw", () => {
-        storage.store.set("ns.val", "stored");
+        storage.store.set("ns.val", env("stored"));
         const { result, store } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("val", { defaultValue: "default", codec: StringCodec }),
         );
@@ -191,7 +195,7 @@ describe("useSyncExternalStore – external mutations", () => {
         );
 
         act(() => {
-            store.current.setRaw("val", "b");
+            store.current.setRaw("val", env("b"));
         });
 
         expect(onChange).toHaveBeenCalledWith("b", "a");
@@ -205,7 +209,7 @@ describe("useSyncExternalStore – external mutations", () => {
         expect(onMount).toHaveBeenCalledTimes(1);
 
         act(() => {
-            store.current.setRaw("val", "new");
+            store.current.setRaw("val", env("new"));
         });
 
         // onMount should still have been called only once
@@ -225,7 +229,7 @@ describe("useSyncExternalStore – tearing prevention", () => {
     });
 
     it("two components reading the same key see consistent values during render", () => {
-        storage.store.set("ns.shared", JSON.stringify(42));
+        storage.store.set("ns.shared", env(JSON.stringify(42)));
         let v1: number | undefined;
         let v2: number | undefined;
 
@@ -284,7 +288,7 @@ describe("useSyncExternalStore – tearing prevention", () => {
         expect(v2).toBe(0);
 
         act(() => {
-            storeApi.setRaw("shared", JSON.stringify(99));
+            storeApi.setRaw("shared", env(JSON.stringify(99)));
         });
 
         expect(v1).toBe(99);
@@ -310,7 +314,7 @@ describe("useSyncExternalStore – rapid mutations", () => {
 
         act(() => {
             for (let i = 1; i <= 100; i++) {
-                store.current.setRaw("count", JSON.stringify(i));
+                store.current.setRaw("count", env(JSON.stringify(i)));
             }
         });
 
@@ -450,7 +454,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: "dark" }),
+                new StorageEvent("storage", { key: "ns.theme", newValue: env("dark") }),
             );
         });
 
@@ -470,7 +474,7 @@ describe("cross-tab sync – data flow integration", () => {
         // Valid value
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.vol", newValue: "75" }),
+                new StorageEvent("storage", { key: "ns.vol", newValue: env("75") }),
             );
         });
         expect(result.current.value).toBe(75);
@@ -478,7 +482,7 @@ describe("cross-tab sync – data flow integration", () => {
         // Invalid value (> 100) — should fall back to default
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.vol", newValue: "999" }),
+                new StorageEvent("storage", { key: "ns.vol", newValue: env("999") }),
             );
         });
         expect(result.current.value).toBe(50);
@@ -495,7 +499,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.count", newValue: "42" }),
+                new StorageEvent("storage", { key: "ns.count", newValue: env("42") }),
             );
         });
 
@@ -515,7 +519,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.count", newValue: "not-a-number" }),
+                new StorageEvent("storage", { key: "ns.count", newValue: env("not-a-number") }),
             );
         });
 
@@ -536,7 +540,7 @@ describe("cross-tab sync – data flow integration", () => {
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "other-ns.theme",
-                    newValue: "dark",
+                    newValue: env("dark"),
                 }),
             );
         });
@@ -560,7 +564,7 @@ describe("cross-tab sync – data flow integration", () => {
                 window.dispatchEvent(
                     new StorageEvent("storage", {
                         key: "ns.count",
-                        newValue: String(i),
+                        newValue: env(String(i)),
                     }),
                 );
             }
@@ -604,7 +608,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.shared", newValue: "b" }),
+                new StorageEvent("storage", { key: "ns.shared", newValue: env("b") }),
             );
         });
 
@@ -626,7 +630,7 @@ describe("cross-tab sync – data flow integration", () => {
         // Should not throw after the component is unmounted
         expect(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: "dark" }),
+                new StorageEvent("storage", { key: "ns.theme", newValue: env("dark") }),
             );
         }).not.toThrow();
     });
@@ -646,12 +650,12 @@ describe("cross-tab sync – data flow integration", () => {
 
         // Tab A: writes "updated" to storage (simulated by direct storage write + event)
         act(() => {
-            storage.store.set("ns.data", "updated");
+            storage.store.set("ns.data", env("updated"));
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "ns.data",
                     oldValue: null,
-                    newValue: "updated",
+                    newValue: env("updated"),
                 }),
             );
         });

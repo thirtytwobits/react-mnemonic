@@ -9,6 +9,7 @@
  */
 
 import type { CodecError, ValidationError } from "./codecs";
+import type { SchemaError } from "./schema";
 
 /**
  * Codec for encoding and decoding values to and from storage.
@@ -129,6 +130,263 @@ export interface MnemonicProviderOptions {
      * ```
      */
     enableDevTools?: boolean;
+
+    /**
+     * Versioning and schema enforcement mode.
+     *
+     * Controls whether stored values require a registered schema, and how
+     * missing schemas are handled. See {@link SchemaMode} for the behaviour
+     * of each mode.
+     *
+     * @default "default"
+     *
+     * @see {@link SchemaMode} - Detailed description of each mode
+     * @see {@link SchemaRegistry} - Registry supplied via `schemaRegistry`
+     */
+    schemaMode?: SchemaMode;
+
+    /**
+     * Schema registry used for version lookup and migration resolution.
+     *
+     * When provided, the library uses the registry to find the correct
+     * codec and validator for each stored version, and to resolve
+     * migration paths when upgrading old data to the latest schema.
+     *
+     * Required when `schemaMode` is `"strict"` or `"autoschema"`.
+     * Optional (but recommended) in `"default"` mode.
+     *
+     * @see {@link SchemaRegistry} - Interface the registry must implement
+     * @see {@link KeySchema} - Schema definition stored in the registry
+     */
+    schemaRegistry?: SchemaRegistry;
+}
+
+/**
+ * Controls how the provider enforces versioned schemas on stored values.
+ *
+ * - `"default"` — Schemas are optional. When a schema exists for the stored
+ *   version it is used for decoding; otherwise the hook's `codec` option is
+ *   used directly. This is the recommended starting mode.
+ *
+ * - `"strict"` — Every read and write **must** have a registered schema for
+ *   the stored version. If no matching schema is found the value falls back
+ *   to `defaultValue` with a `SchemaError` (`SCHEMA_NOT_FOUND` on reads,
+ *   `WRITE_SCHEMA_REQUIRED` on writes).
+ *
+ * - `"autoschema"` — Like `"default"`, but when a key has **no** schema
+ *   registered at all, the library infers a schema at version 1 from the
+ *   first successfully decoded value and registers it via
+ *   `SchemaRegistry.registerSchema`. Subsequent reads/writes for that key
+ *   then behave as if the schema had been registered manually.
+ *
+ * @default "default"
+ *
+ * @see {@link SchemaRegistry} - Registry that stores schemas and migrations
+ * @see {@link KeySchema} - Individual schema definition
+ */
+export type SchemaMode = "strict" | "default" | "autoschema";
+
+/**
+ * Schema definition for a single key at a specific version.
+ *
+ * Each registered schema binds a storage key + version number to a codec
+ * and an optional validator. When the provider reads a value whose envelope
+ * version matches, it uses the schema's codec and validator instead of the
+ * hook-level `codec` and `validate` options.
+ *
+ * @template T - The TypeScript type of the decoded value at this version
+ *
+ * @example
+ * ```typescript
+ * const userSchemaV1: KeySchema<{ name: string }> = {
+ *   key: "user",
+ *   version: 1,
+ *   codec: JSONCodec,
+ *   validate: (v): v is { name: string } =>
+ *     typeof v === "object" && v !== null && typeof (v as any).name === "string",
+ * };
+ * ```
+ *
+ * @see {@link SchemaRegistry} - Where schemas are registered and looked up
+ * @see {@link MigrationRule} - How values migrate between schema versions
+ */
+export type KeySchema<T = unknown> = {
+    /**
+     * The unprefixed storage key this schema applies to.
+     */
+    key: string;
+
+    /**
+     * The version number for this schema.
+     *
+     * Must be a non-negative integer. Version `0` is reserved for the
+     * default (unversioned) envelope written when no schema is active.
+     * User-defined schemas should start at version `1`.
+     */
+    version: number;
+
+    /**
+     * Codec used to encode and decode the payload at this version.
+     *
+     * This overrides the hook-level `codec` option when the stored
+     * envelope's version matches.
+     */
+    codec: Codec<T>;
+
+    /**
+     * Optional type-guard that validates the decoded payload.
+     *
+     * If provided and the guard returns `false` or throws, the value
+     * falls back to `defaultValue` with a `SchemaError` of code
+     * `TYPE_MISMATCH`.
+     *
+     * @param value - The decoded payload to validate
+     * @returns `true` if the value is valid
+     */
+    validate?: (value: unknown) => value is T;
+};
+
+/**
+ * A single migration step that transforms data from one schema version to
+ * the next.
+ *
+ * Migration rules are composed into a {@link MigrationPath} by the
+ * {@link SchemaRegistry} to upgrade stored data across multiple versions in
+ * sequence (e.g. v1 → v2 → v3).
+ *
+ * @example
+ * ```typescript
+ * const userV1ToV2: MigrationRule = {
+ *   key: "user",
+ *   fromVersion: 1,
+ *   toVersion: 2,
+ *   migrate: (v1) => {
+ *     const old = v1 as { name: string };
+ *     return { firstName: old.name, lastName: "" };
+ *   },
+ * };
+ * ```
+ *
+ * @see {@link MigrationPath} - Ordered list of rules applied in sequence
+ * @see {@link SchemaRegistry.getMigrationPath} - How the path is resolved
+ */
+export type MigrationRule = {
+    /**
+     * The unprefixed storage key this rule applies to.
+     */
+    key: string;
+
+    /**
+     * The version the stored data is migrating **from**.
+     */
+    fromVersion: number;
+
+    /**
+     * The version the stored data is migrating **to**.
+     *
+     * Must be strictly greater than `fromVersion`.
+     */
+    toVersion: number;
+
+    /**
+     * Transformation function that converts data from `fromVersion`
+     * to `toVersion`.
+     *
+     * Receives the decoded value at `fromVersion` and must return
+     * the value in the shape expected by `toVersion`.
+     *
+     * @param value - The decoded value at `fromVersion`
+     * @returns The transformed value for `toVersion`
+     */
+    migrate: (value: unknown) => unknown;
+};
+
+/**
+ * An ordered sequence of {@link MigrationRule} steps that upgrades stored
+ * data from an older schema version to a newer one.
+ *
+ * The rules are applied in array order. Each step's output becomes the
+ * next step's input. After the final step the result is validated against
+ * the target schema, re-encoded, and persisted back to storage so the
+ * migration only runs once per key.
+ *
+ * @see {@link MigrationRule} - Individual migration step
+ * @see {@link SchemaRegistry.getMigrationPath} - Resolves a path between versions
+ */
+export type MigrationPath = MigrationRule[];
+
+/**
+ * Lookup and registration API for key schemas and migration paths.
+ *
+ * Implementations of this interface are passed to `MnemonicProvider` via the
+ * `schemaRegistry` option. The provider calls these methods at read and write
+ * time to resolve the correct codec, validator, and migration chain for each
+ * stored value.
+ *
+ * @example
+ * ```typescript
+ * const registry: SchemaRegistry = {
+ *   getSchema: (key, version) => schemas.get(`${key}@${version}`),
+ *   getLatestSchema: (key) => latestByKey.get(key),
+ *   getMigrationPath: (key, from, to) => buildPath(key, from, to),
+ *   registerSchema: (schema) => { schemas.set(`${schema.key}@${schema.version}`, schema); },
+ * };
+ *
+ * <MnemonicProvider namespace="app" schemaRegistry={registry} schemaMode="strict">
+ *   <App />
+ * </MnemonicProvider>
+ * ```
+ *
+ * @see {@link KeySchema} - Schema definition
+ * @see {@link MigrationPath} - Migration chain returned by `getMigrationPath`
+ * @see {@link SchemaMode} - How the provider uses the registry
+ */
+export interface SchemaRegistry {
+    /**
+     * Look up the schema registered for a specific key and version.
+     *
+     * @param key - The unprefixed storage key
+     * @param version - The version number to look up
+     * @returns The matching schema, or `undefined` if none is registered
+     */
+    getSchema(key: string, version: number): KeySchema | undefined;
+
+    /**
+     * Look up the highest-version schema registered for a key.
+     *
+     * Used by the write path to determine which version to stamp on new
+     * values, and by the read path to detect when a migration is needed.
+     *
+     * @param key - The unprefixed storage key
+     * @returns The latest schema, or `undefined` if none is registered
+     */
+    getLatestSchema(key: string): KeySchema | undefined;
+
+    /**
+     * Resolve an ordered migration path between two versions of a key.
+     *
+     * Returns `null` when no contiguous path exists. The returned rules
+     * are applied in order to transform data from `fromVersion` to
+     * `toVersion`.
+     *
+     * @param key - The unprefixed storage key
+     * @param fromVersion - The stored data's current version
+     * @param toVersion - The target version to migrate to
+     * @returns An ordered array of migration rules, or `null`
+     */
+    getMigrationPath(key: string, fromVersion: number, toVersion: number): MigrationPath | null;
+
+    /**
+     * Register a new schema.
+     *
+     * Optional. Required when `schemaMode` is `"autoschema"` so the
+     * library can persist inferred schemas. Implementations should throw
+     * if a schema already exists for the same key + version with a
+     * conflicting definition.
+     *
+     * @param schema - The schema to register
+     */
+    registerSchema?(schema: KeySchema): void;
 }
 
 /**
@@ -358,6 +616,26 @@ export type Mnemonic = {
      * @returns Object mapping unprefixed keys to raw string values
      */
     dump: () => Record<string, string>;
+
+    /**
+     * The active schema enforcement mode for this provider.
+     *
+     * Propagated from the `schemaMode` provider option. Hooks read this
+     * to determine how to handle versioned envelopes.
+     *
+     * @see {@link SchemaMode}
+     */
+    schemaMode: SchemaMode;
+
+    /**
+     * The schema registry for this provider, if one was supplied.
+     *
+     * Hooks use this to look up schemas, resolve migration paths, and
+     * (in autoschema mode) register inferred schemas.
+     *
+     * @see {@link SchemaRegistry}
+     */
+    schemaRegistry?: SchemaRegistry;
 };
 
 /**
@@ -395,6 +673,8 @@ export type UseMnemonicKeyOptions<T> = {
      * - `undefined` — Nominal path: no value exists in storage for this key.
      * - `CodecError` — The stored value could not be decoded by the codec.
      * - `ValidationError` — The decoded value failed the `validate` check.
+     * - `SchemaError` — A schema or migration issue occurred (e.g. missing
+     *   schema, failed migration, invalid envelope).
      *
      * Static (non-function) default values ignore the error entirely.
      *
@@ -437,7 +717,7 @@ export type UseMnemonicKeyOptions<T> = {
      * }
      * ```
      */
-    defaultValue: T | ((error?: CodecError | ValidationError) => T);
+    defaultValue: T | ((error?: CodecError | ValidationError | SchemaError) => T);
 
     /**
      * Codec for encoding and decoding values to/from storage.
@@ -575,4 +855,36 @@ export type UseMnemonicKeyOptions<T> = {
      * automatically via React's state management.
      */
     listenCrossTab?: boolean;
+
+    /**
+     * Optional schema controls for this key.
+     *
+     * Allows overriding the version written by the `set` function. When
+     * omitted, the library writes using the latest registered schema for
+     * this key (or version `0` when no schema exists).
+     *
+     * @example
+     * ```typescript
+     * // Pin writes to schema version 2 even if version 3 exists
+     * const { value, set } = useMnemonicKey("user", {
+     *   defaultValue: { name: "" },
+     *   schema: { version: 2 },
+     * });
+     * ```
+     */
+    schema?: {
+        /**
+         * Explicit schema version to use when writing values.
+         *
+         * When set, the `set` and `reset` functions encode using the
+         * schema registered at this version instead of the latest. Useful
+         * during gradual rollouts where not all consumers have been
+         * updated yet.
+         *
+         * Must reference a version that exists in the `SchemaRegistry`.
+         * If not found the write falls back to the latest schema (default
+         * mode) or fails with a `SchemaError` (strict mode).
+         */
+        version?: number;
+    };
 };

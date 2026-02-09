@@ -12,4 +12,15 @@ export {
   CodecError,
   ValidationError,
 } from "./Mnemonic/codecs";
-export type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, StorageLike } from "./Mnemonic/types";
+export { SchemaError } from "./Mnemonic/schema";
+export type {
+  Codec,
+  MnemonicProviderOptions,
+  UseMnemonicKeyOptions,
+  StorageLike,
+  SchemaMode,
+  KeySchema,
+  MigrationRule,
+  MigrationPath,
+  SchemaRegistry,
+} from "./Mnemonic/types";

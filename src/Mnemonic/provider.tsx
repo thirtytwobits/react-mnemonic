@@ -11,7 +11,15 @@
  */
 
 import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
-import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
+import type {
+    Mnemonic,
+    MnemonicProviderOptions,
+    StorageLike,
+    Listener,
+    Unsubscribe,
+    SchemaMode,
+    SchemaRegistry,
+} from "./types";
 
 /**
  * React Context for the Mnemonic store.
@@ -88,6 +96,11 @@ function defaultBrowserStorage(): StorageLike | undefined {
     }
 }
 
+/** Internal store type with reload capability, not exposed to consumers. */
+type MnemonicInternal = Mnemonic & {
+    reloadFromStorage: (changedKeys?: string[]) => void;
+};
+
 /**
  * React Context provider for namespace-isolated persistent state.
  *
@@ -103,6 +116,8 @@ function defaultBrowserStorage(): StorageLike | undefined {
  * @param props.namespace - Unique namespace for isolating storage keys
  * @param props.storage - Optional custom storage backend (defaults to localStorage)
  * @param props.enableDevTools - Enable DevTools debugging interface (defaults to false)
+ * @param props.schemaMode - Schema enforcement mode (default: "default")
+ * @param props.schemaRegistry - Optional schema registry for storing schemas and migrations
  *
  * @example
  * ```tsx
@@ -177,18 +192,21 @@ function defaultBrowserStorage(): StorageLike | undefined {
  * @see {@link MnemonicProviderOptions} - Configuration options
  * @see {@link useMnemonic} - Low-level hook for accessing the store
  */
-
-/** Internal store type with reload capability, not exposed to consumers. */
-type MnemonicInternal = Mnemonic & {
-    reloadFromStorage: (changedKeys?: string[]) => void;
-};
-
 export function MnemonicProvider({
     children,
     namespace,
     storage,
     enableDevTools = false,
+    schemaMode = "default",
+    schemaRegistry,
 }: MnemonicProviderProps) {
+    if (schemaMode === "strict" && !schemaRegistry) {
+        throw new Error("MnemonicProvider strict mode requires schemaRegistry");
+    }
+    if (schemaMode === "autoschema" && typeof schemaRegistry?.registerSchema !== "function") {
+        throw new Error("MnemonicProvider autoschema mode requires schemaRegistry.registerSchema");
+    }
+
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
@@ -489,6 +507,8 @@ export function MnemonicProvider({
             keys,
             dump,
             reloadFromStorage,
+            schemaMode: schemaMode as SchemaMode,
+            ...(schemaRegistry ? { schemaRegistry: schemaRegistry as SchemaRegistry } : {}),
         };
 
         /**
@@ -555,7 +575,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry]);
 
     // Subscribe to external storage changes (e.g., cross-tab BroadcastChannel)
     useEffect(() => {
