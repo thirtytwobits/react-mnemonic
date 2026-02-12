@@ -299,6 +299,7 @@ code {
 
 .form-row input[type="text"],
 .form-row input[type="email"],
+.form-row input[type="number"],
 .form-row textarea,
 .form-row select {
     padding: 8px 12px;
@@ -494,4 +495,172 @@ code {
 
 .btn-ghost:hover {
     background: var(--color-panel-bg);
+}
+
+/* ============================================================
+   9. Schema Playground
+   ============================================================ */
+
+.schema-playground {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sp-section {
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.sp-section-title {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.sp-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sp-mode-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.sp-mode-group label {
+    text-transform: none;
+    font-weight: normal;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.sp-registry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.sp-registry-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: var(--color-bg-card);
+    border-radius: 4px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.sp-result-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.sp-result {
+    padding: 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.sp-error {
+    padding: 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-danger);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    color: var(--color-danger);
+    margin-top: 8px;
+}
+
+.sp-success {
+    padding: 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-success);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    color: var(--color-success);
+    margin-top: 8px;
+}
+
+.sp-inspector table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.sp-inspector th {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--color-border);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+}
+
+.sp-inspector td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+    word-break: break-all;
+}
+
+.sp-log {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sp-log-entry {
+    font-size: 0.8rem;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    display: flex;
+    gap: 8px;
+}
+
+.sp-log-time {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.sp-log-error {
+    color: var(--color-danger);
+}
+
+.sp-log-success {
+    color: var(--color-success);
+}
+
+.sp-button-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.sp-help {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin: 0 0 8px;
 }

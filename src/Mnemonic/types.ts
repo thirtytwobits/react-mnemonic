@@ -155,6 +155,13 @@ export interface MnemonicProviderOptions {
      * Required when `schemaMode` is `"strict"` or `"autoschema"`.
      * Optional (but recommended) in `"default"` mode.
      *
+     * @remarks
+     * In `"default"` and `"strict"` modes, the registry is treated as
+     * immutable after the provider initializes. Updates should be shipped
+     * as part of a new app version and applied by remounting the provider.
+     * `"autoschema"` remains mutable so inferred schemas can be registered
+     * at runtime.
+     *
      * @see {@link SchemaRegistry} - Interface the registry must implement
      * @see {@link KeySchema} - Schema definition stored in the registry
      */
@@ -172,12 +179,20 @@ export interface MnemonicProviderOptions {
  *   the stored version. If no matching schema is found the value falls back
  *   to `defaultValue` with a `SchemaError` (`SCHEMA_NOT_FOUND` on reads,
  *   `WRITE_SCHEMA_REQUIRED` on writes).
+ *   When no schemas are registered and no explicit schema is provided, writes
+ *   fall back to an unversioned (v0) envelope.
  *
  * - `"autoschema"` — Like `"default"`, but when a key has **no** schema
  *   registered at all, the library infers a schema at version 1 from the
  *   first successfully decoded value and registers it via
  *   `SchemaRegistry.registerSchema`. Subsequent reads/writes for that key
  *   then behave as if the schema had been registered manually.
+ *
+ * @remarks
+ * In `"default"` and `"strict"` modes, registry lookups are cached under the
+ * assumption that the schema registry is immutable for the lifetime of the
+ * provider. If you need to update schemas, publish a new app version and
+ * remount the provider. `"autoschema"` does not assume immutability.
  *
  * @default "default"
  *
@@ -220,8 +235,9 @@ export type KeySchema<T = unknown> = {
      * The version number for this schema.
      *
      * Must be a non-negative integer. Version `0` is reserved for the
-     * default (unversioned) envelope written when no schema is active.
-     * User-defined schemas should start at version `1`.
+    * default (unversioned) envelope written when no schema is active.
+    * User-defined schemas must start at version `1`. Supplying version
+    * `0` via a schema registry is rejected by the library.
      */
     version: number;
 
@@ -323,6 +339,11 @@ export type MigrationPath = MigrationRule[];
  * time to resolve the correct codec, validator, and migration chain for each
  * stored value.
  *
+ * In `"default"` and `"strict"` modes, callers should treat registry contents
+ * as immutable after provider initialization. The hook caches lookups to keep
+ * read/write hot paths fast. `"autoschema"` remains mutable to support
+ * inferred schema registration.
+ *
  * @example
  * ```typescript
  * const registry: SchemaRegistry = {
@@ -382,7 +403,8 @@ export interface SchemaRegistry {
      * Optional. Required when `schemaMode` is `"autoschema"` so the
      * library can persist inferred schemas. Implementations should throw
      * if a schema already exists for the same key + version with a
-     * conflicting definition.
+        * conflicting definition. Implementations should also reject version
+        * `0`, which is reserved for the unversioned envelope.
      *
      * @param schema - The schema to register
      */
@@ -860,8 +882,8 @@ export type UseMnemonicKeyOptions<T> = {
      * Optional schema controls for this key.
      *
      * Allows overriding the version written by the `set` function. When
-     * omitted, the library writes using the latest registered schema for
-     * this key (or version `0` when no schema exists).
+     * omitted, the library writes using the highest registered schema for
+     * this key, or version `0` when no schemas are registered.
      *
      * @example
      * ```typescript

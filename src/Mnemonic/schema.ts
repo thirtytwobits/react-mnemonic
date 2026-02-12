@@ -26,6 +26,7 @@
  * | `MIGRATION_PATH_NOT_FOUND`      | No contiguous migration path between the stored and latest version. |
  * | `MIGRATION_FAILED`              | A migration step threw during execution.                        |
  * | `SCHEMA_REGISTRATION_CONFLICT`  | `registerSchema` was called with a conflicting definition.      |
+ * | `SCHEMA_VERSION_RESERVED`       | Version `0` was supplied by a schema registry.                  |
  * | `TYPE_MISMATCH`                 | A schema or inferred validator rejected the decoded value.      |
  * | `MODE_CONFIGURATION_INVALID`    | The schema mode requires a capability the registry doesn't provide. |
  *
@@ -53,6 +54,7 @@ export class SchemaError extends Error {
         | "MIGRATION_PATH_NOT_FOUND"
         | "MIGRATION_FAILED"
         | "SCHEMA_REGISTRATION_CONFLICT"
+        | "SCHEMA_VERSION_RESERVED"
         | "TYPE_MISMATCH"
         | "MODE_CONFIGURATION_INVALID";
 
@@ -89,7 +91,8 @@ export class SchemaError extends Error {
  * codec + validator) to use for decoding the `payload`.
  *
  * - `version 0` is used when no schema is active (default mode, no
- *   registry). The payload is the codec-encoded string.
+ *   registry). The payload is the codec-encoded string. Registries must
+ *   never define a schema at version `0`.
  * - `version >= 1` corresponds to a user-defined {@link KeySchema}.
  *
  * @internal

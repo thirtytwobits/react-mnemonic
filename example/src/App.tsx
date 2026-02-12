@@ -7,6 +7,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { ResizablePanel } from "./components/ResizablePanel";
 import { PersistedForm } from "./components/PersistedForm";
 import { ShoppingCart } from "./components/ShoppingCart";
+import { SchemaPlayground } from "./components/SchemaPlayground";
 
 function ThemeRoot({ children }: { children: React.ReactNode }) {
     const { value: mode } = useMnemonicKey<string>("theme-mode", {
@@ -68,6 +69,15 @@ export function App() {
                             <code>idb-keyval</code>, running in its own <code>MnemonicProvider</code>.
                         </p>
                         <ShoppingCart />
+                    </section>
+                    <section className="demo-section">
+                        <h2 className="section-title">Schema Playground</h2>
+                        <p className="section-desc">
+                            Explore schema versioning and data migration. Define schemas, add migration
+                            rules, seed versioned data, and watch <code>useMnemonicKey</code> decode,
+                            validate, and migrate in real time.
+                        </p>
+                        <SchemaPlayground />
                     </section>
                 </main>
             </ThemeRoot>

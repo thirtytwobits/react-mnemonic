@@ -217,6 +217,140 @@ const { value, set, remove } = useMnemonicKey<FormData>("form", {
 });
 ```
 
+## Schema modes and immutability
+
+Mnemonic supports optional schema versioning through `schemaMode` and an
+optional `schemaRegistry`.
+
+- `default`: Schemas are optional. Reads use a schema when one exists for the
+  stored version, otherwise the hook codec. Writes use the highest registered
+  schema for the key; if no schemas are registered, writes use an unversioned
+  (v0) envelope.
+- `strict`: Every stored version must have a registered schema. Reads without a
+  matching schema fall back to `defaultValue` with a `SchemaError`.
+  Writes require a registered schema when any schemas exist, but fall back to
+  a v0 envelope when the registry has none.
+- `autoschema`: Like `default`, but if no schema exists for a key, the first
+  successful read infers and registers a v1 schema. Subsequent reads/writes use
+  that schema.
+
+Version `0` is reserved for "no schema". Supplying a schema at version `0`
+causes a `SchemaError` with code `SCHEMA_VERSION_RESERVED`.
+
+### Example schema registry
+
+A schema registry stores versioned codecs and validators for each key, and
+resolves migration paths to upgrade stored data. Migrations are applied in
+order from oldest to newest version when the stored version is older than the
+latest schema.
+
+```tsx
+import {
+  MnemonicProvider,
+  useMnemonicKey,
+  JSONCodec,
+  type SchemaRegistry,
+  type KeySchema,
+  type MigrationRule,
+} from "react-mnemonic";
+
+interface ProfileV1 {
+  name: string;
+  email: string;
+}
+
+interface ProfileV2 extends ProfileV1 {
+  migratedAt: string;
+}
+
+const schemas = new Map<string, KeySchema>();
+const migrations: MigrationRule[] = [];
+
+const registry: SchemaRegistry = {
+  getSchema: (key, version) => schemas.get(`${key}:${version}`),
+  getLatestSchema: (key) =>
+    Array.from(schemas.values())
+      .filter((schema) => schema.key === key)
+      .sort((a, b) => b.version - a.version)[0],
+  getMigrationPath: (key, fromVersion, toVersion) => {
+    const byKey = migrations.filter((rule) => rule.key === key);
+    const path: MigrationRule[] = [];
+    let cur = fromVersion;
+    while (cur < toVersion) {
+      const next = byKey.find((rule) => rule.fromVersion === cur);
+      if (!next) return null;
+      path.push(next);
+      cur = next.toVersion;
+    }
+    return path;
+  },
+  registerSchema: (schema) => {
+    const id = `${schema.key}:${schema.version}`;
+    if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
+    schemas.set(id, schema);
+  },
+};
+
+registry.registerSchema({
+  key: "profile",
+  version: 1,
+  codec: JSONCodec,
+  validate: (v): v is ProfileV1 =>
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as any).name === "string" &&
+    typeof (v as any).email === "string",
+});
+
+migrations.push({
+  key: "profile",
+  fromVersion: 1,
+  toVersion: 2,
+  migrate: (value) => {
+    const v1 = value as ProfileV1;
+    return { ...v1, migratedAt: new Date().toISOString() } as ProfileV2;
+  },
+});
+
+registry.registerSchema({
+  key: "profile",
+  version: 2,
+  codec: JSONCodec,
+  validate: (v): v is ProfileV2 =>
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as any).name === "string" &&
+    typeof (v as any).email === "string" &&
+    typeof (v as any).migratedAt === "string",
+});
+
+function ProfileEditor() {
+  const { value, set } = useMnemonicKey<ProfileV2>("profile", {
+    defaultValue: { name: "", email: "", migratedAt: "" },
+  });
+  // Writes use the latest schema (v2) by default when schemas are registered.
+  return (
+    <input
+      value={value.name}
+      onChange={(e) => set({ ...value, name: e.target.value })}
+    />
+  );
+}
+
+<MnemonicProvider namespace="app" schemaMode="default" schemaRegistry={registry}>
+  <ProfileEditor />
+</MnemonicProvider>;
+```
+
+### Registry immutability
+
+In `default` and `strict` modes, the schema registry is treated as immutable for
+the lifetime of the provider. The hook caches registry lookups to keep read and
+write hot paths fast. To ship new schemas or migrations, publish a new app
+version and remount the provider.
+
+`autoschema` remains mutable because inferred schemas are registered at runtime.
+
 ### Custom storage backend
 
 ```tsx

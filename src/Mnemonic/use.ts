@@ -13,7 +13,7 @@ import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback } from "r
 import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError, ValidationError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
-import type { UseMnemonicKeyOptions, KeySchema } from "./types";
+import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
 
 /**
  * React hook for persistent, type-safe state management.
@@ -274,6 +274,59 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         [validate, key],
     );
 
+    const registryCache = useMemo(() => {
+        if (!schemaRegistry || schemaMode === "autoschema") return null;
+        return {
+            latestSchema: undefined as KeySchema | undefined,
+            latestSchemaSet: false,
+            schemaByVersion: new Map<number, KeySchema | undefined>(),
+            migrationPaths: new Map<string, MigrationPath | null>(),
+        };
+    }, [schemaRegistry, schemaMode, key]);
+
+    const getSchemaForVersion = useCallback(
+        (version: number): KeySchema | undefined => {
+            if (!schemaRegistry) return undefined;
+            if (!registryCache) return schemaRegistry.getSchema(key, version);
+            if (registryCache.schemaByVersion.has(version)) {
+                return registryCache.schemaByVersion.get(version);
+            }
+            const schema = schemaRegistry.getSchema(key, version);
+            registryCache.schemaByVersion.set(version, schema);
+            return schema;
+        },
+        [schemaRegistry, registryCache, key],
+    );
+
+    const getLatestSchemaForKey = useCallback((): KeySchema | undefined => {
+        if (!schemaRegistry) return undefined;
+        if (!registryCache) return schemaRegistry.getLatestSchema(key);
+        if (registryCache.latestSchemaSet) return registryCache.latestSchema;
+        const schema = schemaRegistry.getLatestSchema(key);
+        registryCache.latestSchema = schema;
+        registryCache.latestSchemaSet = true;
+        return schema;
+    }, [schemaRegistry, registryCache, key]);
+
+    const getMigrationPathForKey = useCallback(
+        (fromVersion: number, toVersion: number): MigrationPath | null => {
+            if (!schemaRegistry) return null;
+            if (!registryCache) return schemaRegistry.getMigrationPath(key, fromVersion, toVersion) ?? null;
+            const cacheKey = `${fromVersion}->${toVersion}`;
+            if (registryCache.migrationPaths.has(cacheKey)) {
+                return registryCache.migrationPaths.get(cacheKey) ?? null;
+            }
+            const path = schemaRegistry.getMigrationPath(key, fromVersion, toVersion) ?? null;
+            registryCache.migrationPaths.set(cacheKey, path);
+            return path;
+        },
+        [schemaRegistry, registryCache, key],
+    );
+
+    const isReservedSchema = useCallback((schema?: KeySchema): boolean => {
+        return schema?.version === 0;
+    }, []);
+
     const decodeForRead = useCallback(
         (
             rawText: string | null,
@@ -284,9 +337,19 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             if (!parsed.ok) return { value: getFallback(parsed.error) };
             const envelope = parsed.envelope;
 
-            const registry = schemaRegistry;
-            const schemaForVersion = registry?.getSchema(key, envelope.version);
-            const latestSchema = registry?.getLatestSchema(key);
+            const schemaForVersion = getSchemaForVersion(envelope.version);
+            const latestSchema = getLatestSchemaForKey();
+
+            if (isReservedSchema(schemaForVersion) || isReservedSchema(latestSchema)) {
+                return {
+                    value: getFallback(
+                        new SchemaError(
+                            "SCHEMA_VERSION_RESERVED",
+                            `Schema registry returned reserved version 0 for key "${key}"`,
+                        ),
+                    ),
+                };
+            }
 
             // Strict mode always requires schema for the stored version.
             if (schemaMode === "strict" && !schemaForVersion) {
@@ -306,7 +369,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                         ),
                     };
                 }
-                if (!registry || typeof registry.registerSchema !== "function") {
+                if (!schemaRegistry || typeof schemaRegistry.registerSchema !== "function") {
                     return {
                         value: getFallback(
                             new SchemaError(
@@ -376,7 +439,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 return { value: current as T };
             }
 
-            const path = registry?.getMigrationPath(key, envelope.version, latestSchema.version) ?? null;
+            const path = getMigrationPathForKey(envelope.version, latestSchema.version);
             if (!path) {
                 return {
                     value: getFallback(
@@ -420,59 +483,57 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             parseEnvelope,
             schemaMode,
             schemaRegistry,
+            getSchemaForVersion,
+            getLatestSchemaForKey,
+            getMigrationPathForKey,
+            isReservedSchema,
             validateValue,
         ],
     );
 
     const encodeForWrite = useCallback(
         (nextValue: T): string => {
-            const registry = schemaRegistry;
             const explicitVersion = schema?.version;
-            const latestSchema = registry?.getLatestSchema(key);
-            const explicitSchema = explicitVersion !== undefined ? registry?.getSchema(key, explicitVersion) : undefined;
-            let targetSchema = explicitSchema ?? latestSchema;
+            if (explicitVersion === 0) {
+                throw new SchemaError(
+                    "SCHEMA_VERSION_RESERVED",
+                    `Schema version 0 is reserved for key "${key}"`,
+                );
+            }
+            const latestSchema = getLatestSchemaForKey();
+            const explicitSchema = explicitVersion !== undefined ? getSchemaForVersion(explicitVersion) : undefined;
+            if (isReservedSchema(explicitSchema) || isReservedSchema(latestSchema)) {
+                throw new SchemaError(
+                    "SCHEMA_VERSION_RESERVED",
+                    `Schema registry returned reserved version 0 for key "${key}"`,
+                );
+            }
+            let targetSchema = explicitSchema;
 
             if (!targetSchema) {
-                if (schemaMode === "strict") {
+                if (explicitVersion !== undefined) {
+                    if (schemaMode !== "strict") {
+                        targetSchema = latestSchema;
+                    }
+                } else {
+                    targetSchema = latestSchema;
+                }
+            }
+
+            if (!targetSchema) {
+                if (explicitVersion !== undefined && schemaMode === "strict") {
                     throw new SchemaError(
                         "WRITE_SCHEMA_REQUIRED",
                         `Write requires schema for key "${key}" in strict mode`,
                     );
                 }
-                if (schemaMode === "autoschema") {
-                    if (!registry || typeof registry.registerSchema !== "function") {
-                        throw new SchemaError(
-                            "MODE_CONFIGURATION_INVALID",
-                            `Autoschema mode requires schema registry registration for key "${key}"`,
-                        );
-                    }
-                    const inferred: KeySchema = {
-                        key,
-                        version: 1,
-                        codec: codec as any,
-                        validate: (value: unknown): value is unknown => inferValidator(nextValue)(value),
-                    };
-                    try {
-                        if (!registry.getSchema(key, inferred.version)) {
-                            registry.registerSchema(inferred);
-                        }
-                    } catch (err) {
-                        throw new SchemaError(
-                            "SCHEMA_REGISTRATION_CONFLICT",
-                            `Schema registration conflict for key "${key}"`,
-                            err,
-                        );
-                    }
-                    targetSchema = registry.getSchema(key, inferred.version) ?? inferred;
-                } else {
-                    // Default mode with no schema.
-                    validateValue(nextValue);
-                    const envelope: MnemonicEnvelope = {
-                        version: 0,
-                        payload: codec.encode(nextValue),
-                    };
-                    return JSON.stringify(envelope);
-                }
+                // No schema specified/registered. Default to version 0 envelope.
+                validateValue(nextValue);
+                const envelope: MnemonicEnvelope = {
+                    version: 0,
+                    payload: codec.encode(nextValue),
+                };
+                return JSON.stringify(envelope);
             }
 
             validateValue(nextValue, targetSchema.validate);
@@ -482,7 +543,16 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             };
             return JSON.stringify(envelope);
         },
-        [schemaRegistry, schema?.version, key, schemaMode, codec, inferValidator, validateValue],
+        [
+            schema?.version,
+            key,
+            schemaMode,
+            codec,
+            validateValue,
+            getLatestSchemaForKey,
+            getSchemaForVersion,
+            isReservedSchema,
+        ],
     );
 
     /**

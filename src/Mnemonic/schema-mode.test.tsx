@@ -7,6 +7,7 @@ import type { ComponentProps } from "react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
 import { StringCodec, NumberCodec } from "./codecs";
+import { SchemaError } from "./schema";
 import type { StorageLike, KeySchema, MigrationRule, SchemaRegistry } from "./types";
 
 function createMockStorage(): StorageLike & { store: Map<string, string> } {
@@ -117,6 +118,53 @@ describe("schema mode behavior", () => {
         expect(storage.store.get("ns.count")).toBe(env("7", 0));
     });
 
+    it("default mode uses latest schema when registered", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            { key: "count", version: 1, codec: NumberCodec, validate: (v): v is number => typeof v === "number" },
+            { key: "count", version: 3, codec: NumberCodec, validate: (v): v is number => typeof v === "number" },
+        ]);
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: 0,
+                    codec: NumberCodec,
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+        act(() => {
+            result.current.set(7);
+        });
+        expect(storage.store.get("ns.count")).toBe(env("7", 3));
+    });
+
+    it("strict mode writes version 0 when no schemas are registered", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: 0,
+                    codec: NumberCodec,
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "strict",
+                schemaRegistry: registry,
+            },
+        );
+        act(() => {
+            result.current.set(11);
+        });
+        expect(storage.store.get("ns.count")).toBe(env("11", 0));
+    });
+
     it("strict mode reads and writes with registered schema version", () => {
         const storage = createMockStorage();
         const registry = createRegistry([
@@ -143,6 +191,65 @@ describe("schema mode behavior", () => {
             result.current.set(9);
         });
         expect(storage.store.get("ns.count")).toBe(env("9", 2));
+    });
+
+    it("rejects schema version 0 from registry on read", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            { key: "count", version: 0, codec: NumberCodec, validate: (v): v is number => typeof v === "number" },
+        ]);
+        storage.store.set("ns.count", env("5", 0));
+        let received: SchemaError | undefined;
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: (err) => {
+                        received = err as SchemaError;
+                        return 0;
+                    },
+                    codec: NumberCodec,
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe(0);
+        expect(received).toBeInstanceOf(SchemaError);
+        expect(received?.code).toBe("SCHEMA_VERSION_RESERVED");
+    });
+
+    it("rejects schema version 0 from registry on write", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            { key: "count", version: 0, codec: NumberCodec, validate: (v): v is number => typeof v === "number" },
+        ]);
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: 0,
+                    codec: NumberCodec,
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+        const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        act(() => {
+            result.current.set(4);
+        });
+
+        expect(storage.store.get("ns.count")).toBeUndefined();
+        expect(errSpy).toHaveBeenCalled();
+        errSpy.mockRestore();
     });
 
     it("strict mode discards value when migration path is missing", () => {
