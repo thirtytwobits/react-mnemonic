@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import { describe, it, expect } from "vitest";
-import { CodecError, ValidationError, JSONCodec, StringCodec, NumberCodec, BooleanCodec, createCodec } from "./codecs";
+import { CodecError, JSONCodec, createCodec } from "./codecs";
 
 // ---------------------------------------------------------------------------
 // CodecError
@@ -33,38 +33,6 @@ describe("CodecError", () => {
 
     it("defaults cause to undefined when not provided", () => {
         expect(new CodecError("x").cause).toBeUndefined();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// ValidationError
-// ---------------------------------------------------------------------------
-describe("ValidationError", () => {
-    it("creates an error with a message", () => {
-        const err = new ValidationError("boom");
-        expect(err.message).toBe("boom");
-    });
-
-    it("stores an optional cause", () => {
-        const cause = new TypeError("inner");
-        const err = new ValidationError("outer", cause);
-        expect(err.cause).toBe(cause);
-    });
-
-    it("has name ValidationError", () => {
-        expect(new ValidationError("x").name).toBe("ValidationError");
-    });
-
-    it("is an instance of Error", () => {
-        expect(new ValidationError("x")).toBeInstanceOf(Error);
-    });
-
-    it("is an instance of ValidationError (prototype chain)", () => {
-        expect(new ValidationError("x")).toBeInstanceOf(ValidationError);
-    });
-
-    it("defaults cause to undefined when not provided", () => {
-        expect(new ValidationError("x").cause).toBeUndefined();
     });
 });
 
@@ -101,98 +69,6 @@ describe("JSONCodec", () => {
 
     it("throws on invalid JSON during decode", () => {
         expect(() => JSONCodec.decode("{bad json}")).toThrow();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// StringCodec
-// ---------------------------------------------------------------------------
-describe("StringCodec", () => {
-    it("encode returns the string as-is", () => {
-        expect(StringCodec.encode("hello")).toBe("hello");
-    });
-
-    it("decode returns the string as-is", () => {
-        expect(StringCodec.decode("hello")).toBe("hello");
-    });
-
-    it("roundtrips an empty string", () => {
-        expect(StringCodec.decode(StringCodec.encode(""))).toBe("");
-    });
-
-    it("preserves special characters", () => {
-        const special = 'hello "world" \n\t';
-        expect(StringCodec.decode(StringCodec.encode(special))).toBe(special);
-    });
-});
-
-// ---------------------------------------------------------------------------
-// NumberCodec
-// ---------------------------------------------------------------------------
-describe("NumberCodec", () => {
-    it("encodes a number to a string", () => {
-        expect(NumberCodec.encode(42)).toBe("42");
-    });
-
-    it("decodes a string to a number", () => {
-        expect(NumberCodec.decode("42")).toBe(42);
-    });
-
-    it("roundtrips integers", () => {
-        expect(NumberCodec.decode(NumberCodec.encode(0))).toBe(0);
-        expect(NumberCodec.decode(NumberCodec.encode(-1))).toBe(-1);
-        expect(NumberCodec.decode(NumberCodec.encode(999999))).toBe(999999);
-    });
-
-    it("roundtrips floating-point numbers", () => {
-        expect(NumberCodec.decode(NumberCodec.encode(3.14159))).toBe(3.14159);
-    });
-
-    it("roundtrips Infinity", () => {
-        expect(NumberCodec.decode(NumberCodec.encode(Infinity))).toBe(Infinity);
-        expect(NumberCodec.decode(NumberCodec.encode(-Infinity))).toBe(-Infinity);
-    });
-
-    it("throws CodecError when decoding NaN-producing input", () => {
-        expect(() => NumberCodec.decode("not-a-number")).toThrow(CodecError);
-    });
-
-    it("decodes the empty string as NaN and throws", () => {
-        // Number("") === 0 in JS, so this should NOT throw
-        expect(NumberCodec.decode("")).toBe(0);
-    });
-});
-
-// ---------------------------------------------------------------------------
-// BooleanCodec
-// ---------------------------------------------------------------------------
-describe("BooleanCodec", () => {
-    it('encodes true as "true"', () => {
-        expect(BooleanCodec.encode(true)).toBe("true");
-    });
-
-    it('encodes false as "false"', () => {
-        expect(BooleanCodec.encode(false)).toBe("false");
-    });
-
-    it('decodes "true" as true', () => {
-        expect(BooleanCodec.decode("true")).toBe(true);
-    });
-
-    it('decodes "false" as false', () => {
-        expect(BooleanCodec.decode("false")).toBe(false);
-    });
-
-    it("decodes any non-true string as false", () => {
-        expect(BooleanCodec.decode("TRUE")).toBe(false);
-        expect(BooleanCodec.decode("1")).toBe(false);
-        expect(BooleanCodec.decode("yes")).toBe(false);
-        expect(BooleanCodec.decode("")).toBe(false);
-    });
-
-    it("roundtrips booleans", () => {
-        expect(BooleanCodec.decode(BooleanCodec.encode(true))).toBe(true);
-        expect(BooleanCodec.decode(BooleanCodec.encode(false))).toBe(false);
     });
 });
 

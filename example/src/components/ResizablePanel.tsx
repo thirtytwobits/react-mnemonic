@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import { useRef, useCallback } from "react";
-import { useMnemonicKey, NumberCodec } from "react-mnemonic";
+import { useMnemonicKey } from "react-mnemonic";
 
 const MIN_WIDTH = 150;
 const MAX_WIDTH = 600;
@@ -14,7 +14,6 @@ export function ResizablePanel() {
         reset,
     } = useMnemonicKey<number>("panel-width", {
         defaultValue: 300,
-        codec: NumberCodec,
     });
 
     const dragging = useRef(false);

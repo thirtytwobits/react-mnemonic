@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { MnemonicProvider, useMnemonic } from "./provider";
 import { useMnemonicKey } from "./use";
-import { StringCodec, NumberCodec } from "./codecs";
 import type { StorageLike } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -163,21 +162,21 @@ describe("useSyncExternalStore – external mutations", () => {
 
     it("component shows new value after direct setRaw", () => {
         const { result, store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: "init", codec: StringCodec }),
+            useMnemonicKey("val", { defaultValue: "init" }),
         );
         expect(result.current.value).toBe("init");
 
         act(() => {
-            store.current.setRaw("val", env("external"));
+            store.current.setRaw("val", env(JSON.stringify("external")));
         });
 
         expect(result.current.value).toBe("external");
     });
 
     it("component falls back to default after direct removeRaw", () => {
-        storage.store.set("ns.val", env("stored"));
+        storage.store.set("ns.val", env(JSON.stringify("stored")));
         const { result, store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: "default", codec: StringCodec }),
+            useMnemonicKey("val", { defaultValue: "default" }),
         );
         expect(result.current.value).toBe("stored");
 
@@ -191,11 +190,11 @@ describe("useSyncExternalStore – external mutations", () => {
     it("onChange fires from direct external mutation", () => {
         const onChange = vi.fn();
         const { store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: "a", codec: StringCodec, onChange }),
+            useMnemonicKey("val", { defaultValue: "a", onChange }),
         );
 
         act(() => {
-            store.current.setRaw("val", env("b"));
+            store.current.setRaw("val", env(JSON.stringify("b")));
         });
 
         expect(onChange).toHaveBeenCalledWith("b", "a");
@@ -204,12 +203,12 @@ describe("useSyncExternalStore – external mutations", () => {
     it("onMount does NOT re-fire after external mutation", () => {
         const onMount = vi.fn();
         const { store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: "init", codec: StringCodec, onMount }),
+            useMnemonicKey("val", { defaultValue: "init", onMount }),
         );
         expect(onMount).toHaveBeenCalledTimes(1);
 
         act(() => {
-            store.current.setRaw("val", env("new"));
+            store.current.setRaw("val", env(JSON.stringify("new")));
         });
 
         // onMount should still have been called only once
@@ -374,7 +373,6 @@ describe("cross-tab sync – listener lifecycle", () => {
         renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("key", {
                 defaultValue: "x",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -386,7 +384,6 @@ describe("cross-tab sync – listener lifecycle", () => {
         renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("key", {
                 defaultValue: "x",
-                codec: StringCodec,
                 listenCrossTab: false,
             }),
         );
@@ -399,7 +396,6 @@ describe("cross-tab sync – listener lifecycle", () => {
         const { unmount } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("key", {
                 defaultValue: "x",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -413,7 +409,6 @@ describe("cross-tab sync – listener lifecycle", () => {
         const { unmount } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("key", {
                 defaultValue: "x",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -446,7 +441,6 @@ describe("cross-tab sync – data flow integration", () => {
         renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
                 onChange,
             }),
@@ -454,45 +448,17 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: env("dark") }),
+                new StorageEvent("storage", { key: "ns.theme", newValue: env(JSON.stringify("dark")) }),
             );
         });
 
         expect(onChange).toHaveBeenCalledWith("dark", "light");
     });
 
-    it("validation applies to incoming cross-tab values", () => {
-        const { result } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey<number>("vol", {
-                defaultValue: 50,
-                codec: NumberCodec,
-                listenCrossTab: true,
-                validate: (v): v is number => typeof v === "number" && v >= 0 && v <= 100,
-            }),
-        );
-
-        // Valid value
-        act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.vol", newValue: env("75") }),
-            );
-        });
-        expect(result.current.value).toBe(75);
-
-        // Invalid value (> 100) — should fall back to default
-        act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.vol", newValue: env("999") }),
-            );
-        });
-        expect(result.current.value).toBe(50);
-    });
-
     it("codec decoding applies to incoming cross-tab raw values", () => {
         const { result } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("count", {
                 defaultValue: 0,
-                codec: NumberCodec,
                 listenCrossTab: true,
             }),
         );
@@ -503,7 +469,7 @@ describe("cross-tab sync – data flow integration", () => {
             );
         });
 
-        // NumberCodec decodes "42" → 42
+        // JSONCodec decodes "42" → 42
         expect(result.current.value).toBe(42);
         expect(typeof result.current.value).toBe("number");
     });
@@ -512,7 +478,6 @@ describe("cross-tab sync – data flow integration", () => {
         const { result } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("count", {
                 defaultValue: 0,
-                codec: NumberCodec,
                 listenCrossTab: true,
             }),
         );
@@ -523,7 +488,7 @@ describe("cross-tab sync – data flow integration", () => {
             );
         });
 
-        // NumberCodec throws CodecError for "not-a-number", fallback to default
+        // JSONCodec throws for "not-a-number", fallback to default
         expect(result.current.value).toBe(0);
     });
 
@@ -531,7 +496,6 @@ describe("cross-tab sync – data flow integration", () => {
         const { result } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -540,7 +504,7 @@ describe("cross-tab sync – data flow integration", () => {
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "other-ns.theme",
-                    newValue: env("dark"),
+                    newValue: env(JSON.stringify("dark")),
                 }),
             );
         });
@@ -553,7 +517,6 @@ describe("cross-tab sync – data flow integration", () => {
         const { result } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("count", {
                 defaultValue: 0,
-                codec: NumberCodec,
                 listenCrossTab: true,
                 onChange,
             }),
@@ -580,7 +543,6 @@ describe("cross-tab sync – data flow integration", () => {
         function C1() {
             const { value } = useMnemonicKey("shared", {
                 defaultValue: "a",
-                codec: StringCodec,
                 listenCrossTab: true,
             });
             v1 = value;
@@ -589,7 +551,6 @@ describe("cross-tab sync – data flow integration", () => {
         function C2() {
             const { value } = useMnemonicKey("shared", {
                 defaultValue: "a",
-                codec: StringCodec,
                 listenCrossTab: true,
             });
             v2 = value;
@@ -608,7 +569,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.shared", newValue: env("b") }),
+                new StorageEvent("storage", { key: "ns.shared", newValue: env(JSON.stringify("b")) }),
             );
         });
 
@@ -620,7 +581,6 @@ describe("cross-tab sync – data flow integration", () => {
         const { unmount } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -630,7 +590,7 @@ describe("cross-tab sync – data flow integration", () => {
         // Should not throw after the component is unmounted
         expect(() => {
             window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: env("dark") }),
+                new StorageEvent("storage", { key: "ns.theme", newValue: env(JSON.stringify("dark")) }),
             );
         }).not.toThrow();
     });
@@ -641,7 +601,6 @@ describe("cross-tab sync – data flow integration", () => {
         const { result: tabBResult } = renderHookWithStore(storage, "ns", () =>
             useMnemonicKey("data", {
                 defaultValue: "initial",
-                codec: StringCodec,
                 listenCrossTab: true,
                 onChange: onChangeTabB,
             }),
@@ -650,12 +609,12 @@ describe("cross-tab sync – data flow integration", () => {
 
         // Tab A: writes "updated" to storage (simulated by direct storage write + event)
         act(() => {
-            storage.store.set("ns.data", env("updated"));
+            storage.store.set("ns.data", env(JSON.stringify("updated")));
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "ns.data",
                     oldValue: null,
-                    newValue: env("updated"),
+                    newValue: env(JSON.stringify("updated")),
                 }),
             );
         });

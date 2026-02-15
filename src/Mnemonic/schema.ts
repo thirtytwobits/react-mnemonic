@@ -26,8 +26,7 @@
  * | `MIGRATION_PATH_NOT_FOUND`      | No contiguous migration path between the stored and latest version. |
  * | `MIGRATION_FAILED`              | A migration step threw during execution.                        |
  * | `SCHEMA_REGISTRATION_CONFLICT`  | `registerSchema` was called with a conflicting definition.      |
- * | `SCHEMA_VERSION_RESERVED`       | Version `0` was supplied by a schema registry.                  |
- * | `TYPE_MISMATCH`                 | A schema or inferred validator rejected the decoded value.      |
+ * | `TYPE_MISMATCH`                 | The decoded value failed JSON Schema validation.                |
  * | `MODE_CONFIGURATION_INVALID`    | The schema mode requires a capability the registry doesn't provide. |
  *
  * @example
@@ -54,7 +53,6 @@ export class SchemaError extends Error {
         | "MIGRATION_PATH_NOT_FOUND"
         | "MIGRATION_FAILED"
         | "SCHEMA_REGISTRATION_CONFLICT"
-        | "SCHEMA_VERSION_RESERVED"
         | "TYPE_MISMATCH"
         | "MODE_CONFIGURATION_INVALID";
 
@@ -87,13 +85,13 @@ export class SchemaError extends Error {
  * The JSON envelope that wraps every value persisted by the library.
  *
  * All values are stored as `JSON.stringify({ version, payload })`. The
- * `version` field tells the read path which schema (and therefore which
- * codec + validator) to use for decoding the `payload`.
+ * `version` field tells the read path which schema to use for validating
+ * the `payload`.
  *
- * - `version 0` is used when no schema is active (default mode, no
- *   registry). The payload is the codec-encoded string. Registries must
- *   never define a schema at version `0`.
- * - `version >= 1` corresponds to a user-defined {@link KeySchema}.
+ * - When no schema is active (codec-only mode), `version` is `0` and
+ *   `payload` is a codec-encoded string.
+ * - When a schema is active, `version` corresponds to the schema version
+ *   and `payload` is the JSON value directly (not string-encoded).
  *
  * @internal
  */
@@ -101,17 +99,17 @@ export type MnemonicEnvelope = {
     /**
      * Schema version number.
      *
-     * Non-negative integer. `0` means unversioned; `>= 1` maps to a
+     * Non-negative integer. Any version (including `0`) may have a
      * registered {@link KeySchema}.
      */
     version: number;
 
     /**
-     * The codec-encoded value.
+     * The stored value.
      *
-     * Typically a string produced by `Codec.encode`, but typed as
-     * `unknown` to accommodate envelope parsing before the codec is
-     * resolved.
+     * For schema-managed keys, this is a JSON value (object, array,
+     * string, number, boolean, or null). For codec-managed keys, this
+     * is a string produced by `Codec.encode`.
      */
     payload: unknown;
 };

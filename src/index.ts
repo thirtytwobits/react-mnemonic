@@ -5,14 +5,12 @@ export { MnemonicProvider, MnemonicProviderProps } from "./Mnemonic/provider";
 export { useMnemonicKey } from "./Mnemonic/use";
 export {
   JSONCodec,
-  StringCodec,
-  NumberCodec,
-  BooleanCodec,
   createCodec,
   CodecError,
-  ValidationError,
 } from "./Mnemonic/codecs";
 export { SchemaError } from "./Mnemonic/schema";
+export { validateJsonSchema } from "./Mnemonic/json-schema";
+export type { JsonSchema, JsonSchemaValidationError } from "./Mnemonic/json-schema";
 export type {
   Codec,
   MnemonicProviderOptions,

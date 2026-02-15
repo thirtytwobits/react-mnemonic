@@ -8,7 +8,6 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
-import { StringCodec } from "./codecs";
 import type { StorageLike } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -66,12 +65,11 @@ describe("SSR integration (node environment)", () => {
 
     it("renderToString uses default even when storage has a value", () => {
         const storage = createMockStorage();
-        storage.store.set("ssr.theme", "dark");
+        storage.store.set("ssr.theme", JSON.stringify({ version: 0, payload: JSON.stringify("dark") }));
 
         function Theme() {
             const { value } = useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
             });
             return React.createElement("span", null, value);
         }
@@ -92,7 +90,6 @@ describe("SSR integration (node environment)", () => {
         function Theme() {
             const { value } = useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             });
             return React.createElement("span", null, value);

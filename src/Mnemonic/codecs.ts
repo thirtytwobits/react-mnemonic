@@ -4,9 +4,14 @@
 /**
  * @fileoverview Codec implementations for encoding and decoding values to/from storage.
  *
- * This module provides the built-in codecs (JSON, String, Number, Boolean) and
- * utilities for creating custom codecs. Codecs handle the bidirectional transformation
- * between typed JavaScript values and their string representations for storage.
+ * This module provides the built-in JSON codec and a factory for creating custom
+ * codecs. Codecs handle the bidirectional transformation between typed JavaScript
+ * values and their string representations for storage.
+ *
+ * Codecs are a low-level mechanism for keys that opt out of the JSON Schema
+ * validation system. When a schema is registered for a key, the schema's
+ * JSON Schema is used for validation and the payload is stored as a JSON value
+ * directly (no codec encoding needed).
  */
 
 import type { Codec } from "./types";
@@ -21,7 +26,7 @@ import type { Codec } from "./types";
  * @example
  * ```typescript
  * try {
- *   const value = NumberCodec.decode('not-a-number');
+ *   const value = JSONCodec.decode('not-valid-json');
  * } catch (error) {
  *   if (error instanceof CodecError) {
  *     console.error('Failed to decode:', error.message);
@@ -47,68 +52,6 @@ export class CodecError extends Error {
     constructor(message: string, cause?: unknown) {
         super(message);
         this.name = "CodecError";
-        this.cause = cause;
-
-        // Required for proper instanceof behavior when targeting ES5
-        Object.setPrototypeOf(this, new.target.prototype);
-    }
-}
-
-/**
- * Custom error class for validation failures.
- *
- * Thrown (or synthesized) when a decoded value fails the `validate` type guard
- * provided to `useMnemonicKey`. Consumers can throw `ValidationError` directly
- * from their `validate` function to provide richer failure details (message,
- * cause), or return `false` and let the library synthesize one automatically.
- *
- * When a `defaultValue` factory function is provided, the `ValidationError`
- * instance is passed as the `error` argument so the factory can inspect the
- * failure reason.
- *
- * @example
- * ```typescript
- * // Throwing from a validate function for detailed error info
- * validate: (val): val is User => {
- *   if (typeof val !== 'object' || val === null) {
- *     throw new ValidationError('Expected an object');
- *   }
- *   if (typeof (val as any).name !== 'string') {
- *     throw new ValidationError('Missing or invalid name field');
- *   }
- *   return true;
- * }
- * ```
- *
- * @example
- * ```typescript
- * // Handling in a defaultValue factory
- * defaultValue: (error) => {
- *   if (error instanceof ValidationError) {
- *     console.warn('Stored data invalid:', error.message);
- *   }
- *   return { name: 'Guest' };
- * }
- * ```
- */
-export class ValidationError extends Error {
-    /**
-     * The underlying error that caused the validation failure, if any.
-     *
-     * When the library wraps a non-`ValidationError` thrown by a `validate`
-     * function, the original error is preserved here.
-     */
-    readonly cause?: unknown;
-
-    /**
-     * Creates a new ValidationError.
-     *
-     * @param message - Human-readable description of the validation failure
-     * @param cause - Optional underlying error that caused this failure
-     */
-    constructor(message: string, cause?: unknown) {
-        super(message);
-        this.name = "ValidationError";
         this.cause = cause;
 
         // Required for proper instanceof behavior when targeting ES5
@@ -143,8 +86,6 @@ export class ValidationError extends Error {
  * });
  * ```
  *
- * @see {@link StringCodec} - For plain string values without JSON serialization
- * @see {@link NumberCodec} - For numeric values
  * @see {@link createCodec} - For custom encoding schemes
  */
 export const JSONCodec: Codec<any> = {
@@ -153,139 +94,12 @@ export const JSONCodec: Codec<any> = {
 };
 
 /**
- * String codec for storing plain string values without JSON serialization.
- *
- * This codec performs no transformation - it stores strings directly as-is.
- * Use this when you're working with plain strings and want to avoid the overhead
- * and escaping of JSON encoding.
- *
- * @remarks
- * Unlike JSONCodec, this codec does not add quotes or escape characters.
- * The raw string in storage will be identical to the JavaScript string value.
- *
- * @example
- * ```typescript
- * const { value, set } = useMnemonicKey('username', {
- *   defaultValue: 'guest',
- *   codec: StringCodec
- * });
- *
- * set('alice'); // Stored as: "alice" (not "\"alice\"")
- * ```
- *
- * @example
- * ```typescript
- * // Good use case: plain text content
- * const { value, set } = useMnemonicKey('notes', {
- *   defaultValue: '',
- *   codec: StringCodec
- * });
- * ```
- *
- * @see {@link JSONCodec} - For objects and arrays
- * @see {@link NumberCodec} - For numeric values
- */
-export const StringCodec: Codec<string> = {
-    encode: (value) => value,
-    decode: (encoded) => encoded,
-};
-
-/**
- * Number codec for storing numeric values as strings.
- *
- * Converts numbers to strings using `String(value)` and parses them back
- * using `Number(encoded)`. Throws a CodecError if the stored value cannot
- * be parsed as a valid number (including NaN).
- *
- * @remarks
- * - Preserves integer and floating-point precision
- * - Supports special values: Infinity, -Infinity (but stores as strings)
- * - Does not support NaN (decoding NaN throws CodecError)
- * - More efficient than JSONCodec for simple numeric values
- *
- * @throws {CodecError} When decoding a string that cannot be parsed as a number
- *
- * @example
- * ```typescript
- * const { value, set } = useMnemonicKey('count', {
- *   defaultValue: 0,
- *   codec: NumberCodec
- * });
- *
- * set(42);      // Stored as: "42"
- * set(3.14159); // Stored as: "3.14159"
- * ```
- *
- * @example
- * ```typescript
- * // Good use case: numeric settings or counters
- * const { value, set } = useMnemonicKey('volume', {
- *   defaultValue: 50,
- *   codec: NumberCodec
- * });
- * ```
- *
- * @see {@link JSONCodec} - Can also handle numbers within objects
- * @see {@link BooleanCodec} - For boolean values
- */
-export const NumberCodec: Codec<number> = {
-    encode: (value) => String(value),
-    decode: (encoded) => {
-        const num = Number(encoded);
-        if (Number.isNaN(num)) {
-            throw new CodecError(`Cannot decode "${encoded}" as a number`);
-        }
-        return num;
-    },
-};
-
-/**
- * Boolean codec for storing boolean values as strings.
- *
- * Encodes booleans as the strings "true" or "false". Decodes by comparing
- * the stored string to "true" (strict equality). Any value other than "true"
- * is decoded as false.
- *
- * @remarks
- * - Encoding: `true` → `"true"`, `false` → `"false"`
- * - Decoding: Only `"true"` decodes to `true`, all other values decode to `false`
- * - More compact than JSONCodec for simple boolean flags
- * - Decoding is lenient: corrupted or modified values default to false
- *
- * @example
- * ```typescript
- * const { value, set } = useMnemonicKey('darkMode', {
- *   defaultValue: false,
- *   codec: BooleanCodec
- * });
- *
- * set(true);  // Stored as: "true"
- * set(false); // Stored as: "false"
- * ```
- *
- * @example
- * ```typescript
- * // Good use case: feature flags and toggles
- * const { value, set } = useMnemonicKey('notificationsEnabled', {
- *   defaultValue: true,
- *   codec: BooleanCodec
- * });
- * ```
- *
- * @see {@link JSONCodec} - Can also handle booleans within objects
- * @see {@link NumberCodec} - For numeric values
- */
-export const BooleanCodec: Codec<boolean> = {
-    encode: (value) => String(value),
-    decode: (encoded) => encoded === "true",
-};
-
-/**
  * Factory function for creating custom codecs.
  *
  * Creates a Codec<T> from separate encode and decode functions. This is
  * useful for implementing custom serialization strategies for types that
- * aren't supported by the built-in codecs.
+ * aren't supported by JSONCodec. Using a custom codec on a key opts out
+ * of JSON Schema validation for that key.
  *
  * @template T - The TypeScript type of values to encode/decode
  *
@@ -319,35 +133,6 @@ export const BooleanCodec: Codec<boolean> = {
  *   defaultValue: new Set<string>(),
  *   codec: StringSetCodec
  * });
- * ```
- *
- * @example
- * ```typescript
- * // Codec for compressed data
- * const CompressedCodec = createCodec<string>(
- *   (value) => btoa(value), // Base64 encode
- *   (encoded) => atob(encoded) // Base64 decode
- * );
- * ```
- *
- * @example
- * ```typescript
- * // Codec with validation
- * interface User {
- *   id: string;
- *   name: string;
- * }
- *
- * const UserCodec = createCodec<User>(
- *   (user) => JSON.stringify(user),
- *   (str) => {
- *     const parsed = JSON.parse(str);
- *     if (!parsed.id || !parsed.name) {
- *       throw new CodecError('Invalid user data');
- *     }
- *     return parsed as User;
- *   }
- * );
  * ```
  *
  * @see {@link Codec} - The codec interface

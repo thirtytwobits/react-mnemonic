@@ -6,111 +6,58 @@ import {
     MnemonicProvider,
     useMnemonicKey,
     JSONCodec,
-    StringCodec,
-    NumberCodec,
-    BooleanCodec,
     CodecError,
-    ValidationError,
     SchemaError,
+    validateJsonSchema,
 } from "react-mnemonic";
 import type {
-    StorageLike,
-    Codec,
     SchemaRegistry,
     KeySchema,
     MigrationRule,
     SchemaMode,
+    JsonSchema,
 } from "react-mnemonic";
 
 // ---------------------------------------------------------------------------
-// Codec lookup
+// JSON Schema templates (replace old validator presets)
 // ---------------------------------------------------------------------------
 
-const CODEC_OPTIONS = ["JSON", "String", "Number", "Boolean"] as const;
-type CodecName = (typeof CODEC_OPTIONS)[number];
-
-const CODEC_MAP: Record<CodecName, Codec<any>> = {
-    JSON: JSONCodec,
-    String: StringCodec,
-    Number: NumberCodec,
-    Boolean: BooleanCodec,
-};
-
-const VALIDATOR_PRESETS = [
+const SCHEMA_TEMPLATES = [
     {
-        id: "is-object",
-        label: "is object",
-        body: 'typeof value === "object" && value !== null',
+        id: "object",
+        label: "object",
+        schema: { type: "object" } as JsonSchema,
     },
     {
-        id: "is-string",
-        label: "is string",
-        body: 'typeof value === "string"',
+        id: "string",
+        label: "string",
+        schema: { type: "string" } as JsonSchema,
     },
     {
-        id: "is-number",
-        label: "is finite number",
-        body: 'typeof value === "number" && Number.isFinite(value)',
+        id: "number",
+        label: "number",
+        schema: { type: "number" } as JsonSchema,
     },
     {
-        id: "is-boolean",
-        label: "is boolean",
-        body: 'typeof value === "boolean"',
+        id: "boolean",
+        label: "boolean",
+        schema: { type: "boolean" } as JsonSchema,
     },
     {
-        id: "is-array",
-        label: "is array",
-        body: "Array.isArray(value)",
+        id: "array",
+        label: "array",
+        schema: { type: "array" } as JsonSchema,
     },
     {
-        id: "has-name-email",
-        label: "has name + email",
-        body:
-            'typeof value === "object" && value !== null && typeof (value as any).name === "string" && typeof (value as any).email === "string"',
+        id: "name-email",
+        label: "name + email object",
+        schema: {
+            type: "object",
+            properties: { name: { type: "string" }, email: { type: "string" } },
+            required: ["name", "email"],
+        } as JsonSchema,
     },
 ] as const;
-
-function normalizeValidatorExpression(input: string): string {
-    let trimmed = input.trim();
-    if (!trimmed) return "";
-    if (trimmed.startsWith("return ")) {
-        trimmed = trimmed.slice("return ".length).trim();
-    }
-    if (trimmed.endsWith(";")) {
-        trimmed = trimmed.slice(0, -1).trim();
-    }
-    return trimmed;
-}
-
-// ---------------------------------------------------------------------------
-// In-memory storage (same pattern as test helpers)
-// ---------------------------------------------------------------------------
-
-interface MemoryStorage extends StorageLike {
-    _map: Map<string, string>;
-    _writeCount: number;
-}
-
-function createMemoryStorage(): MemoryStorage {
-    const map = new Map<string, string>();
-    let writeCount = 0;
-    return {
-        _map: map,
-        get _writeCount() {
-            return writeCount;
-        },
-        getItem: (key) => map.get(key) ?? null,
-        setItem: (key, value) => {
-            writeCount++;
-            map.set(key, value);
-        },
-        removeItem: (key) => map.delete(key),
-        get length() {
-            return map.size;
-        },
-        key: (index) => Array.from(map.keys())[index] ?? null,
-    };
-}
 
 // ---------------------------------------------------------------------------
 // Mutable schema registry
@@ -143,18 +90,19 @@ function createMutableRegistry(): MutableRegistry {
             const path: MigrationRule[] = [];
             let cur = fromVersion;
             while (cur < toVersion) {
-                const next = byKey.find((r) => r.fromVersion === cur);
+                const next = byKey.find((r) => r.fromVersion === cur && r.toVersion > cur);
                 if (!next) return null;
                 path.push(next);
                 cur = next.toVersion;
             }
             return path;
         },
+        getWriteMigration(key, version) {
+            const byKey = migrations.filter((r) => r.key === key);
+            return byKey.find((r) => r.fromVersion === version && r.toVersion === version);
+        },
         registerSchema(schema) {
             const id = `${schema.key}:${schema.version}`;
-            if (schema.version === 0) {
-                throw new Error("Schema version 0 is reserved");
-            }
             if (schemas.has(id)) {
                 throw new Error(`Schema already registered for ${id}`);
             }
@@ -184,7 +132,7 @@ function makeEntry(text: string, type: LogType): LogEntry {
 // Display types for registered schemas / migrations
 // ---------------------------------------------------------------------------
 
-type SchemaDisplay = { key: string; version: number; codec: CodecName; hasValidator: boolean };
+type SchemaDisplay = { key: string; version: number; schema: JsonSchema };
 type MigrationDisplay = { key: string; from: number; to: number };
 
 // ---------------------------------------------------------------------------
@@ -199,7 +147,6 @@ type MigrationDisplay = { key: string; from: number; to: number };
 function preflightEncode(
     value: unknown,
     key: string,
-    hookCodec: Codec<any>,
     registry: MutableRegistry,
     schemaMode: SchemaMode,
     schemaVersion?: number,
@@ -225,39 +172,42 @@ function preflightEncode(
                 `Write requires schema for key "${key}" in strict mode`,
             );
         }
-        // No schema specified/registered — encode with hook codec.
+        // No schema — encode with JSONCodec (always valid for JSON values).
         try {
-            hookCodec.encode(value);
+            JSONCodec.encode(value);
             return null;
         } catch (err) {
             return err instanceof Error ? err : new Error(String(err));
         }
     }
 
-    // Schema exists — validate then encode with schema codec
-    if (targetSchema.validate) {
+    // Schema exists — validate against JSON Schema
+    const errors = validateJsonSchema(value, targetSchema.schema);
+    if (errors.length > 0) {
+        return new SchemaError(
+            "TYPE_MISMATCH",
+            `Schema validation failed for key "${key}": ${errors.map((e) => e.message).join("; ")}`,
+        );
+    }
+
+    // Check write-time migration
+    const writeMigration = registry.getWriteMigration?.(key, targetSchema.version);
+    if (writeMigration) {
         try {
-            if (!targetSchema.validate(value)) {
+            const migrated = writeMigration.migrate(value);
+            const migratedErrors = validateJsonSchema(migrated, targetSchema.schema);
+            if (migratedErrors.length > 0) {
                 return new SchemaError(
                     "TYPE_MISMATCH",
-                    `Schema validation failed for key "${key}"`,
+                    `Write-time migration produced invalid value: ${migratedErrors.map((e) => e.message).join("; ")}`,
                 );
             }
         } catch (err) {
-            return new SchemaError(
-                "TYPE_MISMATCH",
-                `Schema validation threw for key "${key}"`,
-                err,
-            );
+            return err instanceof Error ? err : new Error(String(err));
         }
     }
 
-    try {
-        targetSchema.codec.encode(value as any);
-        return null;
-    } catch (err) {
-        return err instanceof Error ? err : new Error(String(err));
-    }
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,37 +238,30 @@ const NAMESPACE = "playground";
 
 function PlaygroundWorkbench({
     activeKey,
-    hookCodec,
     writeValue,
     onWriteValueChange,
     onResult,
-    storage,
     registry,
     schemaMode,
-    schemaSelection,
-    schemaOptions,
-    onSchemaSelectionChange,
+    schemaVersion,
+    readTrigger,
 }: {
     activeKey: string;
-    hookCodec: CodecName;
     writeValue: string;
     onWriteValueChange: (v: string) => void;
     onResult: (decoded: unknown, error: Error | null) => void;
-    storage: MemoryStorage;
     registry: MutableRegistry;
     schemaMode: SchemaMode;
-    schemaSelection: string;
-    schemaOptions: { value: string; label: string }[];
-    onSchemaSelectionChange: (v: string) => void;
+    schemaVersion: number | undefined;
+    readTrigger: number;
 }) {
-    const schemaVersion = schemaSelection === "default" ? undefined : Number(schemaSelection);
     const errorRef = useRef<Error | null>(null);
     errorRef.current = null;
 
     const [writeResult, setWriteResult] = useState<WriteResultState | null>(null);
 
     const defaultFactory = useCallback(
-        (error?: CodecError | ValidationError | SchemaError) => {
+        (error?: CodecError | SchemaError) => {
             if (error) errorRef.current = error;
             return undefined as unknown;
         },
@@ -327,7 +270,6 @@ function PlaygroundWorkbench({
 
     const { value, set, remove } = useMnemonicKey<unknown>(activeKey, {
         defaultValue: defaultFactory,
-        codec: CODEC_MAP[hookCodec],
         ...(schemaVersion !== undefined ? { schema: { version: schemaVersion } } : {}),
     });
 
@@ -335,6 +277,14 @@ function PlaygroundWorkbench({
 
     // Report result to parent after render.
     const reportedRef = useRef<{ value: unknown; error: Error | null } | null>(null);
+
+    // When readTrigger changes, clear the dedup ref so the effect re-fires.
+    const prevTriggerRef = useRef(readTrigger);
+    if (prevTriggerRef.current !== readTrigger) {
+        prevTriggerRef.current = readTrigger;
+        reportedRef.current = null;
+    }
+
     useEffect(() => {
         const current = { value, error: readError };
         if (
@@ -350,24 +300,13 @@ function PlaygroundWorkbench({
 
     const handleWrite = () => {
         try {
-            let parsed: unknown;
-            if (hookCodec === "JSON") {
-                parsed = JSON.parse(writeValue);
-            } else if (hookCodec === "Number") {
-                parsed = Number(writeValue);
-                if (Number.isNaN(parsed)) throw new Error("Not a valid number");
-            } else if (hookCodec === "Boolean") {
-                parsed = writeValue === "true";
-            } else {
-                parsed = writeValue;
-            }
+            const parsed: unknown = JSON.parse(writeValue);
             // The hook's set() catches SchemaError/CodecError internally and
             // logs them instead of throwing.  Run the same encode/validate
             // checks ourselves first so we can surface the real error object.
             const error = preflightEncode(
                 parsed,
                 activeKey,
-                CODEC_MAP[hookCodec],
                 registry,
                 schemaMode,
                 schemaVersion,
@@ -376,16 +315,8 @@ function PlaygroundWorkbench({
                 setWriteResult({ type: "error", error });
                 return;
             }
-            const before = storage._writeCount;
             set(parsed);
-            if (storage._writeCount > before) {
-                setWriteResult({ type: "success", message: "Value written successfully" });
-            } else {
-                setWriteResult({
-                    type: "error",
-                    error: new Error("Write rejected by hook"),
-                });
-            }
+            setWriteResult({ type: "success", message: "Value written successfully" });
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
             setWriteResult({ type: "error", error });
@@ -409,21 +340,11 @@ function PlaygroundWorkbench({
                 Write Value
             </h4>
             <p className="sp-help">
-                Write through the hook&rsquo;s <code>set()</code> function. The value is encoded
-                using the selected schema (or default schema behavior when unset).
+                Write through the hook&rsquo;s <code>set()</code> function. The value is validated
+                against the selected schema (or default behavior when unset).
             </p>
             <div className="form-row">
-                <label>Schema</label>
-                <select value={schemaSelection} onChange={(e) => onSchemaSelectionChange(e.target.value)}>
-                    {schemaOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <div className="form-row">
-                <label>Value</label>
+                <label>Value (JSON)</label>
                 <input
                     type="text"
                     value={writeValue}
@@ -448,8 +369,7 @@ function PlaygroundWorkbench({
 // ---------------------------------------------------------------------------
 
 export function SchemaPlayground() {
-    // Stable storage and registry refs.
-    const [storage] = useState(() => createMemoryStorage());
+    // Stable registry ref.
     const [registry] = useState(() => createMutableRegistry());
 
     // Schema mode.
@@ -464,12 +384,14 @@ export function SchemaPlayground() {
 
     // Hook target.
     const [activeKey, setActiveKey] = useState("player");
-    const [hookCodec, setHookCodec] = useState<CodecName>("JSON");
-    const [writeSchemaSelection, setWriteSchemaSelection] = useState<string>("default");
+    const [schemaSelection, setSchemaSelection] = useState<string>("default");
 
     // Result from workbench.
     const [decoded, setDecoded] = useState<unknown>(undefined);
     const [readError, setReadError] = useState<Error | null>(null);
+
+    // Read trigger — incremented to force workbench to re-report its value.
+    const [readTrigger, setReadTrigger] = useState(0);
 
     // Storage version counter to force inspector re-render.
     const [storageVersion, setStorageVersion] = useState(0);
@@ -489,10 +411,9 @@ export function SchemaPlayground() {
     // ---- Schema form state ----
     const [sKey, setSKey] = useState("player");
     const [sVersion, setSVersion] = useState(1);
-    const [sCodec, setSCodec] = useState<CodecName>("JSON");
-    const [sValidator, setSValidator] = useState("");
-    const [sValidatorPreset, setSValidatorPreset] = useState(VALIDATOR_PRESETS[0].id);
-    const [sValidatorError, setSValidatorError] = useState<string | null>(null);
+    const [sSchemaText, setSSchemaText] = useState('{"type":"object"}');
+    const [sSchemaTemplate, setSSchemaTemplate] = useState<string>(SCHEMA_TEMPLATES[0].id);
+    const [sSchemaParseError, setSSchemaParseError] = useState<string | null>(null);
     const [sSchemaError, setSSchemaError] = useState<string | null>(null);
 
     // ---- Migration form state ----
@@ -505,73 +426,55 @@ export function SchemaPlayground() {
     const [seedKey, setSeedKey] = useState("player");
     const [seedVersion, setSeedVersion] = useState(1);
     const [seedPayload, setSeedPayload] = useState('{"name":"Alice"}');
+    const [seedEncodeJson, setSeedEncodeJson] = useState(false);
 
     // ---- Handlers ----
 
     const handleAddSchema = () => {
         const id = `${sKey}:${sVersion}`;
-        if (sVersion === 0) {
-            const message = `Schema ${id} rejected (version 0 is reserved)`;
-            addLog(message, "error");
-            setSSchemaError(message);
-            return;
-        }
         try {
-            let validate: ((v: unknown) => v is any) | undefined;
-            const validatorExpression = normalizeValidatorExpression(sValidator);
-            if (validatorExpression) {
-                validate = new Function(
-                    "value",
-                    `return (${validatorExpression});`,
-                ) as (v: unknown) => v is any;
-            }
+            const parsedSchema = JSON.parse(sSchemaText) as JsonSchema;
             const schema: KeySchema = {
                 key: sKey,
                 version: sVersion,
-                codec: CODEC_MAP[sCodec],
-                ...(validate ? { validate } : {}),
+                schema: parsedSchema,
             };
             registry.registerSchema?.(schema);
             setSchemas((prev) => [
                 ...prev,
-                { key: sKey, version: sVersion, codec: sCodec, hasValidator: !!validate },
+                { key: sKey, version: sVersion, schema: parsedSchema },
             ]);
-            addLog(`Registered schema ${sKey} v${sVersion} (${sCodec})`, "success");
+            addLog(`Registered schema ${sKey} v${sVersion}`, "success");
             setSSchemaError(null);
         } catch (err) {
-            const message = `Failed to register schema: ${err instanceof Error ? err.message : String(err)}`;
+            const message = `Failed to register schema ${id}: ${err instanceof Error ? err.message : String(err)}`;
             addLog(message, "error");
             setSSchemaError(message);
         }
     };
 
-    const handleAddValidatorPreset = () => {
-        const preset = VALIDATOR_PRESETS.find((entry) => entry.id === sValidatorPreset);
-        if (!preset) return;
-        setSValidator((prev) => {
-            const existing = normalizeValidatorExpression(prev);
-            const nextRule = `(${preset.body})`;
-            if (!existing) return nextRule;
-            return `(${existing}) && ${nextRule}`;
-        });
+    const handleApplySchemaTemplate = () => {
+        const template = SCHEMA_TEMPLATES.find((entry) => entry.id === sSchemaTemplate);
+        if (!template) return;
+        setSSchemaText(JSON.stringify(template.schema, null, 2));
     };
 
     useEffect(() => {
         const handle = window.setTimeout(() => {
-            const expression = normalizeValidatorExpression(sValidator);
-            if (!expression) {
-                setSValidatorError(null);
+            const trimmed = sSchemaText.trim();
+            if (!trimmed) {
+                setSSchemaParseError(null);
                 return;
             }
             try {
-                new Function("value", `return (${expression});`);
-                setSValidatorError(null);
+                JSON.parse(trimmed);
+                setSSchemaParseError(null);
             } catch (err) {
-                setSValidatorError(err instanceof Error ? err.message : String(err));
+                setSSchemaParseError(err instanceof Error ? err.message : String(err));
             }
         }, 300);
         return () => window.clearTimeout(handle);
-    }, [sValidator]);
+    }, [sSchemaText]);
 
     const handleRemoveSchema = (key: string, version: number) => {
         const id = `${key}:${version}`;
@@ -581,8 +484,8 @@ export function SchemaPlayground() {
     };
 
     const handleAddMigration = () => {
-        if (mFrom >= mTo) {
-            addLog("fromVersion must be less than toVersion", "error");
+        if (mFrom > mTo) {
+            addLog("fromVersion must be <= toVersion", "error");
             return;
         }
         try {
@@ -594,8 +497,9 @@ export function SchemaPlayground() {
                 migrate: migrateFn,
             };
             registry._migrations.push(rule);
+            const label = mFrom === mTo ? `write-time normalizer v${mFrom}` : `v${mFrom} → v${mTo}`;
             setMigrations((prev) => [...prev, { key: mKey, from: mFrom, to: mTo }]);
-            addLog(`Added migration ${mKey} v${mFrom} → v${mTo}`, "success");
+            addLog(`Added migration ${mKey} ${label}`, "success");
         } catch (err) {
             addLog(`Failed to create migration: ${err instanceof Error ? err.message : String(err)}`, "error");
         }
@@ -615,11 +519,28 @@ export function SchemaPlayground() {
 
     const handleSeed = () => {
         const prefixedKey = `${NAMESPACE}.${seedKey}`;
-        const envelope = JSON.stringify({ version: seedVersion, payload: seedPayload });
-        storage._map.set(prefixedKey, envelope);
+        let payload: unknown;
+        try {
+            payload = JSON.parse(seedPayload);
+        } catch {
+            // If payload isn't valid JSON, store as-is (codec-managed string payload)
+            payload = seedPayload;
+        }
+        // When "Encode as JSON" is checked, the envelope payload becomes a JSON
+        // string (codec-managed format).  Otherwise it's a raw JSON value
+        // (schema-managed format).
+        const envelopePayload = seedEncodeJson ? JSON.stringify(payload) : payload;
+        const envelope = JSON.stringify({ version: seedVersion, payload: envelopePayload });
+        localStorage.setItem(prefixedKey, envelope);
         refreshStorage();
         setMountKey((k) => k + 1);
-        addLog(`Seeded ${seedKey} at v${seedVersion}: ${seedPayload}`, "success");
+        addLog(`Seeded ${seedKey} at v${seedVersion}: ${seedPayload}${seedEncodeJson ? " (JSON-encoded)" : ""}`, "success");
+    };
+
+    const handleRead = () => {
+        setReadTrigger((t) => t + 1);
+        refreshStorage();
+        addLog("Read current value from hook", "info");
     };
 
     const handleRemount = () => {
@@ -628,7 +549,13 @@ export function SchemaPlayground() {
     };
 
     const handleResetAll = () => {
-        storage._map.clear();
+        // Remove all playground-namespaced keys from localStorage.
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(`${NAMESPACE}.`)) toRemove.push(k);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
         registry._schemas.clear();
         registry._migrations.length = 0;
         setSchemas([]);
@@ -655,26 +582,29 @@ export function SchemaPlayground() {
             .sort((a, b) => a.version - b.version)
             .map((schema) => ({
                 value: String(schema.version),
-                label: `v${schema.version} (${schema.codec})`,
+                label: `v${schema.version}`,
             }));
         return [{ value: "default", label: "default (no schema)" }, ...available];
     }, [schemas, activeKey]);
 
     useEffect(() => {
-        if (writeSchemaSelection === "default") return;
+        if (schemaSelection === "default") return;
         const exists = schemas.some(
-            (schema) => schema.key === activeKey && String(schema.version) === writeSchemaSelection,
+            (schema) => schema.key === activeKey && String(schema.version) === schemaSelection,
         );
-        if (!exists) setWriteSchemaSelection("default");
-    }, [activeKey, schemas, writeSchemaSelection]);
+        if (!exists) setSchemaSelection("default");
+    }, [activeKey, schemas, schemaSelection]);
 
     // ---- Storage inspector entries ----
     const inspectorEntries: { key: string; version: string; payload: string; raw: string }[] = [];
     const prefix = `${NAMESPACE}.`;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     void storageVersion; // read to subscribe to changes
-    for (const [fullKey, raw] of storage._map) {
-        if (!fullKey.startsWith(prefix)) continue;
+    for (let i = 0; i < localStorage.length; i++) {
+        const fullKey = localStorage.key(i);
+        if (!fullKey || !fullKey.startsWith(prefix)) continue;
+        const raw = localStorage.getItem(fullKey);
+        if (raw == null) continue;
         const key = fullKey.slice(prefix.length);
         try {
             const parsed = JSON.parse(raw);
@@ -689,9 +619,27 @@ export function SchemaPlayground() {
         }
     }
 
+    // ---- Storage key suggestions (namespace-stripped) ----
+    const storageKeys = useMemo(() => {
+        void storageVersion;
+        const keys = new Set<string>();
+        for (let i = 0; i < localStorage.length; i++) {
+            const fullKey = localStorage.key(i);
+            if (!fullKey || !fullKey.startsWith(prefix)) continue;
+            keys.add(fullKey.slice(prefix.length));
+        }
+        return Array.from(keys);
+    }, [prefix, storageVersion]);
+
     // ---- Render ----
     return (
         <div className="schema-playground">
+            <datalist id="sp-storage-keys">
+                {storageKeys.map((k) => (
+                    <option key={k} value={k} />
+                ))}
+            </datalist>
+
             {/* Section 1: Registry Configuration */}
             <div className="sp-section">
                 <h3 className="sp-section-title">Registry Configuration</h3>
@@ -725,63 +673,53 @@ export function SchemaPlayground() {
                 <div className="sp-row">
                     <div className="form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" value={sKey} onChange={(e) => setSKey(e.target.value)} />
+                        <input type="text" list="sp-storage-keys" value={sKey} onChange={(e) => setSKey(e.target.value)} />
                     </div>
                     <div className="form-row" style={{ width: 80 }}>
                         <label>Version</label>
                         <input
                             type="number"
-                            min={1}
+                            min={0}
                             value={sVersion}
                             onChange={(e) => setSVersion(Number(e.target.value))}
                         />
                     </div>
-                    <div className="form-row" style={{ width: 120 }}>
-                        <label>Codec</label>
-                        <select value={sCodec} onChange={(e) => setSCodec(e.target.value as CodecName)}>
-                            {CODEC_OPTIONS.map((c) => (
-                                <option key={c} value={c}>
-                                    {c}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
                 </div>
                 <div className="form-row" style={{ marginTop: 4 }}>
-                    <label>Validator presets</label>
+                    <label>Schema templates</label>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <select
-                            value={sValidatorPreset}
-                            onChange={(e) => setSValidatorPreset(e.target.value)}
+                            value={sSchemaTemplate}
+                            onChange={(e) => setSSchemaTemplate(e.target.value)}
                         >
-                            {VALIDATOR_PRESETS.map((preset) => (
-                                <option key={preset.id} value={preset.id}>
-                                    {preset.label}
+                            {SCHEMA_TEMPLATES.map((template) => (
+                                <option key={template.id} value={template.id}>
+                                    {template.label}
                                 </option>
                             ))}
                         </select>
-                        <button className="btn btn-ghost btn-sm" onClick={handleAddValidatorPreset}>
-                            Add
+                        <button className="btn btn-ghost btn-sm" onClick={handleApplySchemaTemplate}>
+                            Apply
                         </button>
                     </div>
                 </div>
                 <div className="form-row" style={{ marginTop: 4 }}>
-                    <label>Validator body (optional)</label>
+                    <label>JSON Schema</label>
                     <textarea
-                        rows={1}
-                        placeholder='(typeof value === "object" && value !== null)'
-                        value={sValidator}
-                        onChange={(e) => setSValidator(e.target.value)}
+                        rows={3}
+                        placeholder='{"type":"object","properties":{"name":{"type":"string"}}}'
+                        value={sSchemaText}
+                        onChange={(e) => setSSchemaText(e.target.value)}
                     />
                 </div>
-                {sValidator.trim() && !sValidatorError && (
+                {sSchemaText.trim() && !sSchemaParseError && (
                     <div className="sp-success" style={{ marginTop: 4 }}>
-                        Validator syntax OK
+                        JSON syntax OK
                     </div>
                 )}
-                {sValidatorError && (
+                {sSchemaParseError && (
                     <div className="sp-error" style={{ marginTop: 4 }}>
-                        <strong>Validator syntax error</strong>: {sValidatorError}
+                        <strong>JSON syntax error</strong>: {sSchemaParseError}
                     </div>
                 )}
                 <div className="sp-button-row">
@@ -805,8 +743,7 @@ export function SchemaPlayground() {
                         {schemas.map((s) => (
                             <div className="sp-registry-item" key={`${s.key}:${s.version}`}>
                                 <span>
-                                    {s.key} v{s.version} ({s.codec})
-                                    {s.hasValidator ? " +validate" : ""}
+                                    {s.key} v{s.version} — {JSON.stringify(s.schema)}
                                 </span>
                                 <button
                                     className="btn btn-ghost btn-sm"
@@ -823,10 +760,13 @@ export function SchemaPlayground() {
                 <h4 className="sp-section-title" style={{ marginTop: 12 }}>
                     Migration Rules
                 </h4>
+                <p className="sp-help">
+                    Set <em>From</em> = <em>To</em> for a write-time normalizer (runs on every write).
+                </p>
                 <div className="sp-row">
                     <div className="form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" value={mKey} onChange={(e) => setMKey(e.target.value)} />
+                        <input type="text" list="sp-storage-keys" value={mKey} onChange={(e) => setMKey(e.target.value)} />
                     </div>
                     <div className="form-row" style={{ width: 80 }}>
                         <label>From</label>
@@ -841,7 +781,7 @@ export function SchemaPlayground() {
                         <label>To</label>
                         <input
                             type="number"
-                            min={1}
+                            min={0}
                             value={mTo}
                             onChange={(e) => setMTo(Number(e.target.value))}
                         />
@@ -867,7 +807,7 @@ export function SchemaPlayground() {
                         {migrations.map((m, i) => (
                             <div className="sp-registry-item" key={i}>
                                 <span>
-                                    {m.key} v{m.from} → v{m.to}
+                                    {m.key} {m.from === m.to ? `v${m.from} (normalizer)` : `v${m.from} → v${m.to}`}
                                 </span>
                                 <button className="btn btn-ghost btn-sm" onClick={() => handleRemoveMigration(i)}>
                                     x
@@ -883,11 +823,12 @@ export function SchemaPlayground() {
                 <h3 className="sp-section-title">Seed Storage</h3>
                 <p className="sp-help">
                     Write a raw versioned envelope directly to storage to simulate legacy data.
+                    Payload is stored as a JSON value for schema-managed keys.
                 </p>
                 <div className="sp-row">
                     <div className="form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" value={seedKey} onChange={(e) => setSeedKey(e.target.value)} />
+                        <input type="text" list="sp-storage-keys" value={seedKey} onChange={(e) => setSeedKey(e.target.value)} />
                     </div>
                     <div className="form-row" style={{ width: 80 }}>
                         <label>Version</label>
@@ -900,13 +841,21 @@ export function SchemaPlayground() {
                     </div>
                 </div>
                 <div className="form-row" style={{ marginTop: 4 }}>
-                    <label>Payload (codec-encoded string)</label>
+                    <label>Payload (JSON value)</label>
                     <input type="text" value={seedPayload} onChange={(e) => setSeedPayload(e.target.value)} />
                 </div>
                 <div className="sp-button-row">
                     <button className="btn btn-primary btn-sm" onClick={handleSeed}>
                         Seed
                     </button>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <input
+                            type="checkbox"
+                            checked={seedEncodeJson}
+                            onChange={(e) => setSeedEncodeJson(e.target.checked)}
+                        />
+                        Encode as JSON string (codec-managed)
+                    </label>
                 </div>
             </div>
 
@@ -916,19 +865,23 @@ export function SchemaPlayground() {
                 <div className="sp-row">
                     <div className="form-row" style={{ flex: 1 }}>
                         <label>Active Key</label>
-                        <input type="text" value={activeKey} onChange={(e) => setActiveKey(e.target.value)} />
+                        <input type="text" list="sp-storage-keys" value={activeKey} onChange={(e) => setActiveKey(e.target.value)} />
                     </div>
-                    <div className="form-row" style={{ width: 120 }}>
-                        <label>Hook Codec</label>
-                        <select value={hookCodec} onChange={(e) => setHookCodec(e.target.value as CodecName)}>
-                            {CODEC_OPTIONS.map((c) => (
-                                <option key={c} value={c}>
-                                    {c}
+                    <div className="form-row" style={{ width: 160 }}>
+                        <label>Schema Version</label>
+                        <select value={schemaSelection} onChange={(e) => setSchemaSelection(e.target.value)}>
+                            {schemaOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
                                 </option>
                             ))}
                         </select>
                     </div>
                 </div>
+                <p className="sp-help">
+                    The schema version applies to both reads and writes. When set, the hook
+                    uses that version for validation and envelope formatting.
+                </p>
 
                 {/* Read Value */}
                 <h4 className="sp-section-title" style={{ marginTop: 12 }}>
@@ -941,7 +894,11 @@ export function SchemaPlayground() {
                 <div>
                     <label className="sp-result-label">Decoded value</label>
                     <pre className="sp-result">
-                        {decoded === undefined ? "(undefined — no data or fallback)" : JSON.stringify(decoded, null, 2)}
+                        {decoded === undefined
+                            ? readError
+                                ? "(undefined — fallback after decode error)"
+                                : "(undefined — key not in storage)"
+                            : JSON.stringify(decoded, null, 2)}
                     </pre>
                 </div>
                 {readError && (
@@ -952,7 +909,10 @@ export function SchemaPlayground() {
                     </div>
                 )}
                 <div className="sp-button-row">
-                    <button className="btn btn-ghost btn-sm" onClick={handleRemount}>
+                    <button className="btn btn-primary btn-sm" onClick={handleRead}>
+                        Read
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={handleRemount}>
                         Re-read (Remount Provider)
                     </button>
                 </div>
@@ -960,22 +920,18 @@ export function SchemaPlayground() {
                 <MnemonicProvider
                     key={mountKey}
                     namespace={NAMESPACE}
-                    storage={storage}
                     schemaMode={schemaMode}
                     schemaRegistry={registry}
                 >
                     <PlaygroundWorkbench
                         activeKey={activeKey}
-                        hookCodec={hookCodec}
                         writeValue={writeValue}
                         onWriteValueChange={setWriteValue}
                         onResult={handleResult}
-                        storage={storage}
                         registry={registry}
                         schemaMode={schemaMode}
-                        schemaSelection={writeSchemaSelection}
-                        schemaOptions={schemaOptions}
-                        onSchemaSelectionChange={setWriteSchemaSelection}
+                        schemaVersion={schemaSelection === "default" ? undefined : Number(schemaSelection)}
+                        readTrigger={readTrigger}
                     />
                 </MnemonicProvider>
 

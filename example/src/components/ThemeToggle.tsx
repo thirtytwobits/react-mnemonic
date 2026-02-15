@@ -2,14 +2,13 @@
 // Copyright Scott Dixon
 
 import { useState, useEffect } from "react";
-import { useMnemonicKey, StringCodec } from "react-mnemonic";
+import { useMnemonicKey } from "react-mnemonic";
 
 const modes = ["light", "system", "dark"] as const;
 
 export function ThemeToggle() {
     const { value: mode, set } = useMnemonicKey<string>("theme-mode", {
         defaultValue: "system",
-        codec: StringCodec,
         listenCrossTab: true,
     });
 

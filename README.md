@@ -16,11 +16,12 @@ through a single hook that works like `useState`.
 ## Features
 
 - **`useState`-like API** -- `useMnemonicKey` returns `{ value, set, reset, remove }`
-- **Type-safe codecs** -- built-in `JSONCodec`, `StringCodec`, `NumberCodec`, `BooleanCodec`, plus `createCodec` for custom types
+- **JSON Schema validation** -- optional schema-based validation using a built-in JSON Schema subset
 - **Namespace isolation** -- `MnemonicProvider` prefixes every key to prevent collisions
 - **Cross-tab sync** -- opt-in `listenCrossTab` uses the browser `storage` event
 - **Pluggable storage** -- bring your own backend via the `StorageLike` interface (IndexedDB, sessionStorage, etc.)
-- **Validation** -- optional type-guard with error-aware default factories
+- **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
+- **Write-time normalization** -- migrations where `fromVersion === toVersion` run on every write
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
 - **DevTools** -- inspect and mutate state from the browser console
 - **SSR-safe** -- returns defaults when `window` is unavailable
@@ -58,12 +59,11 @@ React 18 or later is required.
 Wrap your app in a `MnemonicProvider`, then call `useMnemonicKey` anywhere inside it.
 
 ```tsx
-import { MnemonicProvider, useMnemonicKey, NumberCodec } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
 
 function Counter() {
   const { value: count, set } = useMnemonicKey("count", {
     defaultValue: 0,
-    codec: NumberCodec,
   });
 
   return (
@@ -123,25 +123,20 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 | Option           | Type                                              | Default     | Description                                  |
 | ---------------- | ------------------------------------------------- | ----------- | -------------------------------------------- |
-| `defaultValue`   | `T \| ((error?: CodecError \| ValidationError) => T)` | *required* | Fallback value or error-aware factory        |
-| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy                       |
-| `validate`       | `(value: unknown) => value is T`                  | --          | Type-guard run after decoding                |
+| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | *required* | Fallback value or error-aware factory        |
+| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation) |
 | `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value            |
 | `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                  |
 | `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event         |
 
-### Built-in codecs
+### Codecs
 
-| Codec          | Stored as            | Notes                                      |
-| -------------- | -------------------- | ------------------------------------------ |
-| `JSONCodec`    | `JSON.stringify`     | Default. Handles objects, arrays, primitives. |
-| `StringCodec`  | raw string           | No JSON wrapping.                          |
-| `NumberCodec`  | `String(n)`          | Throws `CodecError` on `NaN`.             |
-| `BooleanCodec` | `"true"` / `"false"` | Decodes anything other than `"true"` as `false`. |
+The default codec is `JSONCodec`, which handles all JSON-serializable values.
+You can create custom codecs using `createCodec` for types that need special
+serialization (e.g., `Date`, `Set`, `Map`).
 
-### `createCodec<T>(encode, decode)`
-
-Build a custom codec from a pair of functions.
+Using a custom codec bypasses JSON Schema validation -- the codec is a low-level
+escape hatch for when you need full control over serialization.
 
 ```ts
 import { createCodec } from "react-mnemonic";
@@ -176,7 +171,7 @@ internally -- see the `StorageLike` JSDoc for the full error-handling contract.
 | Class             | Thrown when                           |
 | ----------------- | ------------------------------------ |
 | `CodecError`      | Encoding or decoding fails           |
-| `ValidationError` | The `validate` type-guard rejects    |
+| `SchemaError`     | Schema validation or migration fails |
 
 Both are passed to `defaultValue` factories so you can inspect or log the
 failure reason.
@@ -188,7 +183,6 @@ failure reason.
 ```tsx
 const { value: theme, set } = useMnemonicKey<"light" | "dark">("theme", {
   defaultValue: "light",
-  codec: StringCodec,
   listenCrossTab: true,
   onChange: (t) => {
     document.documentElement.setAttribute("data-theme", t);
@@ -196,28 +190,25 @@ const { value: theme, set } = useMnemonicKey<"light" | "dark">("theme", {
 });
 ```
 
-### Validated form data
+### Error-aware defaults
 
 ```tsx
-interface FormData {
-  name: string;
-  email: string;
-}
+import { useMnemonicKey, CodecError, SchemaError } from "react-mnemonic";
 
-const isFormData = (v: unknown): v is FormData =>
-  typeof v === "object" &&
-  v !== null &&
-  typeof (v as any).name === "string" &&
-  typeof (v as any).email === "string";
+const getDefault = (error?: CodecError | SchemaError) => {
+  if (error instanceof CodecError) {
+    console.warn("Corrupt stored data:", error.message);
+  }
+  if (error instanceof SchemaError) {
+    console.warn("Schema validation failed:", error.message);
+  }
+  return { count: 0 };
+};
 
-const { value, set, remove } = useMnemonicKey<FormData>("form", {
-  defaultValue: { name: "", email: "" },
-  validate: isFormData,
-  listenCrossTab: true,
-});
+const { value } = useMnemonicKey("counter", { defaultValue: getDefault });
 ```
 
-## Schema modes and immutability
+## Schema modes and versioning
 
 Mnemonic supports optional schema versioning through `schemaMode` and an
 optional `schemaRegistry`.
@@ -234,34 +225,65 @@ optional `schemaRegistry`.
   successful read infers and registers a v1 schema. Subsequent reads/writes use
   that schema.
 
-Version `0` is reserved for "no schema". Supplying a schema at version `0`
-causes a `SchemaError` with code `SCHEMA_VERSION_RESERVED`.
+Version `0` is valid for schemas and migrations. Schemas at version `0` are
+treated like any other version.
+
+### JSON Schema validation
+
+Schemas use a subset of JSON Schema for validation. The supported keywords are:
+
+- `type` (including array form for nullable types, e.g., `["string", "null"]`)
+- `enum`, `const`
+- `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`
+- `minLength`, `maxLength`
+- `properties`, `required`, `additionalProperties`
+- `items`, `minItems`, `maxItems`
+
+```ts
+// Schema definition -- fully serializable JSON, no functions
+const schema: KeySchema = {
+  key: "profile",
+  version: 1,
+  schema: {
+    type: "object",
+    properties: {
+      name: { type: "string", minLength: 1 },
+      email: { type: "string" },
+      age: { type: "number", minimum: 0 },
+    },
+    required: ["name", "email"],
+  },
+};
+```
+
+### Write-time migrations (normalizers)
+
+A migration where `fromVersion === toVersion` runs on every write, acting as a
+normalizer. This is useful for trimming whitespace, lowercasing strings, etc.
+
+```ts
+const normalizer: MigrationRule = {
+  key: "name",
+  fromVersion: 1,
+  toVersion: 1,
+  migrate: (value) => String(value).trim().toLowerCase(),
+};
+```
 
 ### Example schema registry
 
-A schema registry stores versioned codecs and validators for each key, and
-resolves migration paths to upgrade stored data. Migrations are applied in
-order from oldest to newest version when the stored version is older than the
-latest schema.
+A schema registry stores versioned schemas for each key, and resolves migration
+paths to upgrade stored data. Schemas are plain JSON (serializable); migrations
+are procedural functions.
 
 ```tsx
 import {
   MnemonicProvider,
   useMnemonicKey,
-  JSONCodec,
   type SchemaRegistry,
   type KeySchema,
   type MigrationRule,
 } from "react-mnemonic";
-
-interface ProfileV1 {
-  name: string;
-  email: string;
-}
-
-interface ProfileV2 extends ProfileV1 {
-  migratedAt: string;
-}
 
 const schemas = new Map<string, KeySchema>();
 const migrations: MigrationRule[] = [];
@@ -284,6 +306,11 @@ const registry: SchemaRegistry = {
     }
     return path;
   },
+  getWriteMigration: (key, version) => {
+    return migrations.find(
+      (r) => r.key === key && r.fromVersion === version && r.toVersion === version,
+    );
+  },
   registerSchema: (schema) => {
     const id = `${schema.key}:${schema.version}`;
     if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
@@ -294,12 +321,11 @@ const registry: SchemaRegistry = {
 registry.registerSchema({
   key: "profile",
   version: 1,
-  codec: JSONCodec,
-  validate: (v): v is ProfileV1 =>
-    typeof v === "object" &&
-    v !== null &&
-    typeof (v as any).name === "string" &&
-    typeof (v as any).email === "string",
+  schema: {
+    type: "object",
+    properties: { name: { type: "string" }, email: { type: "string" } },
+    required: ["name", "email"],
+  },
 });
 
 migrations.push({
@@ -307,28 +333,29 @@ migrations.push({
   fromVersion: 1,
   toVersion: 2,
   migrate: (value) => {
-    const v1 = value as ProfileV1;
-    return { ...v1, migratedAt: new Date().toISOString() } as ProfileV2;
+    const v1 = value as { name: string; email: string };
+    return { ...v1, migratedAt: new Date().toISOString() };
   },
 });
 
 registry.registerSchema({
   key: "profile",
   version: 2,
-  codec: JSONCodec,
-  validate: (v): v is ProfileV2 =>
-    typeof v === "object" &&
-    v !== null &&
-    typeof (v as any).name === "string" &&
-    typeof (v as any).email === "string" &&
-    typeof (v as any).migratedAt === "string",
+  schema: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      email: { type: "string" },
+      migratedAt: { type: "string" },
+    },
+    required: ["name", "email", "migratedAt"],
+  },
 });
 
 function ProfileEditor() {
-  const { value, set } = useMnemonicKey<ProfileV2>("profile", {
+  const { value, set } = useMnemonicKey<{ name: string; email: string; migratedAt: string }>("profile", {
     defaultValue: { name: "", email: "", migratedAt: "" },
   });
-  // Writes use the latest schema (v2) by default when schemas are registered.
   return (
     <input
       value={value.name}
@@ -373,24 +400,6 @@ const idbStorage: StorageLike = {
 </MnemonicProvider>
 ```
 
-### Error-aware defaults
-
-```tsx
-import { useMnemonicKey, CodecError, ValidationError } from "react-mnemonic";
-
-const getDefault = (error?: CodecError | ValidationError) => {
-  if (error instanceof CodecError) {
-    console.warn("Corrupt stored data:", error.message);
-  }
-  if (error instanceof ValidationError) {
-    console.warn("Invalid stored data:", error.message);
-  }
-  return { count: 0 };
-};
-
-const { value } = useMnemonicKey("counter", { defaultValue: getDefault });
-```
-
 ### DevTools
 
 Enable the console inspector in development:
@@ -421,6 +430,10 @@ import type {
   StorageLike,
   MnemonicProviderOptions,
   UseMnemonicKeyOptions,
+  KeySchema,
+  MigrationRule,
+  SchemaRegistry,
+  JsonSchema,
 } from "react-mnemonic";
 ```
 

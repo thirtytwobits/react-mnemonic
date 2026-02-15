@@ -8,14 +8,18 @@
  * library for type-safe, persistent state management in React applications.
  */
 
-import type { CodecError, ValidationError } from "./codecs";
+import type { CodecError } from "./codecs";
 import type { SchemaError } from "./schema";
+import type { JsonSchema } from "./json-schema";
 
 /**
  * Codec for encoding and decoding values to and from storage.
  *
  * Codecs provide bidirectional transformations between typed values and their
  * string representations suitable for storage in localStorage or similar backends.
+ *
+ * Using a codec on a key opts out of JSON Schema validation. Schema-managed
+ * keys store JSON values directly and are validated against their JSON Schema.
  *
  * @template T - The TypeScript type of the value to encode/decode
  *
@@ -28,9 +32,6 @@ import type { SchemaError } from "./schema";
  * ```
  *
  * @see {@link JSONCodec} - Default codec for JSON-serializable values
- * @see {@link StringCodec} - Codec for plain strings
- * @see {@link NumberCodec} - Codec for numeric values
- * @see {@link BooleanCodec} - Codec for boolean values
  * @see {@link createCodec} - Helper function to create custom codecs
  */
 export interface Codec<T> {
@@ -149,8 +150,8 @@ export interface MnemonicProviderOptions {
      * Schema registry used for version lookup and migration resolution.
      *
      * When provided, the library uses the registry to find the correct
-     * codec and validator for each stored version, and to resolve
-     * migration paths when upgrading old data to the latest schema.
+     * JSON Schema for each stored version, and to resolve migration paths
+     * when upgrading old data to the latest schema.
      *
      * Required when `schemaMode` is `"strict"` or `"autoschema"`.
      * Optional (but recommended) in `"default"` mode.
@@ -172,18 +173,18 @@ export interface MnemonicProviderOptions {
  * Controls how the provider enforces versioned schemas on stored values.
  *
  * - `"default"` — Schemas are optional. When a schema exists for the stored
- *   version it is used for decoding; otherwise the hook's `codec` option is
- *   used directly. This is the recommended starting mode.
+ *   version it is used for validation; otherwise the hook's `codec` option is
+ *   used directly with no validation. This is the recommended starting mode.
  *
  * - `"strict"` — Every read and write **must** have a registered schema for
  *   the stored version. If no matching schema is found the value falls back
  *   to `defaultValue` with a `SchemaError` (`SCHEMA_NOT_FOUND` on reads,
  *   `WRITE_SCHEMA_REQUIRED` on writes).
  *   When no schemas are registered and no explicit schema is provided, writes
- *   fall back to an unversioned (v0) envelope.
+ *   fall back to a codec-encoded (v0) envelope.
  *
  * - `"autoschema"` — Like `"default"`, but when a key has **no** schema
- *   registered at all, the library infers a schema at version 1 from the
+ *   registered at all, the library infers a JSON Schema at version 1 from the
  *   first successfully decoded value and registers it via
  *   `SchemaRegistry.registerSchema`. Subsequent reads/writes for that key
  *   then behave as if the schema had been registered manually.
@@ -204,28 +205,34 @@ export type SchemaMode = "strict" | "default" | "autoschema";
 /**
  * Schema definition for a single key at a specific version.
  *
- * Each registered schema binds a storage key + version number to a codec
- * and an optional validator. When the provider reads a value whose envelope
- * version matches, it uses the schema's codec and validator instead of the
- * hook-level `codec` and `validate` options.
+ * Each registered schema binds a storage key + version number to a
+ * JSON Schema that validates the payload. Schemas are fully serializable
+ * (no functions).
  *
- * @template T - The TypeScript type of the decoded value at this version
+ * When the provider reads a value whose envelope version matches a
+ * registered schema, the payload is validated against the schema's
+ * JSON Schema definition.
  *
  * @example
  * ```typescript
- * const userSchemaV1: KeySchema<{ name: string }> = {
+ * const userSchemaV1: KeySchema = {
  *   key: "user",
  *   version: 1,
- *   codec: JSONCodec,
- *   validate: (v): v is { name: string } =>
- *     typeof v === "object" && v !== null && typeof (v as any).name === "string",
+ *   schema: {
+ *     type: "object",
+ *     properties: {
+ *       name: { type: "string" },
+ *     },
+ *     required: ["name"],
+ *   },
  * };
  * ```
  *
  * @see {@link SchemaRegistry} - Where schemas are registered and looked up
  * @see {@link MigrationRule} - How values migrate between schema versions
+ * @see {@link JsonSchema} - The JSON Schema subset used for validation
  */
-export type KeySchema<T = unknown> = {
+export type KeySchema = {
     /**
      * The unprefixed storage key this schema applies to.
      */
@@ -234,44 +241,34 @@ export type KeySchema<T = unknown> = {
     /**
      * The version number for this schema.
      *
-     * Must be a non-negative integer. Version `0` is reserved for the
-    * default (unversioned) envelope written when no schema is active.
-    * User-defined schemas must start at version `1`. Supplying version
-    * `0` via a schema registry is rejected by the library.
+     * Must be a non-negative integer. Any version (including `0`) is valid.
      */
     version: number;
 
     /**
-     * Codec used to encode and decode the payload at this version.
+     * JSON Schema that validates the payload at this version.
      *
-     * This overrides the hook-level `codec` option when the stored
-     * envelope's version matches.
+     * Only the subset of JSON Schema keywords defined in {@link JsonSchema}
+     * are supported. An empty schema `{}` accepts any value.
      */
-    codec: Codec<T>;
-
-    /**
-     * Optional type-guard that validates the decoded payload.
-     *
-     * If provided and the guard returns `false` or throws, the value
-     * falls back to `defaultValue` with a `SchemaError` of code
-     * `TYPE_MISMATCH`.
-     *
-     * @param value - The decoded payload to validate
-     * @returns `true` if the value is valid
-     */
-    validate?: (value: unknown) => value is T;
+    schema: JsonSchema;
 };
 
 /**
  * A single migration step that transforms data from one schema version to
- * the next.
+ * another, or normalizes data at the same version.
  *
  * Migration rules are composed into a {@link MigrationPath} by the
  * {@link SchemaRegistry} to upgrade stored data across multiple versions in
- * sequence (e.g. v1 → v2 → v3).
+ * sequence (e.g. v1 -> v2 -> v3).
+ *
+ * When `fromVersion === toVersion`, the rule is a **write-time normalizer**
+ * that runs on every write to that version. This is useful for data
+ * normalization (trimming strings, clamping values, injecting defaults).
  *
  * @example
  * ```typescript
+ * // Version upgrade migration
  * const userV1ToV2: MigrationRule = {
  *   key: "user",
  *   fromVersion: 1,
@@ -281,10 +278,22 @@ export type KeySchema<T = unknown> = {
  *     return { firstName: old.name, lastName: "" };
  *   },
  * };
+ *
+ * // Write-time normalizer (same version)
+ * const trimUserV2: MigrationRule = {
+ *   key: "user",
+ *   fromVersion: 2,
+ *   toVersion: 2,
+ *   migrate: (v) => {
+ *     const user = v as { firstName: string; lastName: string };
+ *     return { firstName: user.firstName.trim(), lastName: user.lastName.trim() };
+ *   },
+ * };
  * ```
  *
  * @see {@link MigrationPath} - Ordered list of rules applied in sequence
  * @see {@link SchemaRegistry.getMigrationPath} - How the path is resolved
+ * @see {@link SchemaRegistry.getWriteMigration} - How write-time normalizers are resolved
  */
 export type MigrationRule = {
     /**
@@ -294,13 +303,16 @@ export type MigrationRule = {
 
     /**
      * The version the stored data is migrating **from**.
+     *
+     * Version `0` is allowed, enabling migrations from unversioned data.
      */
     fromVersion: number;
 
     /**
      * The version the stored data is migrating **to**.
      *
-     * Must be strictly greater than `fromVersion`.
+     * When equal to `fromVersion`, this rule is a write-time normalizer
+     * that runs on every write to that version.
      */
     toVersion: number;
 
@@ -323,8 +335,8 @@ export type MigrationRule = {
  *
  * The rules are applied in array order. Each step's output becomes the
  * next step's input. After the final step the result is validated against
- * the target schema, re-encoded, and persisted back to storage so the
- * migration only runs once per key.
+ * the target schema and persisted back to storage so the migration only
+ * runs once per key.
  *
  * @see {@link MigrationRule} - Individual migration step
  * @see {@link SchemaRegistry.getMigrationPath} - Resolves a path between versions
@@ -336,7 +348,7 @@ export type MigrationPath = MigrationRule[];
  *
  * Implementations of this interface are passed to `MnemonicProvider` via the
  * `schemaRegistry` option. The provider calls these methods at read and write
- * time to resolve the correct codec, validator, and migration chain for each
+ * time to resolve the correct JSON Schema and migration chain for each
  * stored value.
  *
  * In `"default"` and `"strict"` modes, callers should treat registry contents
@@ -350,6 +362,7 @@ export type MigrationPath = MigrationRule[];
  *   getSchema: (key, version) => schemas.get(`${key}@${version}`),
  *   getLatestSchema: (key) => latestByKey.get(key),
  *   getMigrationPath: (key, from, to) => buildPath(key, from, to),
+ *   getWriteMigration: (key, version) => normalizers.get(`${key}@${version}`),
  *   registerSchema: (schema) => { schemas.set(`${schema.key}@${schema.version}`, schema); },
  * };
  *
@@ -398,13 +411,29 @@ export interface SchemaRegistry {
     getMigrationPath(key: string, fromVersion: number, toVersion: number): MigrationPath | null;
 
     /**
+     * Look up a write-time normalizer for a specific key and version.
+     *
+     * A write-time normalizer is a {@link MigrationRule} where
+     * `fromVersion === toVersion`. It runs on every write to that version,
+     * transforming the value before storage. The normalized value is
+     * re-validated against the schema after transformation.
+     *
+     * Optional. When not implemented or returns `undefined`, no write-time
+     * normalization is applied.
+     *
+     * @param key - The unprefixed storage key
+     * @param version - The target schema version
+     * @returns The normalizer rule, or `undefined` if none is registered
+     */
+    getWriteMigration?(key: string, version: number): MigrationRule | undefined;
+
+    /**
      * Register a new schema.
      *
      * Optional. Required when `schemaMode` is `"autoschema"` so the
      * library can persist inferred schemas. Implementations should throw
      * if a schema already exists for the same key + version with a
-        * conflicting definition. Implementations should also reject version
-        * `0`, which is reserved for the unversioned envelope.
+     * conflicting definition.
      *
      * @param schema - The schema to register
      */
@@ -663,8 +692,8 @@ export type Mnemonic = {
 /**
  * Configuration options for the useMnemonicKey hook.
  *
- * These options control how a value is persisted, decoded, validated,
- * and synchronized across the application.
+ * These options control how a value is persisted, decoded, and
+ * synchronized across the application.
  *
  * @template T - The TypeScript type of the stored value
  *
@@ -672,10 +701,6 @@ export type Mnemonic = {
  * ```typescript
  * const { value, set } = useMnemonicKey<User>('currentUser', {
  *   defaultValue: { name: 'Guest', id: null },
- *   codec: JSONCodec,
- *   validate: (val): val is User => {
- *     return typeof val === 'object' && 'name' in val && 'id' in val;
- *   },
  *   onMount: (user) => console.log('Loaded user:', user),
  *   onChange: (current, previous) => {
  *     console.log('User changed from', previous, 'to', current);
@@ -694,9 +719,8 @@ export type UseMnemonicKeyOptions<T> = {
      *
      * - `undefined` — Nominal path: no value exists in storage for this key.
      * - `CodecError` — The stored value could not be decoded by the codec.
-     * - `ValidationError` — The decoded value failed the `validate` check.
-     * - `SchemaError` — A schema or migration issue occurred (e.g. missing
-     *   schema, failed migration, invalid envelope).
+     * - `SchemaError` — A schema, migration, or validation issue occurred
+     *   (e.g. missing schema, failed migration, JSON Schema validation failure).
      *
      * Static (non-function) default values ignore the error entirely.
      *
@@ -707,14 +731,14 @@ export type UseMnemonicKeyOptions<T> = {
      *
      * ```typescript
      * // Module-level (stable reference, preferred)
-     * const getDefault = (error?: CodecError | ValidationError) => {
+     * const getDefault = (error?: CodecError | SchemaError) => {
      *     if (error) console.warn('Fallback:', error.message);
      *     return { count: 0 };
      * };
      *
      * // Or with useCallback inside a component
      * const getDefault = useCallback(
-     *     (error?: CodecError | ValidationError) => ({ count: 0 }),
+     *     (error?: CodecError | SchemaError) => ({ count: 0 }),
      *     [],
      * );
      * ```
@@ -724,7 +748,7 @@ export type UseMnemonicKeyOptions<T> = {
      * // Static default
      * defaultValue: { count: 0 }
      *
-     * // Factory with no error handling (works the same as before)
+     * // Factory with no error handling
      * defaultValue: () => ({ timestamp: Date.now() })
      *
      * // Error-aware factory
@@ -732,14 +756,14 @@ export type UseMnemonicKeyOptions<T> = {
      *     if (error instanceof CodecError) {
      *         console.error('Corrupt data:', error.message);
      *     }
-     *     if (error instanceof ValidationError) {
-     *         console.warn('Invalid data:', error.message);
+     *     if (error instanceof SchemaError) {
+     *         console.warn('Schema issue:', error.code, error.message);
      *     }
      *     return { count: 0 };
      * }
      * ```
      */
-    defaultValue: T | ((error?: CodecError | ValidationError | SchemaError) => T);
+    defaultValue: T | ((error?: CodecError | SchemaError) => T);
 
     /**
      * Codec for encoding and decoding values to/from storage.
@@ -747,17 +771,15 @@ export type UseMnemonicKeyOptions<T> = {
      * Determines how the typed value is serialized to a string and
      * deserialized back. Defaults to JSONCodec if not specified.
      *
+     * Using a codec is a low-level option that bypasses JSON Schema
+     * validation. Schema-managed keys store JSON values directly and
+     * are validated against their registered JSON Schema.
+     *
      * @default JSONCodec
      *
      * @example
      * ```typescript
-     * // For plain strings
-     * codec: StringCodec
-     *
-     * // For numbers
-     * codec: NumberCodec
-     *
-     * // For dates
+     * // Custom codec for dates
      * codec: createCodec(
      *   (date) => date.toISOString(),
      *   (str) => new Date(str)
@@ -765,57 +787,6 @@ export type UseMnemonicKeyOptions<T> = {
      * ```
      */
     codec?: Codec<T>;
-
-    /**
-     * Optional validation function for decoded values.
-     *
-     * If provided, this type guard validates the decoded value before
-     * it's returned to the component. If validation fails (returns `false`
-     * or throws), the default value is used instead.
-     *
-     * There are two ways to signal a validation failure:
-     *
-     * 1. **Return `false`** — The library synthesizes a `ValidationError`
-     *    with a generic message and passes it to the `defaultValue` factory.
-     *
-     * 2. **Throw a `ValidationError`** — Provides richer error details
-     *    (custom message, cause). The thrown error is passed directly to the
-     *    `defaultValue` factory.
-     *
-     * If validate throws a non-`ValidationError`, the library wraps it in a
-     * `ValidationError` with the original error as `cause`.
-     *
-     * @param value - The value decoded from storage
-     * @returns True if the value is valid and has type T
-     *
-     * @example
-     * ```typescript
-     * // Simple boolean validation (return false for invalid)
-     * validate: (val): val is UserProfile => {
-     *   return (
-     *     typeof val === 'object' &&
-     *     val !== null &&
-     *     typeof val.id === 'string' &&
-     *     typeof val.name === 'string'
-     *   );
-     * }
-     * ```
-     *
-     * @example
-     * ```typescript
-     * // Rich validation with thrown ValidationError
-     * validate: (val): val is UserProfile => {
-     *   if (typeof val !== 'object' || val === null) {
-     *     throw new ValidationError('Expected an object');
-     *   }
-     *   if (typeof (val as any).name !== 'string') {
-     *     throw new ValidationError('Missing or invalid "name" field');
-     *   }
-     *   return true;
-     * }
-     * ```
-     */
-    validate?: (value: unknown) => value is T;
 
     /**
      * Callback invoked once when the hook is first mounted.
@@ -849,7 +820,7 @@ export type UseMnemonicKeyOptions<T> = {
      * onChange: (newTheme, oldTheme) => {
      *   document.body.classList.remove(oldTheme);
      *   document.body.classList.add(newTheme);
-     *   console.log(`Theme changed: ${oldTheme} → ${newTheme}`);
+     *   console.log(`Theme changed: ${oldTheme} -> ${newTheme}`);
      * }
      * ```
      */

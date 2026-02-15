@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import { useState, useEffect, useRef } from "react";
-import { useMnemonicKey, CodecError, ValidationError } from "react-mnemonic";
+import { useMnemonicKey, CodecError, SchemaError } from "react-mnemonic";
 
 interface FormData {
     name: string;
@@ -20,24 +20,11 @@ const defaultForm: FormData = {
     newsletter: false,
 };
 
-/** Validate that the decoded value has the expected FormData shape. */
-const isFormData = (val: unknown): val is FormData => {
-    if (typeof val !== "object" || val === null) return false;
-    const obj = val as Record<string, unknown>;
-    return (
-        typeof obj.name === "string" &&
-        typeof obj.email === "string" &&
-        typeof obj.bio === "string" &&
-        typeof obj.role === "string" &&
-        typeof obj.newsletter === "boolean"
-    );
-};
-
 /**
  * Error-aware default factory.
  * Defined at module level for a stable reference (avoids re-renders).
  */
-const getDefaultForm = (error?: CodecError | ValidationError): FormData => {
+const getDefaultForm = (error?: CodecError | SchemaError): FormData => {
     if (error) {
         console.warn("[PersistedForm] Using defaults due to:", error.message);
     }
@@ -51,7 +38,6 @@ export function PersistedForm() {
         remove,
     } = useMnemonicKey<FormData>("form-data", {
         defaultValue: getDefaultForm,
-        validate: isFormData,
         listenCrossTab: true,
     });
 

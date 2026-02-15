@@ -6,13 +6,15 @@
  *
  * This module exports the `useMnemonicKey` hook, which provides a React-friendly
  * API for reading and writing persistent state with automatic synchronization,
- * encoding/decoding, and validation.
+ * encoding/decoding, and JSON Schema validation.
  */
 
 import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback } from "react";
 import { useMnemonic } from "./provider";
-import { JSONCodec, CodecError, ValidationError } from "./codecs";
+import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
+import { validateJsonSchema, inferJsonSchema } from "./json-schema";
+import type { JsonSchema } from "./json-schema";
 import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
 
 /**
@@ -20,7 +22,7 @@ import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
  *
  * Creates a stateful value that persists to storage and synchronizes across
  * components. Works like `useState` but with persistent storage, automatic
- * encoding/decoding, validation, and optional cross-tab synchronization.
+ * encoding/decoding, JSON Schema validation, and optional cross-tab synchronization.
  *
  * Must be used within a `MnemonicProvider`. Uses React's `useSyncExternalStore`
  * internally for efficient, tearing-free state synchronization.
@@ -31,173 +33,28 @@ import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
  * @param options - Configuration options controlling persistence, encoding, and behavior
  *
  * @returns Object with the current value and methods to update it
- * @returns {T} value - The current decoded value from storage, or the default if not present
- * @returns {function} set - Update the stored value (supports both direct values and updater functions)
- * @returns {function} reset - Reset the value to the default and persist it
- * @returns {function} remove - Remove the key from storage entirely (future reads return default)
- *
- * @example
- * ```tsx
- * // Simple counter with persistence
- * function Counter() {
- *   const { value, set } = useMnemonicKey('count', {
- *     defaultValue: 0,
- *     codec: NumberCodec
- *   });
- *
- *   return (
- *     <div>
- *       <p>Count: {value}</p>
- *       <button onClick={() => set(value + 1)}>Increment</button>
- *       <button onClick={() => set(c => c + 1)}>Increment (updater)</button>
- *     </div>
- *   );
- * }
- * ```
- *
- * @example
- * ```tsx
- * // User profile with validation and callbacks
- * interface UserProfile {
- *   name: string;
- *   email: string;
- * }
- *
- * function ProfileEditor() {
- *   const { value, set, reset } = useMnemonicKey<UserProfile>('profile', {
- *     defaultValue: { name: '', email: '' },
- *     validate: (val): val is UserProfile => {
- *       return typeof val === 'object' &&
- *              typeof val.name === 'string' &&
- *              typeof val.email === 'string';
- *     },
- *     onMount: (profile) => {
- *       console.log('Loaded profile:', profile);
- *       analytics.track('profile_loaded', profile);
- *     },
- *     onChange: (newProfile, oldProfile) => {
- *       console.log('Profile updated:', { old: oldProfile, new: newProfile });
- *     }
- *   });
- *
- *   return (
- *     <form>
- *       <input
- *         value={value.name}
- *         onChange={e => set({ ...value, name: e.target.value })}
- *       />
- *       <button onClick={() => reset()}>Reset</button>
- *     </form>
- *   );
- * }
- * ```
- *
- * @example
- * ```tsx
- * // Theme switcher with cross-tab sync
- * function ThemeSwitcher() {
- *   const { value, set } = useMnemonicKey<'light' | 'dark'>('theme', {
- *     defaultValue: 'light',
- *     codec: StringCodec,
- *     listenCrossTab: true,
- *     onChange: (theme) => {
- *       document.body.className = theme;
- *     }
- *   });
- *
- *   return (
- *     <button onClick={() => set(value === 'light' ? 'dark' : 'light')}>
- *       Toggle Theme ({value})
- *     </button>
- *   );
- * }
- * ```
- *
- * @example
- * ```tsx
- * // Shopping cart with custom codec
- * interface CartItem {
- *   id: string;
- *   quantity: number;
- * }
- *
- * function ShoppingCart() {
- *   const { value: cart, set, remove } = useMnemonicKey<CartItem[]>('cart', {
- *     defaultValue: [],
- *     codec: JSONCodec
- *   });
- *
- *   const addItem = (item: CartItem) => {
- *     set(currentCart => [...currentCart, item]);
- *   };
- *
- *   const clearCart = () => {
- *     remove(); // Completely remove from storage
- *   };
- *
- *   return (
- *     <div>
- *       <p>Items: {cart.length}</p>
- *       <button onClick={clearCart}>Clear Cart</button>
- *     </div>
- *   );
- * }
- * ```
- *
- * @remarks
- * - The hook automatically subscribes to storage changes and re-renders on updates
- * - Encoding/decoding errors are caught and logged; the default value is used as fallback
- * - The `set` function supports both direct values and updater functions like `useState`
- * - When using updater functions, the current value is read fresh to avoid stale closures
- * - Cross-tab synchronization requires `listenCrossTab: true` and only works with localStorage
- * - Server-side rendering returns the default value (no storage access)
- *
- * @see {@link UseMnemonicKeyOptions} - Configuration options
- * @see {@link MnemonicProvider} - Required provider component
- * @see {@link Codec} - Type for custom encoding/decoding strategies
  *
  * @throws {Error} If used outside of a MnemonicProvider
  */
 export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>) {
     const api = useMnemonic();
 
-    const { defaultValue, validate, onMount, onChange, listenCrossTab, codec: codecOpt, schema } = options;
+    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema } = options;
     const codec = codecOpt ?? JSONCodec;
     const schemaMode = api.schemaMode;
     const schemaRegistry = api.schemaRegistry;
 
     /**
      * Helper to get the fallback/default value.
-     * Handles both static values and factory functions.
-     * Factory functions receive an optional error describing why the fallback
-     * is being used (CodecError, ValidationError, or undefined for nominal).
+     * Factory functions receive an optional error describing why the fallback is used.
      */
     const getFallback = useCallback(
-        (error?: CodecError | ValidationError | SchemaError) =>
+        (error?: CodecError | SchemaError) =>
             typeof defaultValue === "function"
-                ? (defaultValue as (error?: CodecError | ValidationError | SchemaError) => T)(error)
+                ? (defaultValue as (error?: CodecError | SchemaError) => T)(error)
                 : defaultValue,
         [defaultValue],
     );
-
-    const inferValidator = useCallback((sample: unknown): ((value: unknown) => boolean) => {
-        if (sample === null) return (value) => value === null;
-        if (Array.isArray(sample)) return (value) => Array.isArray(value);
-        switch (typeof sample) {
-            case "string":
-                return (value) => typeof value === "string";
-            case "number":
-                return (value) => typeof value === "number" && Number.isFinite(value);
-            case "boolean":
-                return (value) => typeof value === "boolean";
-            case "undefined":
-                return (value) => typeof value === "undefined";
-            case "object":
-                return (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-            default:
-                return (_value) => true;
-        }
-    }, []);
 
     const parseEnvelope = useCallback(
         (rawText: string): { ok: true; envelope: MnemonicEnvelope } | { ok: false; error: SchemaError } => {
@@ -226,12 +83,15 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         [key],
     );
 
-    const decodePayloadWithCodec = useCallback(
+    /**
+     * Decode a string payload using a codec (for codec-managed / no-schema keys).
+     */
+    const decodeStringPayload = useCallback(
         <V,>(payload: unknown, activeCodec: { decode: (encoded: string) => V }) => {
             if (typeof payload !== "string") {
                 throw new SchemaError(
                     "INVALID_ENVELOPE",
-                    `Envelope payload must be a string for key "${key}"`,
+                    `Envelope payload must be a string for codec-managed key "${key}"`,
                 );
             }
             try {
@@ -245,33 +105,21 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         [key],
     );
 
-    const validateValue = useCallback(
-        (value: unknown, schemaValidate?: ((v: unknown) => boolean)): value is T => {
-            if (schemaValidate) {
-                let valid: boolean;
-                try {
-                    valid = schemaValidate(value);
-                } catch (err) {
-                    throw new SchemaError("TYPE_MISMATCH", `Schema validation threw for key "${key}"`, err);
-                }
-                if (!valid) {
-                    throw new SchemaError("TYPE_MISMATCH", `Schema validation failed for key "${key}"`);
-                }
+    /**
+     * Validate a value against a JSON Schema, throwing SchemaError on failure.
+     */
+    const validateAgainstSchema = useCallback(
+        (value: unknown, jsonSchema: JsonSchema): void => {
+            const errors = validateJsonSchema(value, jsonSchema);
+            if (errors.length > 0) {
+                const message = errors.map((e) => `${e.path || "/"}: ${e.message}`).join("; ");
+                throw new SchemaError(
+                    "TYPE_MISMATCH",
+                    `Schema validation failed for key "${key}": ${message}`,
+                );
             }
-            if (validate) {
-                try {
-                    if (!validate(value)) {
-                        throw new ValidationError(`Validation failed for key "${key}"`);
-                    }
-                } catch (err) {
-                    throw err instanceof ValidationError
-                        ? err
-                        : new ValidationError(`Validation threw for key "${key}"`, err);
-                }
-            }
-            return true;
         },
-        [validate, key],
+        [key],
     );
 
     const registryCache = useMemo(() => {
@@ -291,9 +139,9 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             if (registryCache.schemaByVersion.has(version)) {
                 return registryCache.schemaByVersion.get(version);
             }
-            const schema = schemaRegistry.getSchema(key, version);
-            registryCache.schemaByVersion.set(version, schema);
-            return schema;
+            const s = schemaRegistry.getSchema(key, version);
+            registryCache.schemaByVersion.set(version, s);
+            return s;
         },
         [schemaRegistry, registryCache, key],
     );
@@ -302,10 +150,10 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         if (!schemaRegistry) return undefined;
         if (!registryCache) return schemaRegistry.getLatestSchema(key);
         if (registryCache.latestSchemaSet) return registryCache.latestSchema;
-        const schema = schemaRegistry.getLatestSchema(key);
-        registryCache.latestSchema = schema;
+        const s = schemaRegistry.getLatestSchema(key);
+        registryCache.latestSchema = s;
         registryCache.latestSchemaSet = true;
-        return schema;
+        return s;
     }, [schemaRegistry, registryCache, key]);
 
     const getMigrationPathForKey = useCallback(
@@ -323,10 +171,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         [schemaRegistry, registryCache, key],
     );
 
-    const isReservedSchema = useCallback((schema?: KeySchema): boolean => {
-        return schema?.version === 0;
-    }, []);
-
     const decodeForRead = useCallback(
         (
             rawText: string | null,
@@ -339,17 +183,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
 
             const schemaForVersion = getSchemaForVersion(envelope.version);
             const latestSchema = getLatestSchemaForKey();
-
-            if (isReservedSchema(schemaForVersion) || isReservedSchema(latestSchema)) {
-                return {
-                    value: getFallback(
-                        new SchemaError(
-                            "SCHEMA_VERSION_RESERVED",
-                            `Schema registry returned reserved version 0 for key "${key}"`,
-                        ),
-                    ),
-                };
-            }
 
             // Strict mode always requires schema for the stored version.
             if (schemaMode === "strict" && !schemaForVersion) {
@@ -380,17 +213,20 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                     };
                 }
                 try {
-                    const decoded = decodePayloadWithCodec<T>(envelope.payload, codec);
-                    validateValue(decoded);
+                    // Payload may be a codec string or already a JSON value (seeded data).
+                    const decoded = typeof envelope.payload === "string"
+                        ? decodeStringPayload<T>(envelope.payload, codec)
+                        : envelope.payload as T;
+                    const inferredJsonSchema = inferJsonSchema(decoded);
                     const inferred: KeySchema = {
                         key,
                         version: 1,
-                        codec: codec as any,
-                        validate: (value: unknown): value is unknown => inferValidator(decoded)(value),
+                        schema: inferredJsonSchema,
                     };
+                    // Rewrite as a schema-managed envelope (payload is JSON value directly)
                     const rewriteEnvelope: MnemonicEnvelope = {
                         version: inferred.version,
-                        payload: inferred.codec.encode(decoded as any),
+                        payload: decoded,
                     };
                     return {
                         value: decoded,
@@ -399,7 +235,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                     };
                 } catch (err) {
                     const typedErr =
-                        err instanceof SchemaError || err instanceof ValidationError || err instanceof CodecError
+                        err instanceof SchemaError || err instanceof CodecError
                             ? err
                             : new SchemaError("TYPE_MISMATCH", `Autoschema inference failed for key "${key}"`, err);
                     return { value: getFallback(typedErr) };
@@ -408,13 +244,18 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
 
             // No schema found: default mode ignores version and uses hook codec.
             if (!schemaForVersion) {
+                // If payload is already a non-string JSON value (e.g. seeded data,
+                // or previously schema-managed data whose schema was removed),
+                // return it directly without codec decoding.
+                if (typeof envelope.payload !== "string") {
+                    return { value: envelope.payload as T };
+                }
                 try {
-                    const decoded = decodePayloadWithCodec<T>(envelope.payload, codec);
-                    validateValue(decoded);
+                    const decoded = decodeStringPayload<T>(envelope.payload, codec);
                     return { value: decoded };
                 } catch (err) {
                     const typedErr =
-                        err instanceof SchemaError || err instanceof ValidationError || err instanceof CodecError
+                        err instanceof SchemaError || err instanceof CodecError
                             ? err
                             : new CodecError(`Codec decode failed for key "${key}"`, err);
                     return { value: getFallback(typedErr) };
@@ -422,13 +263,14 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             }
 
             // Schema exists for stored version.
+            // Payload is a JSON value directly (no codec decoding needed).
             let current: unknown;
             try {
-                current = decodePayloadWithCodec(envelope.payload, schemaForVersion.codec);
-                validateValue(current, schemaForVersion.validate);
+                current = envelope.payload;
+                validateAgainstSchema(current, schemaForVersion.schema);
             } catch (err) {
                 const typedErr =
-                    err instanceof SchemaError || err instanceof ValidationError || err instanceof CodecError
+                    err instanceof SchemaError || err instanceof CodecError
                         ? err
                         : new SchemaError("TYPE_MISMATCH", `Schema decode failed for key "${key}"`, err);
                 return { value: getFallback(typedErr) };
@@ -456,11 +298,11 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 for (const step of path) {
                     migrated = step.migrate(migrated);
                 }
-                validateValue(migrated, latestSchema.validate);
-                const payload = latestSchema.codec.encode(migrated as any);
+                validateAgainstSchema(migrated, latestSchema.schema);
+                // Rewrite as schema-managed envelope (payload is JSON value)
                 const rewriteEnvelope: MnemonicEnvelope = {
                     version: latestSchema.version,
-                    payload,
+                    payload: migrated,
                 };
                 return {
                     value: migrated as T,
@@ -468,7 +310,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 };
             } catch (err) {
                 const typedErr =
-                    err instanceof SchemaError || err instanceof ValidationError || err instanceof CodecError
+                    err instanceof SchemaError || err instanceof CodecError
                         ? err
                         : new SchemaError("MIGRATION_FAILED", `Migration failed for key "${key}"`, err);
                 return { value: getFallback(typedErr) };
@@ -476,9 +318,8 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         },
         [
             codec,
-            decodePayloadWithCodec,
+            decodeStringPayload,
             getFallback,
-            inferValidator,
             key,
             parseEnvelope,
             schemaMode,
@@ -486,28 +327,16 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             getSchemaForVersion,
             getLatestSchemaForKey,
             getMigrationPathForKey,
-            isReservedSchema,
-            validateValue,
+            validateAgainstSchema,
         ],
     );
 
     const encodeForWrite = useCallback(
         (nextValue: T): string => {
             const explicitVersion = schema?.version;
-            if (explicitVersion === 0) {
-                throw new SchemaError(
-                    "SCHEMA_VERSION_RESERVED",
-                    `Schema version 0 is reserved for key "${key}"`,
-                );
-            }
             const latestSchema = getLatestSchemaForKey();
             const explicitSchema = explicitVersion !== undefined ? getSchemaForVersion(explicitVersion) : undefined;
-            if (isReservedSchema(explicitSchema) || isReservedSchema(latestSchema)) {
-                throw new SchemaError(
-                    "SCHEMA_VERSION_RESERVED",
-                    `Schema registry returned reserved version 0 for key "${key}"`,
-                );
-            }
+
             let targetSchema = explicitSchema;
 
             if (!targetSchema) {
@@ -527,8 +356,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                         `Write requires schema for key "${key}" in strict mode`,
                     );
                 }
-                // No schema specified/registered. Default to version 0 envelope.
-                validateValue(nextValue);
+                // No schema: codec-only path. Encode with hook codec, version 0.
                 const envelope: MnemonicEnvelope = {
                     version: 0,
                     payload: codec.encode(nextValue),
@@ -536,10 +364,27 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 return JSON.stringify(envelope);
             }
 
-            validateValue(nextValue, targetSchema.validate);
+            // Schema exists: validate and apply write-time migration if available.
+            let valueToStore: unknown = nextValue;
+
+            // Check for write-time normalizer (fromVersion === toVersion)
+            const writeMigration = schemaRegistry?.getWriteMigration?.(key, targetSchema.version);
+            if (writeMigration) {
+                try {
+                    valueToStore = writeMigration.migrate(valueToStore);
+                } catch (err) {
+                    throw err instanceof SchemaError
+                        ? err
+                        : new SchemaError("MIGRATION_FAILED", `Write-time migration failed for key "${key}"`, err);
+                }
+            }
+
+            validateAgainstSchema(valueToStore, targetSchema.schema);
+
+            // Schema-managed envelope: payload is JSON value directly
             const envelope: MnemonicEnvelope = {
                 version: targetSchema.version,
-                payload: targetSchema.codec.encode(nextValue as any),
+                payload: valueToStore,
             };
             return JSON.stringify(envelope);
         },
@@ -548,10 +393,10 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             key,
             schemaMode,
             codec,
-            validateValue,
+            schemaRegistry,
+            validateAgainstSchema,
             getLatestSchemaForKey,
             getSchemaForVersion,
-            isReservedSchema,
         ],
     );
 
@@ -647,17 +492,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
 
     /**
      * Update function - supports both direct values and updater functions.
-     *
-     * @param next - Either a new value, or a function that receives the current value and returns the next value
-     *
-     * @example
-     * ```typescript
-     * // Direct value
-     * set(42);
-     *
-     * // Updater function
-     * set(count => count + 1);
-     * ```
      */
     const set = useMemo(() => {
         return (next: T | ((cur: T) => T)) => {
@@ -685,11 +519,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
 
     /**
      * Reset function - sets the value back to the default and persists it.
-     *
-     * @example
-     * ```typescript
-     * reset(); // Restores the defaultValue and writes it to storage
-     * ```
      */
     const reset = useMemo(() => {
         return () => {
@@ -713,11 +542,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
     /**
      * Remove function - completely removes the key from storage.
      * Future reads will return the default value.
-     *
-     * @example
-     * ```typescript
-     * remove(); // Deletes the key from storage
-     * ```
      */
     const remove = useMemo(() => {
         return () => api.removeRaw(key);

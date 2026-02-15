@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import { useEffect } from "react";
-import { MnemonicProvider, useMnemonicKey, StringCodec } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ResizablePanel } from "./components/ResizablePanel";
 import { PersistedForm } from "./components/PersistedForm";
@@ -12,7 +12,6 @@ import { SchemaPlayground } from "./components/SchemaPlayground";
 function ThemeRoot({ children }: { children: React.ReactNode }) {
     const { value: mode } = useMnemonicKey<string>("theme-mode", {
         defaultValue: "system",
-        codec: StringCodec,
         listenCrossTab: true,
     });
 
@@ -43,7 +42,7 @@ export function App() {
                     <section className="demo-section">
                         <h2 className="section-title">Theme</h2>
                         <p className="section-desc">
-                            Persisted with <code>StringCodec</code> and synced across tabs via{" "}
+                            Persisted as a string and synced across tabs via{" "}
                             <code>listenCrossTab</code>.
                         </p>
                         <ThemeToggle />
@@ -51,7 +50,7 @@ export function App() {
                     <section className="demo-section">
                         <h2 className="section-title">Resizable Panel</h2>
                         <p className="section-desc">
-                            Drag the right edge to resize. Width persisted with <code>NumberCodec</code>.
+                            Drag the right edge to resize. Width persisted with the default <code>JSONCodec</code>.
                         </p>
                         <ResizablePanel />
                     </section>

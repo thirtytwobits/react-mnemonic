@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
-import { StringCodec, NumberCodec, BooleanCodec, createCodec, CodecError, ValidationError } from "./codecs";
+import { createCodec, CodecError } from "./codecs";
+import { SchemaError } from "./schema";
 import type { StorageLike, Codec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -148,40 +149,6 @@ describe("useMnemonicKey – codecs", () => {
         storage = createMockStorage();
     });
 
-    it("uses StringCodec", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("name", { defaultValue: "guest", codec: StringCodec }),
-        );
-        act(() => {
-            result.current.set("alice");
-        });
-        expect(result.current.value).toBe("alice");
-        // StringCodec does not JSON-wrap
-        expect(storage.store.get("ns.name")).toBe(env("alice"));
-    });
-
-    it("uses NumberCodec", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("vol", { defaultValue: 50, codec: NumberCodec }),
-        );
-        act(() => {
-            result.current.set(75);
-        });
-        expect(result.current.value).toBe(75);
-        expect(storage.store.get("ns.vol")).toBe(env("75"));
-    });
-
-    it("uses BooleanCodec", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("dark", { defaultValue: false, codec: BooleanCodec }),
-        );
-        act(() => {
-            result.current.set(true);
-        });
-        expect(result.current.value).toBe(true);
-        expect(storage.store.get("ns.dark")).toBe(env("true"));
-    });
-
     it("uses a custom codec", () => {
         const DateCodec = createCodec<Date>(
             (d) => d.toISOString(),
@@ -200,11 +167,11 @@ describe("useMnemonicKey – codecs", () => {
     });
 
     it("falls back to default when decode fails", () => {
-        storage.store.set("ns.count", env("not-a-number"));
+        // JSONCodec (default) cannot parse "not-valid-json{"
+        storage.store.set("ns.count", env("not-valid-json{"));
         const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0, codec: NumberCodec }),
+            useMnemonicKey("count", { defaultValue: 0 }),
         );
-        // NumberCodec throws CodecError for "not-a-number", so fallback
         expect(result.current.value).toBe(0);
     });
 
@@ -226,68 +193,6 @@ describe("useMnemonicKey – codecs", () => {
         expect(result.current.value).toBe("x");
         expect(errorSpy).toHaveBeenCalled();
         errorSpy.mockRestore();
-    });
-});
-
-describe("useMnemonicKey – validation", () => {
-    let storage: ReturnType<typeof createMockStorage>;
-
-    beforeEach(() => {
-        storage = createMockStorage();
-    });
-
-    it("returns default when validation fails", () => {
-        storage.store.set("ns.num", env(JSON.stringify(-5)));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: 0,
-                validate: (v): v is number => typeof v === "number" && v >= 0,
-            }),
-        );
-        expect(result.current.value).toBe(0);
-    });
-
-    it("returns stored value when validation passes", () => {
-        storage.store.set("ns.num", env(JSON.stringify(10)));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: 0,
-                validate: (v): v is number => typeof v === "number" && v >= 0,
-            }),
-        );
-        expect(result.current.value).toBe(10);
-    });
-
-    it("updater function uses validated current value", () => {
-        storage.store.set("ns.num", env(JSON.stringify(5)));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: 0,
-                validate: (v): v is number => typeof v === "number" && v >= 0,
-            }),
-        );
-        act(() => {
-            result.current.set((cur) => cur + 10);
-        });
-        expect(result.current.value).toBe(15);
-    });
-
-    it("updater function falls back to default when validation fails for current value", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: 0,
-                validate: (v): v is number => typeof v === "number" && v >= 0,
-            }),
-        );
-        // Set a value that will fail validation when read during updater
-        storage.store.set("ns.num", env(JSON.stringify(-1)));
-        act(() => {
-            // Force cache invalidation by removing and resetting
-            result.current.set((cur) => cur + 100);
-        });
-        // The updater reads the current raw value which is -1, fails validation,
-        // falls back to 0, then adds 100
-        expect(result.current.value).toBe(100);
     });
 });
 
@@ -352,10 +257,6 @@ describe("useMnemonicKey – callbacks", () => {
         act(() => {
             result.current.set(0);
         });
-        // Value didn't actually change semantically (0 -> 0), but it was set.
-        // The write still hits storage; onChange behavior depends on decoded value identity.
-        // JSONCodec decode will produce a new 0 but Object.is(0, 0) === true
-        // so onChange should NOT fire.
         expect(onChange).not.toHaveBeenCalled();
     });
 });
@@ -371,7 +272,6 @@ describe("useMnemonicKey – cross-tab sync", () => {
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -381,7 +281,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "ns.theme",
-                    newValue: env("dark"),
+                    newValue: env(JSON.stringify("dark")),
                 }),
             );
         });
@@ -389,11 +289,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
     });
 
     it("removes value when a storage event fires with null", () => {
-        storage.store.set("ns.theme", env("dark"));
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -411,11 +310,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
     });
 
     it("handles localStorage.clear() events (key is null)", () => {
-        storage.store.set("ns.theme", env("dark"));
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -437,7 +335,6 @@ describe("useMnemonicKey – cross-tab sync", () => {
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: true,
             }),
         );
@@ -456,7 +353,6 @@ describe("useMnemonicKey – cross-tab sync", () => {
         const { result } = renderHook(storage, "ns", () =>
             useMnemonicKey("theme", {
                 defaultValue: "light",
-                codec: StringCodec,
                 listenCrossTab: false,
             }),
         );
@@ -464,7 +360,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
             window.dispatchEvent(
                 new StorageEvent("storage", {
                     key: "ns.theme",
-                    newValue: env("dark"),
+                    newValue: env(JSON.stringify("dark")),
                 }),
             );
         });
@@ -579,7 +475,7 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
     });
 
     it("factory receives undefined on nominal path (no stored value)", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 42);
+        const factory = vi.fn((_error?: CodecError | SchemaError) => 42);
         renderHook(storage, "ns", () =>
             useMnemonicKey("count", { defaultValue: factory }),
         );
@@ -587,28 +483,25 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
     });
 
     it("factory receives CodecError when decode fails", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
+        const factory = vi.fn((_error?: CodecError | SchemaError) => 0);
+        // Use a codec that throws on decode
+        const StrictCodec: Codec<number> = {
+            encode: (v) => String(v),
+            decode: (s) => {
+                const n = Number(s);
+                if (Number.isNaN(n)) throw new CodecError("not a number");
+                return n;
+            },
+        };
         storage.store.set("ns.count", env("not-a-number"));
         renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: factory, codec: NumberCodec }),
+            useMnemonicKey("count", { defaultValue: factory, codec: StrictCodec }),
         );
         expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
     });
 
-    it("factory receives ValidationError when validation returns false", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
-        storage.store.set("ns.num", env(JSON.stringify(-5)));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: factory,
-                validate: (v): v is number => typeof v === "number" && v >= 0,
-            }),
-        );
-        expect(factory).toHaveBeenCalledWith(expect.any(ValidationError));
-    });
-
     it("non-CodecError from codec.decode is wrapped in CodecError", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => "default");
+        const factory = vi.fn((_error?: CodecError | SchemaError) => "default");
         const BadJsonCodec: Codec<string> = {
             encode: (v) => JSON.stringify(v),
             decode: () => {
@@ -624,43 +517,19 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
         expect(passedError.cause).toBeInstanceOf(SyntaxError);
     });
 
-    it("validate throwing ValidationError passes it through to factory", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
-        const customError = new ValidationError("age must be positive");
-        storage.store.set("ns.num", env(JSON.stringify(-5)));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: factory,
-                validate: (v): v is number => {
-                    if (typeof v !== "number" || v < 0) throw customError;
-                    return true;
-                },
-            }),
-        );
-        expect(factory).toHaveBeenCalledWith(customError);
-    });
-
-    it("validate throwing non-ValidationError wraps in ValidationError", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 0);
-        storage.store.set("ns.num", env(JSON.stringify(42)));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("num", {
-                defaultValue: factory,
-                validate: (_v): _v is number => {
-                    throw new TypeError("unexpected");
-                },
-            }),
-        );
-        expect(factory).toHaveBeenCalledWith(expect.any(ValidationError));
-        const passedError = factory.mock.calls[0]![0] as ValidationError;
-        expect(passedError.cause).toBeInstanceOf(TypeError);
-    });
-
     it("updater passes CodecError to factory when decode fails", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => 10);
+        const StrictCodec: Codec<number> = {
+            encode: (v) => String(v),
+            decode: (s) => {
+                const n = Number(s);
+                if (Number.isNaN(n)) throw new CodecError("not a number");
+                return n;
+            },
+        };
+        const factory = vi.fn((_error?: CodecError | SchemaError) => 10);
         storage.store.set("ns.val", env("corrupt"));
         const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey<number>("val", { defaultValue: factory, codec: NumberCodec }),
+            useMnemonicKey<number>("val", { defaultValue: factory, codec: StrictCodec }),
         );
         // Initial render calls factory with CodecError; clear to isolate updater call
         factory.mockClear();
@@ -673,9 +542,9 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
     });
 
     it("reset calls factory with no error argument (nominal)", () => {
-        const factory = vi.fn((_error?: CodecError | ValidationError) => "default");
+        const factory = vi.fn((_error?: CodecError | SchemaError) => "default");
         const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: factory, codec: StringCodec }),
+            useMnemonicKey("val", { defaultValue: factory }),
         );
         factory.mockClear();
         act(() => {
@@ -685,18 +554,19 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
     });
 
     it("static defaultValue ignores errors and returns value regardless", () => {
-        storage.store.set("ns.count", env("not-a-number"));
+        // JSONCodec cannot parse "not-valid-json{"
+        storage.store.set("ns.count", env("not-valid-json{"));
         const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 99, codec: NumberCodec }),
+            useMnemonicKey("count", { defaultValue: 99 }),
         );
         expect(result.current.value).toBe(99);
     });
 
     it("decode errors do not trigger console.error", () => {
         const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-        storage.store.set("ns.count", env("not-a-number"));
+        storage.store.set("ns.count", env("not-valid-json{"));
         renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0, codec: NumberCodec }),
+            useMnemonicKey("count", { defaultValue: 0 }),
         );
         expect(errorSpy).not.toHaveBeenCalled();
         errorSpy.mockRestore();

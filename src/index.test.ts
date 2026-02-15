@@ -6,14 +6,12 @@ import {
     MnemonicProvider,
     useMnemonicKey,
     JSONCodec,
-    StringCodec,
-    NumberCodec,
-    BooleanCodec,
     createCodec,
     CodecError,
-    ValidationError,
+    SchemaError,
+    validateJsonSchema,
 } from "./index";
-import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions } from "./index";
+import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, JsonSchema } from "./index";
 
 describe("Public API exports", () => {
     it("exports MnemonicProvider", () => {
@@ -32,24 +30,6 @@ describe("Public API exports", () => {
         expect(typeof JSONCodec.decode).toBe("function");
     });
 
-    it("exports StringCodec", () => {
-        expect(StringCodec).toBeDefined();
-        expect(typeof StringCodec.encode).toBe("function");
-        expect(typeof StringCodec.decode).toBe("function");
-    });
-
-    it("exports NumberCodec", () => {
-        expect(NumberCodec).toBeDefined();
-        expect(typeof NumberCodec.encode).toBe("function");
-        expect(typeof NumberCodec.decode).toBe("function");
-    });
-
-    it("exports BooleanCodec", () => {
-        expect(BooleanCodec).toBeDefined();
-        expect(typeof BooleanCodec.encode).toBe("function");
-        expect(typeof BooleanCodec.decode).toBe("function");
-    });
-
     it("exports createCodec", () => {
         expect(createCodec).toBeDefined();
         expect(typeof createCodec).toBe("function");
@@ -61,14 +41,21 @@ describe("Public API exports", () => {
         expect(new CodecError("test")).toBeInstanceOf(Error);
     });
 
-    it("exports ValidationError", () => {
-        expect(ValidationError).toBeDefined();
-        expect(typeof ValidationError).toBe("function");
-        expect(new ValidationError("test")).toBeInstanceOf(Error);
+    it("exports SchemaError", () => {
+        expect(SchemaError).toBeDefined();
+        expect(typeof SchemaError).toBe("function");
+        expect(new SchemaError("TYPE_MISMATCH", "test")).toBeInstanceOf(Error);
+    });
+
+    it("exports validateJsonSchema", () => {
+        expect(validateJsonSchema).toBeDefined();
+        expect(typeof validateJsonSchema).toBe("function");
+        // Quick smoke test
+        expect(validateJsonSchema(42, { type: "number" })).toEqual([]);
+        expect(validateJsonSchema("x", { type: "number" })).toHaveLength(1);
     });
 
     it("type exports are usable (Codec)", () => {
-        // This verifies the type export compiles correctly
         const myCodec: Codec<number> = {
             encode: (v) => String(v),
             decode: (s) => Number(s),
@@ -88,5 +75,14 @@ describe("Public API exports", () => {
             defaultValue: "hello",
         };
         expect(opts.defaultValue).toBe("hello");
+    });
+
+    it("type exports are usable (JsonSchema)", () => {
+        const schema: JsonSchema = {
+            type: "object",
+            properties: { name: { type: "string" } },
+            required: ["name"],
+        };
+        expect(schema.type).toBe("object");
     });
 });
