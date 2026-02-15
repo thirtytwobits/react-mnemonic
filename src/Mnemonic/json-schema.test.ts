@@ -2,8 +2,8 @@
 // Copyright Scott Dixon
 
 import { describe, it, expect } from "vitest";
-import { validateJsonSchema, inferJsonSchema, jsonDeepEqual } from "./json-schema";
-import type { JsonSchema } from "./json-schema";
+import { validateJsonSchema, inferJsonSchema, jsonDeepEqual, compileSchema } from "./json-schema";
+import type { JsonSchema, CompiledValidator } from "./json-schema";
 
 describe("jsonDeepEqual", () => {
     it("compares primitives", () => {
@@ -417,6 +417,194 @@ describe("validateJsonSchema", () => {
             const errors = validateJsonSchema(42, { type: "string" });
             expect(errors[0]!.keyword).toBe("type");
         });
+    });
+});
+
+describe("compileSchema", () => {
+    it("returns a function", () => {
+        const validate = compileSchema({ type: "string" });
+        expect(typeof validate).toBe("function");
+    });
+
+    it("caches by schema identity", () => {
+        const schema: JsonSchema = { type: "number" };
+        const v1 = compileSchema(schema);
+        const v2 = compileSchema(schema);
+        expect(v1).toBe(v2);
+    });
+
+    it("returns separate validators for different schema objects", () => {
+        const a: JsonSchema = { type: "number" };
+        const b: JsonSchema = { type: "number" };
+        expect(compileSchema(a)).not.toBe(compileSchema(b));
+    });
+
+    it("empty schema accepts any value", () => {
+        const validate = compileSchema({});
+        expect(validate("hello")).toEqual([]);
+        expect(validate(42)).toEqual([]);
+        expect(validate(null)).toEqual([]);
+        expect(validate({})).toEqual([]);
+        expect(validate([])).toEqual([]);
+        expect(validate(true)).toEqual([]);
+    });
+
+    it("validates type keyword", () => {
+        const validate = compileSchema({ type: "string" });
+        expect(validate("hello")).toEqual([]);
+        expect(validate(42)).toHaveLength(1);
+    });
+
+    it("validates union types", () => {
+        const validate = compileSchema({ type: ["string", "null"] });
+        expect(validate("hello")).toEqual([]);
+        expect(validate(null)).toEqual([]);
+        expect(validate(42)).toHaveLength(1);
+    });
+
+    it("validates enum with primitive set optimization", () => {
+        const validate = compileSchema({ enum: [1, 2, 3] });
+        expect(validate(1)).toEqual([]);
+        expect(validate(3)).toEqual([]);
+        expect(validate(4)).toHaveLength(1);
+    });
+
+    it("validates enum with mixed types", () => {
+        const validate = compileSchema({ enum: ["a", null, 42, { x: 1 }] });
+        expect(validate("a")).toEqual([]);
+        expect(validate(null)).toEqual([]);
+        expect(validate(42)).toEqual([]);
+        expect(validate({ x: 1 })).toEqual([]);
+        expect(validate("b")).toHaveLength(1);
+        expect(validate({ x: 2 })).toHaveLength(1);
+    });
+
+    it("validates const keyword", () => {
+        const validate = compileSchema({ const: 42 });
+        expect(validate(42)).toEqual([]);
+        expect(validate(43)).toHaveLength(1);
+    });
+
+    it("validates number constraints", () => {
+        const validate = compileSchema({
+            type: "number",
+            minimum: 0,
+            maximum: 100,
+        });
+        expect(validate(50)).toEqual([]);
+        expect(validate(-1)).toHaveLength(1);
+        expect(validate(101)).toHaveLength(1);
+
+        const exclusive = compileSchema({
+            type: "number",
+            exclusiveMinimum: 0,
+            exclusiveMaximum: 100,
+        });
+        expect(exclusive(50)).toEqual([]);
+        expect(exclusive(0)).toHaveLength(1);
+        expect(exclusive(100)).toHaveLength(1);
+    });
+
+    it("validates string constraints", () => {
+        const validate = compileSchema({ type: "string", minLength: 1, maxLength: 5 });
+        expect(validate("hi")).toEqual([]);
+        expect(validate("")).toHaveLength(1);
+        expect(validate("toolong")).toHaveLength(1);
+    });
+
+    it("validates object with required, properties, additionalProperties", () => {
+        const validate = compileSchema({
+            type: "object",
+            properties: {
+                name: { type: "string" },
+                age: { type: "number" },
+            },
+            required: ["name"],
+            additionalProperties: false,
+        });
+        expect(validate({ name: "Alice", age: 30 })).toEqual([]);
+        expect(validate({ name: "Alice" })).toEqual([]);
+        expect(validate({})).toHaveLength(1); // missing required
+        expect(validate({ name: "Alice", extra: true })).toHaveLength(1); // additional
+    });
+
+    it("validates nested objects via pre-compiled sub-validators", () => {
+        const validate = compileSchema({
+            type: "object",
+            properties: {
+                address: {
+                    type: "object",
+                    properties: { city: { type: "string" } },
+                    required: ["city"],
+                },
+            },
+        });
+        expect(validate({ address: { city: "NYC" } })).toEqual([]);
+        expect(validate({ address: {} })).toHaveLength(1);
+    });
+
+    it("validates array constraints with pre-compiled item validator", () => {
+        const validate = compileSchema({
+            type: "array",
+            items: { type: "number" },
+            minItems: 1,
+            maxItems: 3,
+        });
+        expect(validate([1, 2])).toEqual([]);
+        expect(validate([])).toHaveLength(1); // minItems
+        expect(validate([1, 2, 3, 4])).toHaveLength(1); // maxItems
+        expect(validate([1, "two"])).toHaveLength(1); // item type
+    });
+
+    it("reports correct paths", () => {
+        const validate = compileSchema({
+            type: "object",
+            properties: {
+                items: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: { id: { type: "number" } },
+                    },
+                },
+            },
+        });
+        const errors = validate({ items: [{ id: "bad" }] });
+        expect(errors[0]!.path).toBe("/items/0/id");
+    });
+
+    it("compiled validator matches validateJsonSchema for all types", () => {
+        const schemas: JsonSchema[] = [
+            { type: "string" },
+            { type: "number" },
+            { type: "integer" },
+            { type: "boolean" },
+            { type: "null" },
+            { type: "object" },
+            { type: "array" },
+        ];
+        const values = ["hello", 42, 3.14, true, null, { a: 1 }, [1, 2], undefined];
+        for (const schema of schemas) {
+            const validate = compileSchema(schema);
+            for (const value of values) {
+                expect(validate(value)).toEqual(validateJsonSchema(value, schema));
+            }
+        }
+    });
+
+    it("validates additionalProperties against a schema", () => {
+        const validate = compileSchema({
+            type: "object",
+            properties: { name: { type: "string" } },
+            additionalProperties: { type: "number" },
+        });
+        expect(validate({ name: "Alice", score: 42 })).toEqual([]);
+        expect(validate({ name: "Alice", score: "high" })).toHaveLength(1);
+    });
+
+    it("CompiledValidator type is usable", () => {
+        const v: CompiledValidator = compileSchema({ type: "string" });
+        expect(v("hello")).toEqual([]);
     });
 });
 

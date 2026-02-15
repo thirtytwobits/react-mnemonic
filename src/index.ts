@@ -9,8 +9,8 @@ export {
   CodecError,
 } from "./Mnemonic/codecs";
 export { SchemaError } from "./Mnemonic/schema";
-export { validateJsonSchema } from "./Mnemonic/json-schema";
-export type { JsonSchema, JsonSchemaValidationError } from "./Mnemonic/json-schema";
+export { validateJsonSchema, compileSchema } from "./Mnemonic/json-schema";
+export type { JsonSchema, JsonSchemaValidationError, CompiledValidator } from "./Mnemonic/json-schema";
 export type {
   Codec,
   MnemonicProviderOptions,

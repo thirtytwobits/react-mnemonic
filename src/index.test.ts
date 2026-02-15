@@ -10,8 +10,9 @@ import {
     CodecError,
     SchemaError,
     validateJsonSchema,
+    compileSchema,
 } from "./index";
-import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, JsonSchema } from "./index";
+import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, JsonSchema, CompiledValidator } from "./index";
 
 describe("Public API exports", () => {
     it("exports MnemonicProvider", () => {
@@ -53,6 +54,19 @@ describe("Public API exports", () => {
         // Quick smoke test
         expect(validateJsonSchema(42, { type: "number" })).toEqual([]);
         expect(validateJsonSchema("x", { type: "number" })).toHaveLength(1);
+    });
+
+    it("exports compileSchema", () => {
+        expect(compileSchema).toBeDefined();
+        expect(typeof compileSchema).toBe("function");
+        const validate = compileSchema({ type: "number" });
+        expect(validate(42)).toEqual([]);
+        expect(validate("x")).toHaveLength(1);
+    });
+
+    it("type exports are usable (CompiledValidator)", () => {
+        const validator: CompiledValidator = compileSchema({ type: "string" });
+        expect(validator("hello")).toEqual([]);
     });
 
     it("type exports are usable (Codec)", () => {
