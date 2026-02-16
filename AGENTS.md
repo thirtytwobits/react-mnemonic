@@ -13,8 +13,6 @@
 - `npm run dev` runs `tsup --watch` for continuous builds.
 - `npm run test` runs the Vitest test suite once.
 - `npm run test:watch` runs Vitest in watch mode.
-- `npm run storybook` starts Storybook at port `6006`.
-- `npm run storybook:build` builds the static Storybook site.
 - `npm run lint` runs TypeScript type-checking with `tsc --noEmit`.
 - `npm run format` formats all files with Prettier.
 - `npm run format:check` checks formatting without writing.
@@ -36,7 +34,7 @@
 
 ## Commit & Pull Request Guidelines
 - No commit history exists yet. Use clear, imperative messages (e.g., `Add Mnemonic headers`).
-- PRs should include a concise summary, testing notes (`npm run test`/`npm run lint`), and screenshots for UI changes (Storybook or rendered components).
+- PRs should include a concise summary, testing notes (`npm run test`/`npm run lint`), and screenshots for UI changes.
 
 ## Release & Publishing
 - Releases are handled by GitHub Actions on tagged releases. Tag format: `vX.Y.Z` (example: `v0.1.0`).
