@@ -96,6 +96,8 @@ Context provider that scopes storage keys under a namespace.
 <MnemonicProvider
   namespace="my-app"       // key prefix (required)
   storage={localStorage}   // StorageLike backend (default: localStorage)
+  schemaMode="default"     // "default" | "strict" | "autoschema" (default: "default")
+  schemaRegistry={registry} // optional SchemaRegistry for versioned schemas
   enableDevTools={false}   // expose console helpers (default: false)
 >
   {children}
@@ -128,6 +130,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 | `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value            |
 | `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                  |
 | `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event         |
+| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version      |
 
 ### Codecs
 
@@ -165,6 +168,47 @@ interface StorageLike {
 `onExternalChange` enables cross-tab sync for non-localStorage backends (e.g.
 IndexedDB over `BroadcastChannel`). The library handles all error cases
 internally -- see the `StorageLike` JSDoc for the full error-handling contract.
+
+### `validateJsonSchema(schema, value)`
+
+Validate an arbitrary value against a JSON Schema (the same subset used by the
+hook). Returns an array of validation errors, empty when the value is valid.
+
+```ts
+import { validateJsonSchema } from "react-mnemonic";
+
+const errors = validateJsonSchema(
+  { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+  { name: 42 },
+);
+// [{ path: ".name", message: 'Expected type "string"' }]
+```
+
+### `compileSchema(schema)`
+
+Pre-compile a JSON Schema into a reusable validator function. The compiled
+validator is cached by schema reference (via `WeakMap`), so calling
+`compileSchema` twice with the same object returns the identical function.
+
+```ts
+import { compileSchema } from "react-mnemonic";
+import type { CompiledValidator } from "react-mnemonic";
+
+const validate: CompiledValidator = compileSchema({
+  type: "object",
+  properties: {
+    name: { type: "string", minLength: 1 },
+    age: { type: "number", minimum: 0 },
+  },
+  required: ["name"],
+});
+
+validate({ name: "Alice", age: 30 }); // []
+validate({ age: -1 });                // [{ path: "", … }, { path: ".age", … }]
+```
+
+This is useful when you validate the same schema frequently outside of the hook
+(e.g. in form validation or server responses).
 
 ### Error classes
 
@@ -429,11 +473,16 @@ import type {
   Codec,
   StorageLike,
   MnemonicProviderOptions,
+  MnemonicProviderProps,
   UseMnemonicKeyOptions,
   KeySchema,
   MigrationRule,
+  MigrationPath,
   SchemaRegistry,
+  SchemaMode,
   JsonSchema,
+  JsonSchemaValidationError,
+  CompiledValidator,
 } from "react-mnemonic";
 ```
 

@@ -547,5 +547,19 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         return () => api.removeRaw(key);
     }, [api, key]);
 
-    return useMemo(() => ({ value, set, reset, remove }), [value, set, reset, remove]);
+    return useMemo(
+        () =>
+            /** @see {@link UseMnemonicKeyOptions} for configuration details */
+            ({
+                /** Current decoded value, or the default when the key is absent or invalid. */
+                value,
+                /** Persist a new value (direct or updater function). */
+                set,
+                /** Reset to `defaultValue` and persist it. */
+                reset,
+                /** Delete the key from storage entirely. */
+                remove,
+            }),
+        [value, set, reset, remove],
+    );
 }

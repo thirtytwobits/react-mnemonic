@@ -7,3 +7,4 @@ coverage
 .last-run*
 *.tsbuildinfo
 build-ts
+docs

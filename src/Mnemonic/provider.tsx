@@ -190,7 +190,6 @@ type MnemonicInternal = Mnemonic & {
  *
  * @see {@link useMnemonicKey} - Hook for using persistent state
  * @see {@link MnemonicProviderOptions} - Configuration options
- * @see {@link useMnemonic} - Low-level hook for accessing the store
  */
 export function MnemonicProvider({
     children,

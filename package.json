@@ -25,7 +25,9 @@
     "storybook:build": "storybook build",
     "lint": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "keywords": [
     "react",
@@ -61,9 +63,12 @@
     "react-dom": "^18.3.1",
     "storybook": "^8.5.0",
     "tsup": "^8.3.5",
+    "typedoc": "^0.28.17",
     "typescript": "^5.7.3",
     "vitest": "^3.2.4"
   },
   "sideEffects": false,
-  "workspaces": ["example"]
+  "workspaces": [
+    "example"
+  ]
 }
