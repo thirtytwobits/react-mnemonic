@@ -6,7 +6,7 @@ coverage
 .last-run*
 *.tsbuildinfo
 build-ts
-docs
+/docs
 website/build
 website/.docusaurus
 website/docs/api
