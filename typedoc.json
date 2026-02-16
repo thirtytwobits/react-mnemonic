@@ -1,33 +1,26 @@
 {
-  "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["src/index.ts"],
-  "out": "docs",
-  "name": "react-mnemonic",
-  "readme": "README.md",
-  "tsconfig": "tsconfig.json",
-  "includeVersion": true,
-  "excludePrivate": true,
-  "excludeProtected": true,
-  "excludeInternal": true,
-  "excludeNotDocumented": false,
-  "categorizeByGroup": true,
-  "sort": ["kind", "alphabetical"],
-  "kindSortOrder": [
-    "Function",
-    "Class",
-    "Interface",
-    "TypeAlias",
-    "Variable",
-    "Enum"
-  ],
-  "navigationLinks": {
-    "GitHub": "https://github.com/scottdarch/react-mnemonic",
-    "npm": "https://www.npmjs.com/package/react-mnemonic"
-  },
-  "plugin": [],
-  "validation": {
-    "notExported": true,
-    "invalidLink": true,
-    "notDocumented": true
-  }
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": ["src/index.ts"],
+    "out": "docs",
+    "name": "react-mnemonic",
+    "readme": "README.md",
+    "tsconfig": "tsconfig.json",
+    "includeVersion": true,
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "excludeInternal": true,
+    "excludeNotDocumented": false,
+    "categorizeByGroup": true,
+    "sort": ["kind", "alphabetical"],
+    "kindSortOrder": ["Function", "Class", "Interface", "TypeAlias", "Variable", "Enum"],
+    "navigationLinks": {
+        "GitHub": "https://github.com/thirtytwobits/react-mnemonic",
+        "npm": "https://www.npmjs.com/package/react-mnemonic"
+    },
+    "plugin": [],
+    "validation": {
+        "notExported": true,
+        "invalidLink": true,
+        "notDocumented": true
+    }
 }

@@ -10,12 +10,8 @@ Mnemonic supports optional schema versioning through the `schemaMode` prop on
 `MnemonicProvider` and an optional `schemaRegistry`.
 
 ```tsx
-<MnemonicProvider
-  namespace="app"
-  schemaMode="default"
-  schemaRegistry={registry}
->
-  <App />
+<MnemonicProvider namespace="app" schemaMode="default" schemaRegistry={registry}>
+    <App />
 </MnemonicProvider>
 ```
 
@@ -38,7 +34,7 @@ the registry has none.
 
 ```tsx
 <MnemonicProvider namespace="app" schemaMode="strict" schemaRegistry={registry}>
-  <App />
+    <App />
 </MnemonicProvider>
 ```
 
@@ -50,7 +46,7 @@ that schema.
 
 ```tsx
 <MnemonicProvider namespace="app" schemaMode="autoschema" schemaRegistry={registry}>
-  <App />
+    <App />
 </MnemonicProvider>
 ```
 

@@ -66,15 +66,15 @@ cd ..
 
 ### Library development
 
-| Command               | Description                                    |
-| --------------------- | ---------------------------------------------- |
-| `npm run build`       | One-shot production build into `dist/`         |
-| `npm run dev`         | Watch mode — rebuilds `dist/` on file changes  |
-| `npm run test`        | Run the full Vitest test suite once            |
-| `npm run test:watch`  | Run Vitest in watch mode                       |
-| `npm run lint`        | Type-check with `tsc --noEmit`                 |
-| `npm run format`      | Format all files with Prettier                 |
-| `npm run format:check`| Check formatting without writing               |
+| Command                | Description                                   |
+| ---------------------- | --------------------------------------------- |
+| `npm run build`        | One-shot production build into `dist/`        |
+| `npm run dev`          | Watch mode — rebuilds `dist/` on file changes |
+| `npm run test`         | Run the full Vitest test suite once           |
+| `npm run test:watch`   | Run Vitest in watch mode                      |
+| `npm run lint`         | Type-check with `tsc --noEmit`                |
+| `npm run format`       | Format all files with Prettier                |
+| `npm run format:check` | Check formatting without writing              |
 
 All commands are run from the **repository root**.
 
@@ -84,12 +84,12 @@ The documentation is built with [Docusaurus](https://docusaurus.io/) and lives
 in the `website/` directory. API reference pages are auto-generated from source
 via [TypeDoc](https://typedoc.org/) + `docusaurus-plugin-typedoc`.
 
-| Command                  | Description                                        |
-| ------------------------ | -------------------------------------------------- |
-| `npm run docs`           | Generate standalone TypeDoc API docs into `docs/`  |
-| `npm run docs:watch`     | TypeDoc in watch mode for live editing             |
-| `npm run docs:site`      | Build the full Docusaurus site (`website/build/`)  |
-| `npm run docs:site:start`| Start the Docusaurus dev server with hot reload    |
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `npm run docs`            | Generate standalone TypeDoc API docs into `docs/` |
+| `npm run docs:watch`      | TypeDoc in watch mode for live editing            |
+| `npm run docs:site`       | Build the full Docusaurus site (`website/build/`) |
+| `npm run docs:site:start` | Start the Docusaurus dev server with hot reload   |
 
 **Important:** The Docusaurus site depends on the built library. Always run
 `npm run build` at the root before building or starting the site.
@@ -151,29 +151,29 @@ Coverage reports (HTML + LCOV) are written to `coverage/`.
 
 ### Library (`src/`)
 
-| File                   | Purpose                                              |
-| ---------------------- | ---------------------------------------------------- |
-| `index.ts`             | Public API barrel — all exports                      |
-| `Mnemonic/provider.tsx`| `MnemonicProvider` context provider                  |
-| `Mnemonic/use.ts`      | `useMnemonicKey` hook                                |
-| `Mnemonic/codecs.ts`   | `JSONCodec`, `createCodec`, `CodecError`             |
-| `Mnemonic/json-schema.ts` | JSON Schema validation & compiled validators      |
-| `Mnemonic/schema.ts`   | Schema versioning, migration, `SchemaError`          |
-| `Mnemonic/types.ts`    | Shared TypeScript types and interfaces               |
+| File                      | Purpose                                      |
+| ------------------------- | -------------------------------------------- |
+| `index.ts`                | Public API barrel — all exports              |
+| `Mnemonic/provider.tsx`   | `MnemonicProvider` context provider          |
+| `Mnemonic/use.ts`         | `useMnemonicKey` hook                        |
+| `Mnemonic/codecs.ts`      | `JSONCodec`, `createCodec`, `CodecError`     |
+| `Mnemonic/json-schema.ts` | JSON Schema validation & compiled validators |
+| `Mnemonic/schema.ts`      | Schema versioning, migration, `SchemaError`  |
+| `Mnemonic/types.ts`       | Shared TypeScript types and interfaces       |
 
 ### Documentation site (`website/`)
 
-| Path                          | Purpose                                  |
-| ----------------------------- | ---------------------------------------- |
-| `docs/getting-started/`       | Installation and quick-start guides      |
-| `docs/guides/`                | In-depth feature guides                  |
-| `docs/api/`                   | Auto-generated API reference (TypeDoc)   |
-| `src/pages/index.tsx`         | Landing page                             |
-| `src/pages/demo.tsx`          | Interactive demo page                    |
-| `src/components/demo/`        | Demo React components                    |
-| `src/css/`                    | Custom stylesheets                       |
-| `docusaurus.config.ts`        | Site configuration                       |
-| `sidebars.ts`                 | Sidebar navigation                       |
+| Path                    | Purpose                                |
+| ----------------------- | -------------------------------------- |
+| `docs/getting-started/` | Installation and quick-start guides    |
+| `docs/guides/`          | In-depth feature guides                |
+| `docs/api/`             | Auto-generated API reference (TypeDoc) |
+| `src/pages/index.tsx`   | Landing page                           |
+| `src/pages/demo.tsx`    | Interactive demo page                  |
+| `src/components/demo/`  | Demo React components                  |
+| `src/css/`              | Custom stylesheets                     |
+| `docusaurus.config.ts`  | Site configuration                     |
+| `sidebars.ts`           | Sidebar navigation                     |
 
 ## Making changes
 
@@ -202,15 +202,21 @@ Coverage reports (HTML + LCOV) are written to `coverage/`.
 ### Continuous Integration (`ci.yml`)
 
 Runs on every push and pull request:
+
 - Installs dependencies
 - Type-checks with `tsc --noEmit` (`npm run lint`)
 - Checks formatting with Prettier (`npm run format:check`)
 - Builds the library (`npm run build`)
 - Runs the test suite (`npm run test`)
+- **Package install test** — after the above passes, a matrix job packs the
+  tarball and installs it with **npm**, **yarn**, and **pnpm** in parallel, then
+  verifies ESM imports, CJS requires, and TypeScript type resolution
+  (`moduleResolution: "nodenext"`).
 
 ### Documentation deployment (`deploy-docs.yml`)
 
 Runs on push to `main`:
+
 1. Installs root dependencies
 2. Builds the library (`dist/`)
 3. Installs website dependencies
@@ -220,7 +226,11 @@ Runs on push to `main`:
 ### Releases (`release.yml`)
 
 Triggered by tagged releases matching `vX.Y.Z`:
-- Publishes to npm
+
+- Type-checks and format-checks the code
+- Builds and tests the library
+- Publishes to npm with `--tag alpha` (during prerelease phase)
+- Includes npm provenance attestation
 
 ## License
 

@@ -15,11 +15,11 @@ For `localStorage` backends, enable cross-tab sync with `listenCrossTab`:
 
 ```tsx
 const { value: theme, set } = useMnemonicKey<"light" | "dark">("theme", {
-  defaultValue: "light",
-  listenCrossTab: true,
-  onChange: (t) => {
-    document.documentElement.setAttribute("data-theme", t);
-  },
+    defaultValue: "light",
+    listenCrossTab: true,
+    onChange: (t) => {
+        document.documentElement.setAttribute("data-theme", t);
+    },
 });
 ```
 
@@ -34,12 +34,12 @@ on your `StorageLike`:
 
 ```ts
 const idbStorage: StorageLike = {
-  // ... getItem, setItem, removeItem ...
-  onExternalChange: (cb) => {
-    const bc = new BroadcastChannel("my-app-sync");
-    bc.onmessage = (e) => cb(e.data.keys);
-    return () => bc.close();
-  },
+    // ... getItem, setItem, removeItem ...
+    onExternalChange: (cb) => {
+        const bc = new BroadcastChannel("my-app-sync");
+        bc.onmessage = (e) => cb(e.data.keys);
+        return () => bc.close();
+    },
 };
 ```
 

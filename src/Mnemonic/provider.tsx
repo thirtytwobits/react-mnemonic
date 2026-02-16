@@ -257,11 +257,7 @@ export function MnemonicProvider({
          * swallows all non-DOMException errors.
          */
         const logAccessError = (err: unknown): void => {
-            if (
-                !accessErrorLogged &&
-                err instanceof DOMException &&
-                err.name !== "QuotaExceededError"
-            ) {
+            if (!accessErrorLogged && err instanceof DOMException && err.name !== "QuotaExceededError") {
                 console.error(
                     `[Mnemonic] Storage access error (${err.name}): ${err.message}. ` +
                         "Data is cached in memory but may not persist.",
@@ -310,11 +306,7 @@ export function MnemonicProvider({
                     quotaErrorLogged = false;
                     accessErrorLogged = false;
                 } catch (err) {
-                    if (
-                        !quotaErrorLogged &&
-                        err instanceof DOMException &&
-                        err.name === "QuotaExceededError"
-                    ) {
+                    if (!quotaErrorLogged && err instanceof DOMException && err.name === "QuotaExceededError") {
                         console.error(
                             `[Mnemonic] Storage quota exceeded writing key "${key}". ` +
                                 "Data is cached in memory but will not persist.",

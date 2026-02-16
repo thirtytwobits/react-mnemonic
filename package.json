@@ -1,65 +1,80 @@
 {
-  "name": "react-mnemonic",
-  "version": "0.1.0",
-  "description": "Persistent, type-safe state management for React",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "tsc -p tsconfig.json --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "docs": "typedoc",
-    "docs:watch": "typedoc --watch",
-    "docs:site": "npm --prefix website run build",
-    "docs:site:start": "npm --prefix website start"
-  },
-  "keywords": [
-    "react",
-    "react-hooks",
-    "persistent-state",
-    "localstorage",
-    "state-management",
-    "typescript",
-    "codec",
-    "cross-tab"
-  ],
-  "author": "Scott Dixon",
-  "license": "MIT",
-  "peerDependencies": {
-    "react": ">=18",
-    "react-dom": ">=18"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.0.1",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@vitest/coverage-v8": "^3.2.4",
-    "@vitest/ui": "^3.2.4",
-    "jsdom": "^25.0.1",
-    "prettier": "^3.6.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tsup": "^8.3.5",
-    "typedoc": "^0.28.17",
-    "typescript": "^5.7.3",
-    "vitest": "^3.2.4"
-  },
-  "sideEffects": false
+    "name": "react-mnemonic",
+    "version": "0.1.0-alpha.0",
+    "description": "Persistent, type-safe state management for React",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": {
+                "import": "./dist/index.d.ts",
+                "require": "./dist/index.d.cts"
+            },
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "tsc -p tsconfig.json --noEmit",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "docs": "typedoc",
+        "docs:watch": "typedoc --watch",
+        "docs:site": "npm --prefix website run build",
+        "docs:site:start": "npm --prefix website start"
+    },
+    "keywords": [
+        "react",
+        "react-hooks",
+        "persistent-state",
+        "localstorage",
+        "state-management",
+        "typescript",
+        "codec",
+        "cross-tab"
+    ],
+    "author": "Scott Dixon",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/thirtytwobits/react-mnemonic.git"
+    },
+    "homepage": "https://thirtytwobits.github.io/react-mnemonic/",
+    "bugs": {
+        "url": "https://github.com/thirtytwobits/react-mnemonic/issues"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "peerDependencies": {
+        "react": ">=18",
+        "react-dom": ">=18"
+    },
+    "devDependencies": {
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.0.1",
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@vitest/coverage-v8": "^3.2.4",
+        "@vitest/ui": "^3.2.4",
+        "jsdom": "^25.0.1",
+        "prettier": "^3.6.2",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "tsup": "^8.3.5",
+        "typedoc": "^0.28.17",
+        "typescript": "^5.7.3",
+        "vitest": "^3.2.4"
+    },
+    "sideEffects": false
 }

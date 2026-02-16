@@ -13,24 +13,24 @@ inside it.
 import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
 
 function Counter() {
-  const { value: count, set } = useMnemonicKey("count", {
-    defaultValue: 0,
-  });
+    const { value: count, set } = useMnemonicKey("count", {
+        defaultValue: 0,
+    });
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => set((c) => c + 1)}>Increment</button>
-    </div>
-  );
+    return (
+        <div>
+            <p>Count: {count}</p>
+            <button onClick={() => set((c) => c + 1)}>Increment</button>
+        </div>
+    );
 }
 
 export default function App() {
-  return (
-    <MnemonicProvider namespace="my-app">
-      <Counter />
-    </MnemonicProvider>
-  );
+    return (
+        <MnemonicProvider namespace="my-app">
+            <Counter />
+        </MnemonicProvider>
+    );
 }
 ```
 
@@ -57,12 +57,12 @@ survives full page reloads.
 const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 ```
 
-| Property | Type                                  | Description                                      |
-| -------- | ------------------------------------- | ------------------------------------------------ |
-| `value`  | `T`                                   | Current decoded value (or default)               |
-| `set`    | `(next: T \| (cur: T) => T) => void` | Update the value (direct or updater function)    |
-| `reset`  | `() => void`                          | Reset to `defaultValue` and persist it           |
-| `remove` | `() => void`                          | Delete the key from storage entirely             |
+| Property | Type                                 | Description                                   |
+| -------- | ------------------------------------ | --------------------------------------------- |
+| `value`  | `T`                                  | Current decoded value (or default)            |
+| `set`    | `(next: T \| (cur: T) => T) => void` | Update the value (direct or updater function) |
+| `reset`  | `() => void`                         | Reset to `defaultValue` and persist it        |
+| `remove` | `() => void`                         | Delete the key from storage entirely          |
 
 ## Next steps
 

@@ -176,9 +176,7 @@ describe("schema mode behavior", () => {
 
     it("strict mode reads and writes with registered schema version", () => {
         const storage = createMockStorage();
-        const registry = createRegistry([
-            { key: "count", version: 2, schema: { type: "number" } },
-        ]);
+        const registry = createRegistry([{ key: "count", version: 2, schema: { type: "number" } }]);
         // Schema-managed envelope: payload is JSON value
         storage.store.set("ns.count", schemaEnv(5, 2));
 
@@ -204,9 +202,7 @@ describe("schema mode behavior", () => {
 
     it("v0 schema is accepted on read", () => {
         const storage = createMockStorage();
-        const registry = createRegistry([
-            { key: "count", version: 0, schema: { type: "number" } },
-        ]);
+        const registry = createRegistry([{ key: "count", version: 0, schema: { type: "number" } }]);
         storage.store.set("ns.count", schemaEnv(5, 0));
 
         const result = renderHook(
@@ -227,9 +223,7 @@ describe("schema mode behavior", () => {
 
     it("v0 schema is accepted on write", () => {
         const storage = createMockStorage();
-        const registry = createRegistry([
-            { key: "count", version: 0, schema: { type: "number" } },
-        ]);
+        const registry = createRegistry([{ key: "count", version: 0, schema: { type: "number" } }]);
 
         const result = renderHook(
             () =>
@@ -313,9 +307,7 @@ describe("schema mode behavior", () => {
     it("write-time migration normalizes value on write", () => {
         const storage = createMockStorage();
         const registry = createRegistry(
-            [
-                { key: "name", version: 1, schema: { type: "string" } },
-            ],
+            [{ key: "name", version: 1, schema: { type: "string" } }],
             [
                 {
                     key: "name",
@@ -435,9 +427,7 @@ describe("schema mode behavior", () => {
 
     it("schema validation rejects mistyped values on read", () => {
         const storage = createMockStorage();
-        const registry = createRegistry([
-            { key: "count", version: 1, schema: { type: "number" } },
-        ]);
+        const registry = createRegistry([{ key: "count", version: 1, schema: { type: "number" } }]);
         // Store a string where a number is expected
         storage.store.set("ns.count", schemaEnv("not-a-number", 1));
 

@@ -12,11 +12,8 @@ during development.
 ## Enabling DevTools
 
 ```tsx
-<MnemonicProvider
-  namespace="app"
-  enableDevTools={process.env.NODE_ENV === "development"}
->
-  <App />
+<MnemonicProvider namespace="app" enableDevTools={process.env.NODE_ENV === "development"}>
+    <App />
 </MnemonicProvider>
 ```
 

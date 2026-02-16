@@ -76,24 +76,18 @@ describe("useMnemonicKey – basic read/write", () => {
     });
 
     it("returns the default value when no stored value exists", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 42 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 42 }));
         expect(result.current.value).toBe(42);
     });
 
     it("returns the stored value when it exists", () => {
         storage.store.set("ns.count", env(JSON.stringify(99)));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         expect(result.current.value).toBe(99);
     });
 
     it("set() updates the value", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         act(() => {
             result.current.set(10);
         });
@@ -102,9 +96,7 @@ describe("useMnemonicKey – basic read/write", () => {
     });
 
     it("set() with updater function", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 5 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 5 }));
         act(() => {
             result.current.set((c) => c + 1);
         });
@@ -112,9 +104,7 @@ describe("useMnemonicKey – basic read/write", () => {
     });
 
     it("reset() restores the default value", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         act(() => {
             result.current.set(100);
         });
@@ -127,9 +117,7 @@ describe("useMnemonicKey – basic read/write", () => {
     });
 
     it("remove() clears the value and returns default", () => {
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         act(() => {
             result.current.set(50);
         });
@@ -169,9 +157,7 @@ describe("useMnemonicKey – codecs", () => {
     it("falls back to default when decode fails", () => {
         // JSONCodec (default) cannot parse "not-valid-json{"
         storage.store.set("ns.count", env("not-valid-json{"));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         expect(result.current.value).toBe(0);
     });
 
@@ -183,9 +169,7 @@ describe("useMnemonicKey – codecs", () => {
             },
             decode: (s) => s,
         };
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("k", { defaultValue: "x", codec: BadCodec }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("k", { defaultValue: "x", codec: BadCodec }));
         act(() => {
             result.current.set("anything");
         });
@@ -205,9 +189,7 @@ describe("useMnemonicKey – defaultValue factory", () => {
 
     it("calls factory function for the default value", () => {
         const factory = vi.fn(() => ({ items: [] as string[] }));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("cart", { defaultValue: factory }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("cart", { defaultValue: factory }));
         expect(result.current.value).toEqual({ items: [] });
         expect(factory).toHaveBeenCalled();
     });
@@ -223,26 +205,20 @@ describe("useMnemonicKey – callbacks", () => {
     it("calls onMount once with the initial value", () => {
         const onMount = vi.fn();
         storage.store.set("ns.greeting", env(JSON.stringify("hello")));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("greeting", { defaultValue: "default", onMount }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("greeting", { defaultValue: "default", onMount }));
         expect(onMount).toHaveBeenCalledTimes(1);
         expect(onMount).toHaveBeenCalledWith("hello");
     });
 
     it("calls onMount with default when no stored value", () => {
         const onMount = vi.fn();
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("greeting", { defaultValue: "fallback", onMount }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("greeting", { defaultValue: "fallback", onMount }));
         expect(onMount).toHaveBeenCalledWith("fallback");
     });
 
     it("calls onChange when value changes", () => {
         const onChange = vi.fn();
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0, onChange }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0, onChange }));
         act(() => {
             result.current.set(5);
         });
@@ -251,9 +227,7 @@ describe("useMnemonicKey – callbacks", () => {
 
     it("does not call onChange if value is the same", () => {
         const onChange = vi.fn();
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0, onChange }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0, onChange }));
         act(() => {
             result.current.set(0);
         });
@@ -476,9 +450,7 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
 
     it("factory receives undefined on nominal path (no stored value)", () => {
         const factory = vi.fn((_error?: CodecError | SchemaError) => 42);
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: factory }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: factory }));
         expect(factory).toHaveBeenCalledWith(undefined);
     });
 
@@ -494,9 +466,7 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
             },
         };
         storage.store.set("ns.count", env("not-a-number"));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: factory, codec: StrictCodec }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: factory, codec: StrictCodec }));
         expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
     });
 
@@ -509,9 +479,7 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
             },
         };
         storage.store.set("ns.val", env("corrupt"));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: factory, codec: BadJsonCodec }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("val", { defaultValue: factory, codec: BadJsonCodec }));
         expect(factory).toHaveBeenCalledWith(expect.any(CodecError));
         const passedError = factory.mock.calls[0]![0] as CodecError;
         expect(passedError.cause).toBeInstanceOf(SyntaxError);
@@ -543,9 +511,7 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
 
     it("reset calls factory with no error argument (nominal)", () => {
         const factory = vi.fn((_error?: CodecError | SchemaError) => "default");
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("val", { defaultValue: factory }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("val", { defaultValue: factory }));
         factory.mockClear();
         act(() => {
             result.current.reset();
@@ -556,18 +522,14 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
     it("static defaultValue ignores errors and returns value regardless", () => {
         // JSONCodec cannot parse "not-valid-json{"
         storage.store.set("ns.count", env("not-valid-json{"));
-        const { result } = renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 99 }),
-        );
+        const { result } = renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 99 }));
         expect(result.current.value).toBe(99);
     });
 
     it("decode errors do not trigger console.error", () => {
         const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         storage.store.set("ns.count", env("not-valid-json{"));
-        renderHook(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         expect(errorSpy).not.toHaveBeenCalled();
         errorSpy.mockRestore();
     });

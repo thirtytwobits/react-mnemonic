@@ -74,10 +74,7 @@ function HomepageHeader() {
                 <h1 className="hero__title">{siteConfig.title}</h1>
                 <p className="hero__subtitle">{siteConfig.tagline}</p>
                 <div className={styles.buttons}>
-                    <Link
-                        className="button button--secondary button--lg"
-                        to="/docs/getting-started/installation"
-                    >
+                    <Link className="button button--secondary button--lg" to="/docs/getting-started/installation">
                         Get Started
                     </Link>
                     <Link
@@ -125,17 +122,15 @@ function HomepageExample() {
     return (
         <section className={styles.example}>
             <div className="container">
-                <h2 style={{ textAlign: "center", marginBottom: "2rem" }}>
-                    Simple as useState
-                </h2>
+                <h2 style={{ textAlign: "center", marginBottom: "2rem" }}>Simple as useState</h2>
                 <div className="row">
                     <div className="col col--8 col--offset-2">
                         <CodeBlock language="tsx" title="App.tsx">
                             {quickExample}
                         </CodeBlock>
                         <p style={{ textAlign: "center", marginTop: "1rem", opacity: 0.8 }}>
-                            The counter value persists in <code>localStorage</code> under{" "}
-                            <code>my-app.count</code> and survives full page reloads.
+                            The counter value persists in <code>localStorage</code> under <code>my-app.count</code> and
+                            survives full page reloads.
                         </p>
                     </div>
                 </div>

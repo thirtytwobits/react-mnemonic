@@ -79,9 +79,7 @@ describe("useSyncExternalStore – snapshot stability", () => {
     });
 
     it("getRawSnapshot returns same value on repeated calls without mutation", () => {
-        const { store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("key", { defaultValue: "x" }),
-        );
+        const { store } = renderHookWithStore(storage, "ns", () => useMnemonicKey("key", { defaultValue: "x" }));
         const snap1 = store.current.getRawSnapshot("key");
         const snap2 = store.current.getRawSnapshot("key");
         const snap3 = store.current.getRawSnapshot("key");
@@ -90,9 +88,7 @@ describe("useSyncExternalStore – snapshot stability", () => {
     });
 
     it("getRawSnapshot returns different value after mutation", () => {
-        const { store } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("key", { defaultValue: "x" }),
-        );
+        const { store } = renderHookWithStore(storage, "ns", () => useMnemonicKey("key", { defaultValue: "x" }));
         const snap1 = store.current.getRawSnapshot("key");
         store.current.setRaw("key", env("changed"));
         const snap2 = store.current.getRawSnapshot("key");
@@ -321,9 +317,7 @@ describe("useSyncExternalStore – rapid mutations", () => {
     });
 
     it("rapid set() via hook settle to the final value", () => {
-        const { result } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHookWithStore(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
 
         act(() => {
             for (let i = 1; i <= 50; i++) {
@@ -335,9 +329,7 @@ describe("useSyncExternalStore – rapid mutations", () => {
     });
 
     it("rapid updater functions accumulate correctly", () => {
-        const { result } = renderHookWithStore(storage, "ns", () =>
-            useMnemonicKey("count", { defaultValue: 0 }),
-        );
+        const { result } = renderHookWithStore(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
 
         act(() => {
             for (let i = 0; i < 10; i++) {
@@ -464,9 +456,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.count", newValue: env("42") }),
-            );
+            window.dispatchEvent(new StorageEvent("storage", { key: "ns.count", newValue: env("42") }));
         });
 
         // JSONCodec decodes "42" → 42
@@ -483,9 +473,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.count", newValue: env("not-a-number") }),
-            );
+            window.dispatchEvent(new StorageEvent("storage", { key: "ns.count", newValue: env("not-a-number") }));
         });
 
         // JSONCodec throws for "not-a-number", fallback to default
@@ -568,9 +556,7 @@ describe("cross-tab sync – data flow integration", () => {
         expect(v2).toBe("a");
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.shared", newValue: env(JSON.stringify("b")) }),
-            );
+            window.dispatchEvent(new StorageEvent("storage", { key: "ns.shared", newValue: env(JSON.stringify("b")) }));
         });
 
         expect(v1).toBe("b");

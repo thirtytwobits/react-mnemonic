@@ -58,10 +58,7 @@ export async function createIdbStorage(
     }
 
     const channelName = `idb-storage:${dbName}:${storeName}`;
-    const bc =
-        typeof BroadcastChannel !== "undefined"
-            ? new BroadcastChannel(channelName)
-            : null;
+    const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(channelName) : null;
 
     const notifyExternal = () => {
         for (const fn of externalListeners) {
@@ -93,33 +90,30 @@ export async function createIdbStorage(
         pending = new Map();
 
         try {
-            const committed: boolean = await idbStore(
-                "readwrite",
-                (os: IDBObjectStore) => {
-                    return new Promise<boolean>((resolve, reject) => {
-                        const revReq = os.get(REV_KEY);
-                        revReq.onsuccess = () => {
-                            const currentRev = Number(revReq.result) || 0;
-                            if (currentRev !== localRev) {
-                                os.transaction.oncomplete = () => resolve(false);
-                                os.transaction.onerror = () => reject(os.transaction.error);
-                                return;
-                            }
-                            for (const [key, value] of batch) {
-                                if (value === null) {
-                                    os.delete(key);
-                                } else {
-                                    os.put(value, key);
-                                }
-                            }
-                            os.put(String(currentRev + 1), REV_KEY);
-                            os.transaction.oncomplete = () => resolve(true);
+            const committed: boolean = await idbStore("readwrite", (os: IDBObjectStore) => {
+                return new Promise<boolean>((resolve, reject) => {
+                    const revReq = os.get(REV_KEY);
+                    revReq.onsuccess = () => {
+                        const currentRev = Number(revReq.result) || 0;
+                        if (currentRev !== localRev) {
+                            os.transaction.oncomplete = () => resolve(false);
                             os.transaction.onerror = () => reject(os.transaction.error);
-                        };
-                        revReq.onerror = () => reject(revReq.error);
-                    });
-                },
-            );
+                            return;
+                        }
+                        for (const [key, value] of batch) {
+                            if (value === null) {
+                                os.delete(key);
+                            } else {
+                                os.put(value, key);
+                            }
+                        }
+                        os.put(String(currentRev + 1), REV_KEY);
+                        os.transaction.oncomplete = () => resolve(true);
+                        os.transaction.onerror = () => reject(os.transaction.error);
+                    };
+                    revReq.onerror = () => reject(revReq.error);
+                });
+            });
 
             if (committed) {
                 localRev += 1;

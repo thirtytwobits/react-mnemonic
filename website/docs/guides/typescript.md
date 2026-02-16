@@ -13,20 +13,20 @@ All public types are re-exported from the package root.
 
 ```ts
 import type {
-  Codec,
-  StorageLike,
-  MnemonicProviderOptions,
-  MnemonicProviderProps,
-  UseMnemonicKeyOptions,
-  KeySchema,
-  MigrationRule,
-  MigrationPath,
-  SchemaRegistry,
-  SchemaMode,
-  JsonSchema,
-  JsonSchemaType,
-  JsonSchemaValidationError,
-  CompiledValidator,
+    Codec,
+    StorageLike,
+    MnemonicProviderOptions,
+    MnemonicProviderProps,
+    UseMnemonicKeyOptions,
+    KeySchema,
+    MigrationRule,
+    MigrationPath,
+    SchemaRegistry,
+    SchemaMode,
+    JsonSchema,
+    JsonSchemaType,
+    JsonSchemaValidationError,
+    CompiledValidator,
 } from "react-mnemonic";
 ```
 
@@ -40,7 +40,7 @@ const { value, set } = useMnemonicKey("count", { defaultValue: 0 });
 
 // T is inferred as { name: string; email: string }
 const { value, set } = useMnemonicKey("profile", {
-  defaultValue: { name: "", email: "" },
+    defaultValue: { name: "", email: "" },
 });
 ```
 
@@ -48,7 +48,7 @@ You can also supply the generic explicitly:
 
 ```ts
 const { value, set } = useMnemonicKey<"light" | "dark">("theme", {
-  defaultValue: "light",
+    defaultValue: "light",
 });
 ```
 
@@ -60,8 +60,8 @@ Bidirectional serialization between `T` and `string`:
 
 ```ts
 interface Codec<T> {
-  encode: (value: T) => string;
-  decode: (encoded: string) => T;
+    encode: (value: T) => string;
+    decode: (encoded: string) => T;
 }
 ```
 
@@ -71,9 +71,9 @@ A versioned JSON Schema definition for a storage key:
 
 ```ts
 interface KeySchema {
-  key: string;
-  version: number;
-  schema: JsonSchema;
+    key: string;
+    version: number;
+    schema: JsonSchema;
 }
 ```
 
@@ -83,10 +83,10 @@ Defines how to transform data between schema versions:
 
 ```ts
 interface MigrationRule {
-  key: string;
-  fromVersion: number;
-  toVersion: number;
-  migrate: (value: unknown) => unknown;
+    key: string;
+    fromVersion: number;
+    toVersion: number;
+    migrate: (value: unknown) => unknown;
 }
 ```
 
@@ -96,11 +96,11 @@ The interface for registering schemas and resolving migrations:
 
 ```ts
 interface SchemaRegistry {
-  getSchema(key: string, version: number): KeySchema | undefined;
-  getLatestSchema(key: string): KeySchema | undefined;
-  getMigrationPath(key: string, from: number, to: number): MigrationRule[] | null;
-  getWriteMigration(key: string, version: number): MigrationRule | undefined;
-  registerSchema(schema: KeySchema): void;
+    getSchema(key: string, version: number): KeySchema | undefined;
+    getLatestSchema(key: string): KeySchema | undefined;
+    getMigrationPath(key: string, from: number, to: number): MigrationRule[] | null;
+    getWriteMigration(key: string, version: number): MigrationRule | undefined;
+    registerSchema(schema: KeySchema): void;
 }
 ```
 

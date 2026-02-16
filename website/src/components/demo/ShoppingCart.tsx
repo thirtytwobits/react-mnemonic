@@ -34,20 +34,14 @@ function CartContents() {
         set((prev) => {
             const existing = prev.find((i) => i.id === product.id);
             if (existing) {
-                return prev.map((i) =>
-                    i.id === product.id ? { ...i, qty: i.qty + 1 } : i,
-                );
+                return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
             }
             return [...prev, { ...product, qty: 1 }];
         });
     };
 
     const updateQty = (id: string, delta: number) => {
-        set((prev) =>
-            prev
-                .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
-                .filter((i) => i.qty > 0),
-        );
+        set((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0));
     };
 
     const removeItem = (id: string) => {
@@ -61,14 +55,9 @@ function CartContents() {
             <div className="demo-cart-catalog">
                 {catalog.map((p) => (
                     <div key={p.id} className="demo-catalog-item">
-                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
-                            {p.name}
-                        </span>
+                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{p.name}</span>
                         <span className="demo-muted">${p.price.toFixed(2)}</span>
-                        <button
-                            className="button button--sm button--primary"
-                            onClick={() => addItem(p)}
-                        >
+                        <button className="button button--sm button--primary" onClick={() => addItem(p)}>
                             Add to Cart
                         </button>
                     </div>

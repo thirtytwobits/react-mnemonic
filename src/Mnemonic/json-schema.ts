@@ -17,14 +17,7 @@
  *
  * `"integer"` is a JSON Schema keyword meaning "a number that is a whole number."
  */
-export type JsonSchemaType =
-    | "string"
-    | "number"
-    | "integer"
-    | "boolean"
-    | "null"
-    | "object"
-    | "array";
+export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "null" | "object" | "array";
 
 /**
  * A subset of JSON Schema sufficient for localStorage state management.
@@ -213,11 +206,7 @@ function isJsonPrimitive(value: unknown): boolean {
 function buildValidator(schema: JsonSchema): CompiledValidator {
     // --- Pre-compute: type ---
     const resolvedTypes: readonly JsonSchemaType[] | null =
-        schema.type !== undefined
-            ? Array.isArray(schema.type)
-                ? schema.type
-                : [schema.type]
-            : null;
+        schema.type !== undefined ? (Array.isArray(schema.type) ? schema.type : [schema.type]) : null;
     const typeLabel = resolvedTypes !== null ? JSON.stringify(schema.type) : "";
 
     // --- Pre-compute: enum ---
@@ -266,17 +255,13 @@ function buildValidator(schema: JsonSchema): CompiledValidator {
     const hasProperties = schema.properties !== undefined;
     const propertyValidators: [string, CompiledValidator][] | null = hasProperties
         ? Object.entries(schema.properties!).map(
-              ([name, propSchema]) =>
-                  [name, compileSchema(propSchema)] as [string, CompiledValidator],
+              ([name, propSchema]) => [name, compileSchema(propSchema)] as [string, CompiledValidator],
           )
         : null;
-    const checkAdditional =
-        schema.additionalProperties !== undefined && schema.additionalProperties !== true;
+    const checkAdditional = schema.additionalProperties !== undefined && schema.additionalProperties !== true;
     const additionalIsFalse = schema.additionalProperties === false;
     const additionalValidator: CompiledValidator | null =
-        checkAdditional && !additionalIsFalse
-            ? compileSchema(schema.additionalProperties as JsonSchema)
-            : null;
+        checkAdditional && !additionalIsFalse ? compileSchema(schema.additionalProperties as JsonSchema) : null;
     const definedPropKeys: Set<string> | null = checkAdditional
         ? new Set(schema.properties ? Object.keys(schema.properties) : [])
         : null;
@@ -287,8 +272,7 @@ function buildValidator(schema: JsonSchema): CompiledValidator {
     const minItems = schema.minItems!;
     const hasMaxItems = schema.maxItems !== undefined;
     const maxItems = schema.maxItems!;
-    const itemsValidator: CompiledValidator | null =
-        schema.items !== undefined ? compileSchema(schema.items) : null;
+    const itemsValidator: CompiledValidator | null = schema.items !== undefined ? compileSchema(schema.items) : null;
     const hasArrayConstraints = hasMinItems || hasMaxItems || itemsValidator !== null;
 
     // --- Empty schema fast path ---
@@ -401,12 +385,7 @@ function buildValidator(schema: JsonSchema): CompiledValidator {
         }
 
         // --- object constraints ---
-        if (
-            hasObjectConstraints &&
-            typeof value === "object" &&
-            value !== null &&
-            !Array.isArray(value)
-        ) {
+        if (hasObjectConstraints && typeof value === "object" && value !== null && !Array.isArray(value)) {
             const obj = value as Record<string, unknown>;
 
             if (hasRequired) {
@@ -440,10 +419,7 @@ function buildValidator(schema: JsonSchema): CompiledValidator {
                                 keyword: "additionalProperties",
                             });
                         } else {
-                            const propErrors = additionalValidator!(
-                                obj[objKey],
-                                `${path}/${objKey}`,
-                            );
+                            const propErrors = additionalValidator!(obj[objKey], `${path}/${objKey}`);
                             errors.push(...propErrors);
                         }
                     }
@@ -491,11 +467,7 @@ function buildValidator(schema: JsonSchema): CompiledValidator {
  * @param path - Internal: JSON Pointer path for error reporting (default: `""`)
  * @returns Array of validation errors (empty = valid)
  */
-export function validateJsonSchema(
-    value: unknown,
-    schema: JsonSchema,
-    path: string = "",
-): JsonSchemaValidationError[] {
+export function validateJsonSchema(value: unknown, schema: JsonSchema, path: string = ""): JsonSchemaValidationError[] {
     const compiled = compileSchema(schema);
     return compiled(value, path);
 }

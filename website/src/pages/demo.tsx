@@ -19,8 +19,7 @@ function DemoContent() {
             <section className="demo-section">
                 <h2>Resizable Panel</h2>
                 <p>
-                    Drag the right edge to resize. Width persisted with the
-                    default <code>JSONCodec</code>.
+                    Drag the right edge to resize. Width persisted with the default <code>JSONCodec</code>.
                 </p>
                 <ResizablePanel />
             </section>
@@ -28,8 +27,7 @@ function DemoContent() {
             <section className="demo-section">
                 <h2>Persisted Form</h2>
                 <p>
-                    All field values persisted with <code>JSONCodec</code>. Try
-                    refreshing the page.
+                    All field values persisted with <code>JSONCodec</code>. Try refreshing the page.
                 </p>
                 <PersistedForm />
             </section>
@@ -37,9 +35,8 @@ function DemoContent() {
             <section className="demo-section">
                 <h2>Shopping Cart</h2>
                 <p>
-                    Uses a custom <code>StorageLike</code> adapter backed by
-                    IndexedDB via <code>idb-keyval</code>, running in its own{" "}
-                    <code>MnemonicProvider</code>.
+                    Uses a custom <code>StorageLike</code> adapter backed by IndexedDB via <code>idb-keyval</code>,
+                    running in its own <code>MnemonicProvider</code>.
                 </p>
                 <ShoppingCart />
             </section>
@@ -47,10 +44,8 @@ function DemoContent() {
             <section className="demo-section">
                 <h2>Schema Playground</h2>
                 <p>
-                    Explore schema versioning and data migration. Define schemas,
-                    add migration rules, seed versioned data, and watch{" "}
-                    <code>useMnemonicKey</code> decode, validate, and migrate in
-                    real time.
+                    Explore schema versioning and data migration. Define schemas, add migration rules, seed versioned
+                    data, and watch <code>useMnemonicKey</code> decode, validate, and migrate in real time.
                 </p>
                 <SchemaPlayground />
             </section>
@@ -64,20 +59,13 @@ export default function DemoPage(): React.JSX.Element {
             <div className="demo-page">
                 <h1>Interactive Demo</h1>
                 <p className="demo-subtitle">
-                    Try each demo below — all state persists across page reloads.
-                    {" "}
-                    <a
-                        href="demo"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
+                    Try each demo below — all state persists across page reloads.{" "}
+                    <a href="demo" target="_blank" rel="noopener noreferrer">
                         Open this page in a new tab
-                    </a>
-                    {" "}to test cross-tab sync.
+                    </a>{" "}
+                    to test cross-tab sync.
                 </p>
-                <BrowserOnly fallback={<p>Loading demos…</p>}>
-                    {() => <DemoContent />}
-                </BrowserOnly>
+                <BrowserOnly fallback={<p>Loading demos…</p>}>{() => <DemoContent />}</BrowserOnly>
             </div>
         </Layout>
     );

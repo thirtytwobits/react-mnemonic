@@ -28,9 +28,7 @@ export function ResizablePanel() {
             const onMove = (ev: MouseEvent) => {
                 if (!dragging.current || !wrapperRef.current) return;
                 const rect = wrapperRef.current.getBoundingClientRect();
-                const next = Math.round(
-                    Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, ev.clientX - rect.left)),
-                );
+                const next = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, ev.clientX - rect.left)));
                 set(next);
             };
 
@@ -59,22 +57,13 @@ export function ResizablePanel() {
                 />
             </div>
             <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                <button
-                    className="button button--sm button--outline button--secondary"
-                    onClick={() => set(MIN_WIDTH)}
-                >
+                <button className="button button--sm button--outline button--secondary" onClick={() => set(MIN_WIDTH)}>
                     Min ({MIN_WIDTH}px)
                 </button>
-                <button
-                    className="button button--sm button--outline button--secondary"
-                    onClick={() => reset()}
-                >
+                <button className="button button--sm button--outline button--secondary" onClick={() => reset()}>
                     Reset (300px)
                 </button>
-                <button
-                    className="button button--sm button--outline button--secondary"
-                    onClick={() => set(MAX_WIDTH)}
-                >
+                <button className="button button--sm button--outline button--secondary" onClick={() => set(MAX_WIDTH)}>
                     Max ({MAX_WIDTH}px)
                 </button>
             </div>

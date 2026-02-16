@@ -7,6 +7,10 @@ Persistent, type-safe state management for React.
 [![license](https://img.shields.io/npm/l/react-mnemonic.svg)](./LICENSE.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
+> **⚠️ Alpha Software** — This library is in active development. APIs may
+> change between releases without prior notice. Use in production at your own
+> risk.
+
 ---
 
 **react-mnemonic** gives your React components persistent memory. Values survive
@@ -47,10 +51,10 @@ React 18 or later is required.
 
 ```json
 {
-  "peerDependencies": {
-    "react": ">=18",
-    "react-dom": ">=18"
-  }
+    "peerDependencies": {
+        "react": ">=18",
+        "react-dom": ">=18"
+    }
 }
 ```
 
@@ -62,24 +66,24 @@ Wrap your app in a `MnemonicProvider`, then call `useMnemonicKey` anywhere insid
 import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
 
 function Counter() {
-  const { value: count, set } = useMnemonicKey("count", {
-    defaultValue: 0,
-  });
+    const { value: count, set } = useMnemonicKey("count", {
+        defaultValue: 0,
+    });
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => set((c) => c + 1)}>Increment</button>
-    </div>
-  );
+    return (
+        <div>
+            <p>Count: {count}</p>
+            <button onClick={() => set((c) => c + 1)}>Increment</button>
+        </div>
+    );
 }
 
 export default function App() {
-  return (
-    <MnemonicProvider namespace="my-app">
-      <Counter />
-    </MnemonicProvider>
-  );
+    return (
+        <MnemonicProvider namespace="my-app">
+            <Counter />
+        </MnemonicProvider>
+    );
 }
 ```
 
@@ -94,13 +98,13 @@ Context provider that scopes storage keys under a namespace.
 
 ```tsx
 <MnemonicProvider
-  namespace="my-app"       // key prefix (required)
-  storage={localStorage}   // StorageLike backend (default: localStorage)
-  schemaMode="default"     // "default" | "strict" | "autoschema" (default: "default")
-  schemaRegistry={registry} // optional SchemaRegistry for versioned schemas
-  enableDevTools={false}   // expose console helpers (default: false)
+    namespace="my-app" // key prefix (required)
+    storage={localStorage} // StorageLike backend (default: localStorage)
+    schemaMode="default" // "default" | "strict" | "autoschema" (default: "default")
+    schemaRegistry={registry} // optional SchemaRegistry for versioned schemas
+    enableDevTools={false} // expose console helpers (default: false)
 >
-  {children}
+    {children}
 </MnemonicProvider>
 ```
 
@@ -114,23 +118,23 @@ Hook for reading and writing a single persistent value.
 const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 ```
 
-| Return   | Type                           | Description                                      |
-| -------- | ------------------------------ | ------------------------------------------------ |
-| `value`  | `T`                            | Current decoded value (or default)               |
+| Return   | Type                                 | Description                                   |
+| -------- | ------------------------------------ | --------------------------------------------- |
+| `value`  | `T`                                  | Current decoded value (or default)            |
 | `set`    | `(next: T \| (cur: T) => T) => void` | Update the value (direct or updater function) |
-| `reset`  | `() => void`                   | Reset to `defaultValue` and persist it           |
-| `remove` | `() => void`                   | Delete the key from storage entirely             |
+| `reset`  | `() => void`                         | Reset to `defaultValue` and persist it        |
+| `remove` | `() => void`                         | Delete the key from storage entirely          |
 
 #### Options
 
-| Option           | Type                                              | Default     | Description                                  |
-| ---------------- | ------------------------------------------------- | ----------- | -------------------------------------------- |
-| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | *required* | Fallback value or error-aware factory        |
+| Option           | Type                                              | Default     | Description                                         |
+| ---------------- | ------------------------------------------------- | ----------- | --------------------------------------------------- |
+| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | _required_  | Fallback value or error-aware factory               |
 | `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation) |
-| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value            |
-| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                  |
-| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event         |
-| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version      |
+| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value                  |
+| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                        |
+| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                |
+| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version             |
 
 ### Codecs
 
@@ -145,8 +149,8 @@ escape hatch for when you need full control over serialization.
 import { createCodec } from "react-mnemonic";
 
 const DateCodec = createCodec<Date>(
-  (date) => date.toISOString(),
-  (str) => new Date(str),
+    (date) => date.toISOString(),
+    (str) => new Date(str),
 );
 ```
 
@@ -156,12 +160,12 @@ The interface your custom storage backend must satisfy.
 
 ```ts
 interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  key?(index: number): string | null;
-  readonly length?: number;
-  onExternalChange?: (callback: (changedKeys?: string[]) => void) => () => void;
+    getItem(key: string): string | null;
+    setItem(key: string, value: string): void;
+    removeItem(key: string): void;
+    key?(index: number): string | null;
+    readonly length?: number;
+    onExternalChange?: (callback: (changedKeys?: string[]) => void) => () => void;
 }
 ```
 
@@ -178,8 +182,8 @@ hook). Returns an array of validation errors, empty when the value is valid.
 import { validateJsonSchema } from "react-mnemonic";
 
 const errors = validateJsonSchema(
-  { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
-  { name: 42 },
+    { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+    { name: 42 },
 );
 // [{ path: ".name", message: 'Expected type "string"' }]
 ```
@@ -195,16 +199,16 @@ import { compileSchema } from "react-mnemonic";
 import type { CompiledValidator } from "react-mnemonic";
 
 const validate: CompiledValidator = compileSchema({
-  type: "object",
-  properties: {
-    name: { type: "string", minLength: 1 },
-    age: { type: "number", minimum: 0 },
-  },
-  required: ["name"],
+    type: "object",
+    properties: {
+        name: { type: "string", minLength: 1 },
+        age: { type: "number", minimum: 0 },
+    },
+    required: ["name"],
 });
 
 validate({ name: "Alice", age: 30 }); // []
-validate({ age: -1 });                // [{ path: "", … }, { path: ".age", … }]
+validate({ age: -1 }); // [{ path: "", … }, { path: ".age", … }]
 ```
 
 This is useful when you validate the same schema frequently outside of the hook
@@ -212,10 +216,10 @@ This is useful when you validate the same schema frequently outside of the hook
 
 ### Error classes
 
-| Class             | Thrown when                           |
-| ----------------- | ------------------------------------ |
-| `CodecError`      | Encoding or decoding fails           |
-| `SchemaError`     | Schema validation or migration fails |
+| Class         | Thrown when                          |
+| ------------- | ------------------------------------ |
+| `CodecError`  | Encoding or decoding fails           |
+| `SchemaError` | Schema validation or migration fails |
 
 Both are passed to `defaultValue` factories so you can inspect or log the
 failure reason.
@@ -226,11 +230,11 @@ failure reason.
 
 ```tsx
 const { value: theme, set } = useMnemonicKey<"light" | "dark">("theme", {
-  defaultValue: "light",
-  listenCrossTab: true,
-  onChange: (t) => {
-    document.documentElement.setAttribute("data-theme", t);
-  },
+    defaultValue: "light",
+    listenCrossTab: true,
+    onChange: (t) => {
+        document.documentElement.setAttribute("data-theme", t);
+    },
 });
 ```
 
@@ -240,13 +244,13 @@ const { value: theme, set } = useMnemonicKey<"light" | "dark">("theme", {
 import { useMnemonicKey, CodecError, SchemaError } from "react-mnemonic";
 
 const getDefault = (error?: CodecError | SchemaError) => {
-  if (error instanceof CodecError) {
-    console.warn("Corrupt stored data:", error.message);
-  }
-  if (error instanceof SchemaError) {
-    console.warn("Schema validation failed:", error.message);
-  }
-  return { count: 0 };
+    if (error instanceof CodecError) {
+        console.warn("Corrupt stored data:", error.message);
+    }
+    if (error instanceof SchemaError) {
+        console.warn("Schema validation failed:", error.message);
+    }
+    return { count: 0 };
 };
 
 const { value } = useMnemonicKey("counter", { defaultValue: getDefault });
@@ -286,17 +290,17 @@ Schemas use a subset of JSON Schema for validation. The supported keywords are:
 ```ts
 // Schema definition -- fully serializable JSON, no functions
 const schema: KeySchema = {
-  key: "profile",
-  version: 1,
-  schema: {
-    type: "object",
-    properties: {
-      name: { type: "string", minLength: 1 },
-      email: { type: "string" },
-      age: { type: "number", minimum: 0 },
+    key: "profile",
+    version: 1,
+    schema: {
+        type: "object",
+        properties: {
+            name: { type: "string", minLength: 1 },
+            email: { type: "string" },
+            age: { type: "number", minimum: 0 },
+        },
+        required: ["name", "email"],
     },
-    required: ["name", "email"],
-  },
 };
 ```
 
@@ -307,10 +311,10 @@ normalizer. This is useful for trimming whitespace, lowercasing strings, etc.
 
 ```ts
 const normalizer: MigrationRule = {
-  key: "name",
-  fromVersion: 1,
-  toVersion: 1,
-  migrate: (value) => String(value).trim().toLowerCase(),
+    key: "name",
+    fromVersion: 1,
+    toVersion: 1,
+    migrate: (value) => String(value).trim().toLowerCase(),
 };
 ```
 
@@ -322,94 +326,87 @@ are procedural functions.
 
 ```tsx
 import {
-  MnemonicProvider,
-  useMnemonicKey,
-  type SchemaRegistry,
-  type KeySchema,
-  type MigrationRule,
+    MnemonicProvider,
+    useMnemonicKey,
+    type SchemaRegistry,
+    type KeySchema,
+    type MigrationRule,
 } from "react-mnemonic";
 
 const schemas = new Map<string, KeySchema>();
 const migrations: MigrationRule[] = [];
 
 const registry: SchemaRegistry = {
-  getSchema: (key, version) => schemas.get(`${key}:${version}`),
-  getLatestSchema: (key) =>
-    Array.from(schemas.values())
-      .filter((schema) => schema.key === key)
-      .sort((a, b) => b.version - a.version)[0],
-  getMigrationPath: (key, fromVersion, toVersion) => {
-    const byKey = migrations.filter((rule) => rule.key === key);
-    const path: MigrationRule[] = [];
-    let cur = fromVersion;
-    while (cur < toVersion) {
-      const next = byKey.find((rule) => rule.fromVersion === cur);
-      if (!next) return null;
-      path.push(next);
-      cur = next.toVersion;
-    }
-    return path;
-  },
-  getWriteMigration: (key, version) => {
-    return migrations.find(
-      (r) => r.key === key && r.fromVersion === version && r.toVersion === version,
-    );
-  },
-  registerSchema: (schema) => {
-    const id = `${schema.key}:${schema.version}`;
-    if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
-    schemas.set(id, schema);
-  },
+    getSchema: (key, version) => schemas.get(`${key}:${version}`),
+    getLatestSchema: (key) =>
+        Array.from(schemas.values())
+            .filter((schema) => schema.key === key)
+            .sort((a, b) => b.version - a.version)[0],
+    getMigrationPath: (key, fromVersion, toVersion) => {
+        const byKey = migrations.filter((rule) => rule.key === key);
+        const path: MigrationRule[] = [];
+        let cur = fromVersion;
+        while (cur < toVersion) {
+            const next = byKey.find((rule) => rule.fromVersion === cur);
+            if (!next) return null;
+            path.push(next);
+            cur = next.toVersion;
+        }
+        return path;
+    },
+    getWriteMigration: (key, version) => {
+        return migrations.find((r) => r.key === key && r.fromVersion === version && r.toVersion === version);
+    },
+    registerSchema: (schema) => {
+        const id = `${schema.key}:${schema.version}`;
+        if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
+        schemas.set(id, schema);
+    },
 };
 
 registry.registerSchema({
-  key: "profile",
-  version: 1,
-  schema: {
-    type: "object",
-    properties: { name: { type: "string" }, email: { type: "string" } },
-    required: ["name", "email"],
-  },
+    key: "profile",
+    version: 1,
+    schema: {
+        type: "object",
+        properties: { name: { type: "string" }, email: { type: "string" } },
+        required: ["name", "email"],
+    },
 });
 
 migrations.push({
-  key: "profile",
-  fromVersion: 1,
-  toVersion: 2,
-  migrate: (value) => {
-    const v1 = value as { name: string; email: string };
-    return { ...v1, migratedAt: new Date().toISOString() };
-  },
+    key: "profile",
+    fromVersion: 1,
+    toVersion: 2,
+    migrate: (value) => {
+        const v1 = value as { name: string; email: string };
+        return { ...v1, migratedAt: new Date().toISOString() };
+    },
 });
 
 registry.registerSchema({
-  key: "profile",
-  version: 2,
-  schema: {
-    type: "object",
-    properties: {
-      name: { type: "string" },
-      email: { type: "string" },
-      migratedAt: { type: "string" },
+    key: "profile",
+    version: 2,
+    schema: {
+        type: "object",
+        properties: {
+            name: { type: "string" },
+            email: { type: "string" },
+            migratedAt: { type: "string" },
+        },
+        required: ["name", "email", "migratedAt"],
     },
-    required: ["name", "email", "migratedAt"],
-  },
 });
 
 function ProfileEditor() {
-  const { value, set } = useMnemonicKey<{ name: string; email: string; migratedAt: string }>("profile", {
-    defaultValue: { name: "", email: "", migratedAt: "" },
-  });
-  return (
-    <input
-      value={value.name}
-      onChange={(e) => set({ ...value, name: e.target.value })}
-    />
-  );
+    const { value, set } = useMnemonicKey<{ name: string; email: string; migratedAt: string }>("profile", {
+        defaultValue: { name: "", email: "", migratedAt: "" },
+    });
+    return <input value={value.name} onChange={(e) => set({ ...value, name: e.target.value })} />;
 }
 
 <MnemonicProvider namespace="app" schemaMode="default" schemaRegistry={registry}>
-  <ProfileEditor />
+    <ProfileEditor />
 </MnemonicProvider>;
 ```
 
@@ -455,12 +452,12 @@ Enable the console inspector in development:
 Then in the browser console:
 
 ```js
-__REACT_MNEMONIC_DEVTOOLS__.app.dump();       // table of all keys
+__REACT_MNEMONIC_DEVTOOLS__.app.dump(); // table of all keys
 __REACT_MNEMONIC_DEVTOOLS__.app.get("theme"); // read a decoded value
 __REACT_MNEMONIC_DEVTOOLS__.app.set("theme", "dark"); // write
-__REACT_MNEMONIC_DEVTOOLS__.app.remove("theme");      // delete
-__REACT_MNEMONIC_DEVTOOLS__.app.keys();       // list all keys
-__REACT_MNEMONIC_DEVTOOLS__.app.clear();      // remove all keys
+__REACT_MNEMONIC_DEVTOOLS__.app.remove("theme"); // delete
+__REACT_MNEMONIC_DEVTOOLS__.app.keys(); // list all keys
+__REACT_MNEMONIC_DEVTOOLS__.app.clear(); // remove all keys
 ```
 
 ## TypeScript
@@ -470,21 +467,30 @@ All public types are re-exported from the package root:
 
 ```ts
 import type {
-  Codec,
-  StorageLike,
-  MnemonicProviderOptions,
-  MnemonicProviderProps,
-  UseMnemonicKeyOptions,
-  KeySchema,
-  MigrationRule,
-  MigrationPath,
-  SchemaRegistry,
-  SchemaMode,
-  JsonSchema,
-  JsonSchemaValidationError,
-  CompiledValidator,
+    Codec,
+    StorageLike,
+    MnemonicProviderOptions,
+    MnemonicProviderProps,
+    UseMnemonicKeyOptions,
+    KeySchema,
+    MigrationRule,
+    MigrationPath,
+    SchemaRegistry,
+    SchemaMode,
+    JsonSchema,
+    JsonSchemaType,
+    JsonSchemaValidationError,
+    CompiledValidator,
 } from "react-mnemonic";
 ```
+
+## Disclaimer
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. The authors make no guarantees
+regarding the reliability, availability, or suitability of this library for any
+particular use case. See the [MIT License](./LICENSE.md) for full terms.
 
 ## License
 

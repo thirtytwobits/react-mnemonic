@@ -87,7 +87,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
      * Decode a string payload using a codec (for codec-managed / no-schema keys).
      */
     const decodeStringPayload = useCallback(
-        <V,>(payload: unknown, activeCodec: { decode: (encoded: string) => V }) => {
+        <V>(payload: unknown, activeCodec: { decode: (encoded: string) => V }) => {
             if (typeof payload !== "string") {
                 throw new SchemaError(
                     "INVALID_ENVELOPE",
@@ -97,9 +97,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             try {
                 return activeCodec.decode(payload);
             } catch (err) {
-                throw err instanceof CodecError
-                    ? err
-                    : new CodecError(`Codec decode failed for key "${key}"`, err);
+                throw err instanceof CodecError ? err : new CodecError(`Codec decode failed for key "${key}"`, err);
             }
         },
         [key],
@@ -113,10 +111,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             const errors = validateJsonSchema(value, jsonSchema);
             if (errors.length > 0) {
                 const message = errors.map((e) => `${e.path || "/"}: ${e.message}`).join("; ");
-                throw new SchemaError(
-                    "TYPE_MISMATCH",
-                    `Schema validation failed for key "${key}": ${message}`,
-                );
+                throw new SchemaError("TYPE_MISMATCH", `Schema validation failed for key "${key}": ${message}`);
             }
         },
         [key],
@@ -172,9 +167,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
     );
 
     const decodeForRead = useCallback(
-        (
-            rawText: string | null,
-        ): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
+        (rawText: string | null): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
             if (rawText == null) return { value: getFallback() };
 
             const parsed = parseEnvelope(rawText);
@@ -214,9 +207,10 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 }
                 try {
                     // Payload may be a codec string or already a JSON value (seeded data).
-                    const decoded = typeof envelope.payload === "string"
-                        ? decodeStringPayload<T>(envelope.payload, codec)
-                        : envelope.payload as T;
+                    const decoded =
+                        typeof envelope.payload === "string"
+                            ? decodeStringPayload<T>(envelope.payload, codec)
+                            : (envelope.payload as T);
                     const inferredJsonSchema = inferJsonSchema(decoded);
                     const inferred: KeySchema = {
                         key,
@@ -496,9 +490,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
     const set = useMemo(() => {
         return (next: T | ((cur: T) => T)) => {
             const nextVal =
-                typeof next === "function"
-                    ? (next as (c: T) => T)(decodeForRead(api.getRawSnapshot(key)).value)
-                    : next;
+                typeof next === "function" ? (next as (c: T) => T)(decodeForRead(api.getRawSnapshot(key)).value) : next;
             try {
                 const encoded = encodeForWrite(nextVal);
                 api.setRaw(key, encoded);

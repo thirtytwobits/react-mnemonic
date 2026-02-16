@@ -12,10 +12,10 @@ failure reason.
 
 ## Error classes
 
-| Class        | When thrown                                |
-| ------------ | ----------------------------------------- |
-| `CodecError` | Encoding or decoding fails (custom codec) |
-| `SchemaError`| Schema validation, migration, or envelope parsing fails |
+| Class         | When thrown                                             |
+| ------------- | ------------------------------------------------------- |
+| `CodecError`  | Encoding or decoding fails (custom codec)               |
+| `SchemaError` | Schema validation, migration, or envelope parsing fails |
 
 ## Error-aware defaults
 
@@ -26,13 +26,13 @@ receives the error:
 import { useMnemonicKey, CodecError, SchemaError } from "react-mnemonic";
 
 const getDefault = (error?: CodecError | SchemaError) => {
-  if (error instanceof CodecError) {
-    console.warn("Corrupt stored data:", error.message);
-  }
-  if (error instanceof SchemaError) {
-    console.warn("Schema validation failed:", error.message);
-  }
-  return { count: 0 };
+    if (error instanceof CodecError) {
+        console.warn("Corrupt stored data:", error.message);
+    }
+    if (error instanceof SchemaError) {
+        console.warn("Schema validation failed:", error.message);
+    }
+    return { count: 0 };
 };
 
 const { value } = useMnemonicKey("counter", { defaultValue: getDefault });
@@ -47,12 +47,12 @@ storage — the nominal "first visit" path. No error occurred.
 
 `SchemaError` includes a `code` property for programmatic handling:
 
-| Code                | Meaning                                        |
-| ------------------- | ---------------------------------------------- |
-| `INVALID_ENVELOPE`  | Stored JSON doesn't match the envelope format  |
-| `MISSING_SCHEMA`    | No schema registered for this key/version      |
-| `MIGRATION_FAILED`  | A migration rule threw or returned bad data    |
-| `VALIDATION_FAILED` | Value doesn't pass JSON Schema validation      |
+| Code                | Meaning                                       |
+| ------------------- | --------------------------------------------- |
+| `INVALID_ENVELOPE`  | Stored JSON doesn't match the envelope format |
+| `MISSING_SCHEMA`    | No schema registered for this key/version     |
+| `MIGRATION_FAILED`  | A migration rule threw or returned bad data   |
+| `VALIDATION_FAILED` | Value doesn't pass JSON Schema validation     |
 
 ## Write errors
 
@@ -62,7 +62,7 @@ write, the value is **not persisted** — the previous stored value remains.
 
 ```tsx
 const { set } = useMnemonicKey("profile", {
-  defaultValue: { name: "", email: "" },
+    defaultValue: { name: "", email: "" },
 });
 
 // If this fails schema validation, it's logged but not thrown.

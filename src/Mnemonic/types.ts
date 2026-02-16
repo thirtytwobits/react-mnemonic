@@ -551,7 +551,7 @@ export type StorageLike = {
      * @param callback - Invoked when external data changes
      * @returns An unsubscribe function that removes the callback
      */
-    onExternalChange?: (callback: (changedKeys?: string[]) => void) => (() => void);
+    onExternalChange?: (callback: (changedKeys?: string[]) => void) => () => void;
 };
 
 /**

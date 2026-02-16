@@ -82,11 +82,7 @@ export function PersistedForm() {
             </div>
             <div className="demo-form-row">
                 <label htmlFor="pf-role">Role</label>
-                <select
-                    id="pf-role"
-                    value={form.role}
-                    onChange={(e) => update("role", e.target.value)}
-                >
+                <select id="pf-role" value={form.role} onChange={(e) => update("role", e.target.value)}>
                     <option value="developer">Developer</option>
                     <option value="designer">Designer</option>
                     <option value="manager">Manager</option>

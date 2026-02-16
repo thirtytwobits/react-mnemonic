@@ -68,11 +68,7 @@ export class SchemaError extends Error {
      * @param message - Human-readable error description
      * @param cause - Optional underlying error
      */
-    constructor(
-        code: SchemaError["code"],
-        message: string,
-        cause?: unknown,
-    ) {
+    constructor(code: SchemaError["code"], message: string, cause?: unknown) {
         super(message);
         this.name = "SchemaError";
         this.code = code;

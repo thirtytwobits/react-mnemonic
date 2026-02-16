@@ -1,22 +1,123 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+    pull_request:
+    push:
+        branches:
+            - main
 
 jobs:
-  build-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run build
-      - run: npm run test
+    build-test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+            - run: npm ci
+            - run: npm run lint
+            - run: npm run format:check
+            - run: npm run build
+            - run: npm run test
+
+    pack-install:
+        needs: build-test
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                pm: [npm, yarn, pnpm]
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+            - if: matrix.pm == 'pnpm'
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+            - run: npm ci
+            - run: npm run build
+            - run: npm pack
+
+            - name: Create test project
+              run: |
+                  mkdir /tmp/test-pkg
+                  cd /tmp/test-pkg
+
+                  cat > package.json << 'EOF'
+                  {
+                    "name": "test-install",
+                    "private": true,
+                    "type": "module",
+                    "dependencies": {
+                      "react": "^18.3.1",
+                      "react-dom": "^18.3.1"
+                    }
+                  }
+                  EOF
+
+                  cat > test-esm.mjs << 'EOF'
+                  import { MnemonicProvider, useMnemonicKey, createCodec, JSONCodec, validateJsonSchema, compileSchema, CodecError, SchemaError } from "react-mnemonic";
+                  const fns = [MnemonicProvider, useMnemonicKey, createCodec, JSONCodec, validateJsonSchema, compileSchema, CodecError, SchemaError];
+                  if (fns.some(f => f === undefined)) { console.error("ESM: missing export"); process.exit(1); }
+                  console.log("ESM imports OK —", fns.length, "exports verified");
+                  EOF
+
+                  cat > test-cjs.cjs << 'EOF'
+                  const m = require("react-mnemonic");
+                  const keys = ["MnemonicProvider","useMnemonicKey","createCodec","JSONCodec","validateJsonSchema","compileSchema","CodecError","SchemaError"];
+                  const missing = keys.filter(k => m[k] === undefined);
+                  if (missing.length) { console.error("CJS: missing exports:", missing); process.exit(1); }
+                  console.log("CJS requires OK —", keys.length, "exports verified");
+                  EOF
+
+                  cat > test-types.ts << 'EOF'
+                  import type { Codec, StorageLike, MnemonicProviderOptions, UseMnemonicKeyOptions, KeySchema, MigrationRule, SchemaRegistry, SchemaMode, JsonSchema, CompiledValidator } from "react-mnemonic";
+                  const _check: Codec<string> | StorageLike | MnemonicProviderOptions | UseMnemonicKeyOptions<string> | KeySchema | MigrationRule | SchemaRegistry | SchemaMode | JsonSchema | CompiledValidator | null = null;
+                  console.log("Types OK");
+                  EOF
+
+                  cat > tsconfig.json << 'EOF'
+                  {
+                    "compilerOptions": {
+                      "module": "nodenext",
+                      "moduleResolution": "nodenext",
+                      "strict": true,
+                      "noEmit": true,
+                      "skipLibCheck": false,
+                      "target": "es2020"
+                    },
+                    "include": ["test-types.ts"]
+                  }
+                  EOF
+
+            - name: Install with ${{ matrix.pm }}
+              run: |
+                  cd /tmp/test-pkg
+                  TARBALL=$(ls $GITHUB_WORKSPACE/react-mnemonic-*.tgz)
+
+                  case "${{ matrix.pm }}" in
+                    npm)
+                      npm install "$TARBALL"
+                      ;;
+                    yarn)
+                      yarn add "$TARBALL"
+                      ;;
+                    pnpm)
+                      pnpm add "$TARBALL"
+                      ;;
+                  esac
+
+            - name: Verify ESM import
+              run: node /tmp/test-pkg/test-esm.mjs
+
+            - name: Verify CJS require
+              run: node /tmp/test-pkg/test-cjs.cjs
+
+            - name: Verify TypeScript types
+              run: |
+                  cd /tmp/test-pkg
+                  npm install --save-dev typescript @types/react @types/react-dom
+                  npx tsc --noEmit

@@ -35,13 +35,8 @@ function createMockStorage(): StorageLike & { store: Map<string, string> } {
 }
 
 /** Helper to render MnemonicProvider with children via createElement. */
-function ssrRender(
-    props: { namespace: string; storage?: StorageLike },
-    child: React.ReactElement,
-): string {
-    return renderToString(
-        React.createElement(MnemonicProvider, { ...props, children: child }),
-    );
+function ssrRender(props: { namespace: string; storage?: StorageLike }, child: React.ReactElement): string {
+    return renderToString(React.createElement(MnemonicProvider, { ...props, children: child }));
 }
 
 // ---------------------------------------------------------------------------
@@ -74,10 +69,7 @@ describe("SSR integration (node environment)", () => {
             return React.createElement("span", null, value);
         }
 
-        const html = ssrRender(
-            { namespace: "ssr", storage },
-            React.createElement(Theme),
-        );
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Theme));
 
         // Server snapshot is always null, so the default is used
         // even though storage has "dark". This is the SSR contract:
@@ -95,9 +87,7 @@ describe("SSR integration (node environment)", () => {
             return React.createElement("span", null, value);
         }
 
-        expect(() =>
-            ssrRender({ namespace: "ssr" }, React.createElement(Theme)),
-        ).not.toThrow();
+        expect(() => ssrRender({ namespace: "ssr" }, React.createElement(Theme))).not.toThrow();
     });
 
     it("MnemonicProvider without explicit storage defaults gracefully in SSR", () => {
@@ -107,10 +97,7 @@ describe("SSR integration (node environment)", () => {
         }
 
         // No storage prop — defaultBrowserStorage() returns undefined in node
-        const html = ssrRender(
-            { namespace: "ssr-no-storage" },
-            React.createElement(Display),
-        );
+        const html = ssrRender({ namespace: "ssr-no-storage" }, React.createElement(Display));
 
         expect(html).toContain("fallback");
     });
@@ -131,10 +118,7 @@ describe("SSR integration (node environment)", () => {
             );
         }
 
-        const html = ssrRender(
-            { namespace: "ssr", storage },
-            React.createElement(Multi),
-        );
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Multi));
 
         expect(html).toContain("A-default");
         expect(html).toContain("B-default");
@@ -154,10 +138,7 @@ describe("SSR integration (node environment)", () => {
             return React.createElement("span", null, JSON.stringify(value));
         }
 
-        const html = ssrRender(
-            { namespace: "ssr" },
-            React.createElement(FactoryComp),
-        );
+        const html = ssrRender({ namespace: "ssr" }, React.createElement(FactoryComp));
 
         expect(factoryCalled).toBe(true);
         // renderToString HTML-encodes quotes: {"ts":0} → {&quot;ts&quot;:0}

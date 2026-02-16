@@ -21,8 +21,8 @@ low-level escape hatch for when you need full control over serialization.
 import { createCodec } from "react-mnemonic";
 
 const DateCodec = createCodec<Date>(
-  (date) => date.toISOString(),       // encode: Date → string
-  (str) => new Date(str),             // decode: string → Date
+    (date) => date.toISOString(), // encode: Date → string
+    (str) => new Date(str), // decode: string → Date
 );
 ```
 
@@ -32,8 +32,8 @@ Pass the codec in the `codec` option:
 
 ```ts
 const { value, set } = useMnemonicKey<Date>("lastVisit", {
-  defaultValue: new Date(),
-  codec: DateCodec,
+    defaultValue: new Date(),
+    codec: DateCodec,
 });
 ```
 
@@ -45,8 +45,8 @@ You can also create a codec by implementing the interface directly:
 import type { Codec } from "react-mnemonic";
 
 const SetCodec: Codec<Set<string>> = {
-  encode: (s) => JSON.stringify([...s]),
-  decode: (raw) => new Set(JSON.parse(raw)),
+    encode: (s) => JSON.stringify([...s]),
+    decode: (raw) => new Set(JSON.parse(raw)),
 };
 ```
 
@@ -60,12 +60,12 @@ recover:
 import { useMnemonicKey, CodecError } from "react-mnemonic";
 
 const { value } = useMnemonicKey("data", {
-  defaultValue: (error) => {
-    if (error instanceof CodecError) {
-      console.warn("Decode failed:", error.message);
-    }
-    return fallback;
-  },
-  codec: myCodec,
+    defaultValue: (error) => {
+        if (error instanceof CodecError) {
+            console.warn("Decode failed:", error.message);
+        }
+        return fallback;
+    },
+    codec: myCodec,
 });
 ```

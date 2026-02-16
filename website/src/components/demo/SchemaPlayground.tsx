@@ -10,13 +10,7 @@ import {
     SchemaError,
     validateJsonSchema,
 } from "react-mnemonic";
-import type {
-    SchemaRegistry,
-    KeySchema,
-    MigrationRule,
-    SchemaMode,
-    JsonSchema,
-} from "react-mnemonic";
+import type { SchemaRegistry, KeySchema, MigrationRule, SchemaMode, JsonSchema } from "react-mnemonic";
 
 // ---------------------------------------------------------------------------
 // JSON Schema templates
@@ -120,8 +114,7 @@ function preflightEncode(
     schemaMode: SchemaMode,
     schemaVersion?: number,
 ): Error | null {
-    const explicitSchema =
-        schemaVersion !== undefined ? registry.getSchema(key, schemaVersion) : undefined;
+    const explicitSchema = schemaVersion !== undefined ? registry.getSchema(key, schemaVersion) : undefined;
     const latestSchema = registry.getLatestSchema(key);
     let targetSchema = explicitSchema;
 
@@ -137,10 +130,7 @@ function preflightEncode(
 
     if (!targetSchema) {
         if (schemaVersion !== undefined && schemaMode === "strict") {
-            return new SchemaError(
-                "WRITE_SCHEMA_REQUIRED",
-                `Write requires schema for key "${key}" in strict mode`,
-            );
+            return new SchemaError("WRITE_SCHEMA_REQUIRED", `Write requires schema for key "${key}" in strict mode`);
         }
         try {
             JSONCodec.encode(value);
@@ -181,9 +171,7 @@ function preflightEncode(
 // Write result display
 // ---------------------------------------------------------------------------
 
-type WriteResultState =
-    | { type: "success"; message: string }
-    | { type: "error"; error: Error };
+type WriteResultState = { type: "success"; message: string } | { type: "error"; error: Error };
 
 function WriteResult({ result }: { result: WriteResultState | null }): ReactNode {
     if (!result) return null;
@@ -193,10 +181,7 @@ function WriteResult({ result }: { result: WriteResultState | null }): ReactNode
     return (
         <div className="demo-alert demo-alert--error">
             <strong>{result.error.name}</strong>
-            {"code" in result.error
-                ? ` [${(result.error as SchemaError).code}]`
-                : ""}
-            : {result.error.message}
+            {"code" in result.error ? ` [${(result.error as SchemaError).code}]` : ""}: {result.error.message}
         </div>
     );
 }
@@ -229,13 +214,10 @@ function PlaygroundWorkbench({
     const errorRef = useRef<Error | null>(null);
     const [writeResult, setWriteResult] = useState<WriteResultState | null>(null);
 
-    const defaultFactory = useCallback(
-        (error?: CodecError | SchemaError) => {
-            errorRef.current = error ?? null;
-            return undefined as unknown;
-        },
-        [],
-    );
+    const defaultFactory = useCallback((error?: CodecError | SchemaError) => {
+        errorRef.current = error ?? null;
+        return undefined as unknown;
+    }, []);
 
     const { value, set, remove } = useMnemonicKey<unknown>(activeKey, {
         defaultValue: defaultFactory,
@@ -295,25 +277,18 @@ function PlaygroundWorkbench({
         <>
             <h4 style={{ marginTop: 12 }}>Write Value</h4>
             <p className="demo-muted" style={{ fontSize: "0.85rem", marginBottom: 8 }}>
-                Write through the hook&rsquo;s <code>set()</code> function. The value is
-                validated against the selected schema.
+                Write through the hook&rsquo;s <code>set()</code> function. The value is validated against the selected
+                schema.
             </p>
             <div className="demo-form-row">
                 <label>Value (JSON)</label>
-                <input
-                    type="text"
-                    value={writeValue}
-                    onChange={(e) => onWriteValueChange(e.target.value)}
-                />
+                <input type="text" value={writeValue} onChange={(e) => onWriteValueChange(e.target.value)} />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button className="button button--sm button--primary" onClick={handleWrite}>
                     Write via Hook
                 </button>
-                <button
-                    className="button button--sm button--outline button--secondary"
-                    onClick={handleRemove}
-                >
+                <button className="button button--sm button--outline button--secondary" onClick={handleRemove}>
                     Remove Key
                 </button>
             </div>
@@ -342,8 +317,7 @@ export function SchemaPlayground() {
     const [writeValue, setWriteValue] = useState('{"name":"Alice"}');
     const [log, setLog] = useState<LogEntry[]>([]);
     const addLog = useCallback(
-        (text: string, type: LogType = "info") =>
-            setLog((prev) => [...prev, makeEntry(text, type)]),
+        (text: string, type: LogType = "info") => setLog((prev) => [...prev, makeEntry(text, type)]),
         [],
     );
 
@@ -374,10 +348,7 @@ export function SchemaPlayground() {
             const parsedSchema = JSON.parse(sSchemaText) as JsonSchema;
             const schema: KeySchema = { key: sKey, version: sVersion, schema: parsedSchema };
             registry.registerSchema?.(schema);
-            setSchemas((prev) => [
-                ...prev,
-                { key: sKey, version: sVersion, schema: parsedSchema },
-            ]);
+            setSchemas((prev) => [...prev, { key: sKey, version: sVersion, schema: parsedSchema }]);
             addLog(`Registered schema ${sKey} v${sVersion}`, "success");
             setSSchemaError(null);
         } catch (err) {
@@ -413,9 +384,7 @@ export function SchemaPlayground() {
     const handleRemoveSchema = (key: string, version: number) => {
         const id = `${key}:${version}`;
         registry._schemas.delete(id);
-        setSchemas((prev) =>
-            prev.filter((s) => !(s.key === key && s.version === version)),
-        );
+        setSchemas((prev) => prev.filter((s) => !(s.key === key && s.version === version)));
         addLog(`Removed schema ${id}`, "info");
     };
 
@@ -433,17 +402,11 @@ export function SchemaPlayground() {
                 migrate: migrateFn,
             };
             registry._migrations.push(rule);
-            const label =
-                mFrom === mTo
-                    ? `write-time normalizer v${mFrom}`
-                    : `v${mFrom} → v${mTo}`;
+            const label = mFrom === mTo ? `write-time normalizer v${mFrom}` : `v${mFrom} → v${mTo}`;
             setMigrations((prev) => [...prev, { key: mKey, from: mFrom, to: mTo }]);
             addLog(`Added migration ${mKey} ${label}`, "success");
         } catch (err) {
-            addLog(
-                `Failed to create migration: ${err instanceof Error ? err.message : String(err)}`,
-                "error",
-            );
+            addLog(`Failed to create migration: ${err instanceof Error ? err.message : String(err)}`, "error");
         }
     };
 
@@ -451,17 +414,11 @@ export function SchemaPlayground() {
         const removed = migrations[index];
         if (!removed) return;
         const regIdx = registry._migrations.findIndex(
-            (r) =>
-                r.key === removed.key &&
-                r.fromVersion === removed.from &&
-                r.toVersion === removed.to,
+            (r) => r.key === removed.key && r.fromVersion === removed.from && r.toVersion === removed.to,
         );
         if (regIdx !== -1) registry._migrations.splice(regIdx, 1);
         setMigrations((prev) => prev.filter((_, i) => i !== index));
-        addLog(
-            `Removed migration ${removed.key} v${removed.from} → v${removed.to}`,
-            "info",
-        );
+        addLog(`Removed migration ${removed.key} v${removed.from} → v${removed.to}`, "info");
     };
 
     const handleSeed = () => {
@@ -541,10 +498,7 @@ export function SchemaPlayground() {
 
     useEffect(() => {
         if (schemaSelection === "default") return;
-        const exists = schemas.some(
-            (schema) =>
-                schema.key === activeKey && String(schema.version) === schemaSelection,
-        );
+        const exists = schemas.some((schema) => schema.key === activeKey && String(schema.version) === schemaSelection);
         if (!exists) setSchemaSelection("default");
     }, [activeKey, schemas, schemaSelection]);
 
@@ -568,10 +522,7 @@ export function SchemaPlayground() {
             inspectorEntries.push({
                 key,
                 version: String(parsed.version ?? "?"),
-                payload:
-                    typeof parsed.payload === "string"
-                        ? parsed.payload
-                        : JSON.stringify(parsed.payload),
+                payload: typeof parsed.payload === "string" ? parsed.payload : JSON.stringify(parsed.payload),
                 raw,
             });
         } catch {
@@ -608,7 +559,14 @@ export function SchemaPlayground() {
                         {(["default", "strict", "autoschema"] as SchemaMode[]).map((m) => (
                             <label
                                 key={m}
-                                style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: "normal", textTransform: "none", fontSize: "0.9rem" }}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontWeight: "normal",
+                                    textTransform: "none",
+                                    fontSize: "0.9rem",
+                                }}
                             >
                                 <input
                                     type="radio"
@@ -630,11 +588,21 @@ export function SchemaPlayground() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <div className="demo-form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" list="sp-storage-keys" value={sKey} onChange={(e) => setSKey(e.target.value)} />
+                        <input
+                            type="text"
+                            list="sp-storage-keys"
+                            value={sKey}
+                            onChange={(e) => setSKey(e.target.value)}
+                        />
                     </div>
                     <div className="demo-form-row" style={{ width: 80 }}>
                         <label>Version</label>
-                        <input type="number" min={0} value={sVersion} onChange={(e) => setSVersion(Number(e.target.value))} />
+                        <input
+                            type="number"
+                            min={0}
+                            value={sVersion}
+                            onChange={(e) => setSVersion(Number(e.target.value))}
+                        />
                     </div>
                 </div>
                 <div className="demo-form-row" style={{ marginTop: 4 }}>
@@ -642,10 +610,15 @@ export function SchemaPlayground() {
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <select value={sSchemaTemplate} onChange={(e) => setSSchemaTemplate(e.target.value)}>
                             {SCHEMA_TEMPLATES.map((t) => (
-                                <option key={t.id} value={t.id}>{t.label}</option>
+                                <option key={t.id} value={t.id}>
+                                    {t.label}
+                                </option>
                             ))}
                         </select>
-                        <button className="button button--sm button--outline button--secondary" onClick={handleApplySchemaTemplate}>
+                        <button
+                            className="button button--sm button--outline button--secondary"
+                            onClick={handleApplySchemaTemplate}
+                        >
                             Apply
                         </button>
                     </div>
@@ -660,7 +633,9 @@ export function SchemaPlayground() {
                     />
                 </div>
                 {sSchemaText.trim() && !sSchemaParseError && (
-                    <div className="demo-alert demo-alert--success" style={{ marginTop: 4 }}>JSON syntax OK</div>
+                    <div className="demo-alert demo-alert--success" style={{ marginTop: 4 }}>
+                        JSON syntax OK
+                    </div>
                 )}
                 {sSchemaParseError && (
                     <div className="demo-alert demo-alert--error" style={{ marginTop: 4 }}>
@@ -678,14 +653,23 @@ export function SchemaPlayground() {
                     </div>
                 )}
                 {schemas.length === 0 && (
-                    <p className="demo-muted" style={{ fontSize: "0.85rem", marginTop: 4 }}>No schemas registered yet.</p>
+                    <p className="demo-muted" style={{ fontSize: "0.85rem", marginTop: 4 }}>
+                        No schemas registered yet.
+                    </p>
                 )}
                 {schemas.length > 0 && (
                     <div className="demo-registry-list">
                         {schemas.map((s) => (
                             <div className="demo-registry-item" key={`${s.key}:${s.version}`}>
-                                <span>{s.key} v{s.version} — {JSON.stringify(s.schema)}</span>
-                                <button className="button button--sm button--outline button--secondary" onClick={() => handleRemoveSchema(s.key, s.version)}>x</button>
+                                <span>
+                                    {s.key} v{s.version} — {JSON.stringify(s.schema)}
+                                </span>
+                                <button
+                                    className="button button--sm button--outline button--secondary"
+                                    onClick={() => handleRemoveSchema(s.key, s.version)}
+                                >
+                                    x
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -698,7 +682,12 @@ export function SchemaPlayground() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <div className="demo-form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" list="sp-storage-keys" value={mKey} onChange={(e) => setMKey(e.target.value)} />
+                        <input
+                            type="text"
+                            list="sp-storage-keys"
+                            value={mKey}
+                            onChange={(e) => setMKey(e.target.value)}
+                        />
                     </div>
                     <div className="demo-form-row" style={{ width: 80 }}>
                         <label>From</label>
@@ -710,7 +699,9 @@ export function SchemaPlayground() {
                     </div>
                 </div>
                 <div className="demo-form-row" style={{ marginTop: 4 }}>
-                    <label>Transform body (receives <code>value</code>, must return new value)</label>
+                    <label>
+                        Transform body (receives <code>value</code>, must return new value)
+                    </label>
                     <textarea
                         rows={1}
                         placeholder="return { ...value, score: 0 }"
@@ -728,12 +719,14 @@ export function SchemaPlayground() {
                         {migrations.map((m, i) => (
                             <div className="demo-registry-item" key={i}>
                                 <span>
-                                    {m.key}{" "}
-                                    {m.from === m.to
-                                        ? `v${m.from} (normalizer)`
-                                        : `v${m.from} → v${m.to}`}
+                                    {m.key} {m.from === m.to ? `v${m.from} (normalizer)` : `v${m.from} → v${m.to}`}
                                 </span>
-                                <button className="button button--sm button--outline button--secondary" onClick={() => handleRemoveMigration(i)}>x</button>
+                                <button
+                                    className="button button--sm button--outline button--secondary"
+                                    onClick={() => handleRemoveMigration(i)}
+                                >
+                                    x
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -749,11 +742,21 @@ export function SchemaPlayground() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <div className="demo-form-row" style={{ flex: 1 }}>
                         <label>Key</label>
-                        <input type="text" list="sp-storage-keys" value={seedKey} onChange={(e) => setSeedKey(e.target.value)} />
+                        <input
+                            type="text"
+                            list="sp-storage-keys"
+                            value={seedKey}
+                            onChange={(e) => setSeedKey(e.target.value)}
+                        />
                     </div>
                     <div className="demo-form-row" style={{ width: 80 }}>
                         <label>Version</label>
-                        <input type="number" min={0} value={seedVersion} onChange={(e) => setSeedVersion(Number(e.target.value))} />
+                        <input
+                            type="number"
+                            min={0}
+                            value={seedVersion}
+                            onChange={(e) => setSeedVersion(Number(e.target.value))}
+                        />
                     </div>
                 </div>
                 <div className="demo-form-row" style={{ marginTop: 4 }}>
@@ -764,8 +767,21 @@ export function SchemaPlayground() {
                     <button className="button button--sm button--primary" onClick={handleSeed}>
                         Seed
                     </button>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: "normal", textTransform: "none", fontSize: "0.85rem" }}>
-                        <input type="checkbox" checked={seedEncodeJson} onChange={(e) => setSeedEncodeJson(e.target.checked)} />
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontWeight: "normal",
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={seedEncodeJson}
+                            onChange={(e) => setSeedEncodeJson(e.target.checked)}
+                        />
                         Encode as JSON string (codec-managed)
                     </label>
                 </div>
@@ -777,13 +793,20 @@ export function SchemaPlayground() {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <div className="demo-form-row" style={{ flex: 1 }}>
                         <label>Active Key</label>
-                        <input type="text" list="sp-storage-keys" value={activeKey} onChange={(e) => setActiveKey(e.target.value)} />
+                        <input
+                            type="text"
+                            list="sp-storage-keys"
+                            value={activeKey}
+                            onChange={(e) => setActiveKey(e.target.value)}
+                        />
                     </div>
                     <div className="demo-form-row" style={{ width: 160 }}>
                         <label>Schema Version</label>
                         <select value={schemaSelection} onChange={(e) => setSchemaSelection(e.target.value)}>
                             {schemaOptions.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -811,10 +834,7 @@ export function SchemaPlayground() {
                 {readError && (
                     <div className="demo-alert demo-alert--error">
                         <strong>{readError.name}</strong>
-                        {"code" in readError
-                            ? ` [${(readError as SchemaError).code}]`
-                            : ""}
-                        : {readError.message}
+                        {"code" in readError ? ` [${(readError as SchemaError).code}]` : ""}: {readError.message}
                     </div>
                 )}
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -839,11 +859,7 @@ export function SchemaPlayground() {
                         onResult={handleResult}
                         registry={registry}
                         schemaMode={schemaMode}
-                        schemaVersion={
-                            schemaSelection === "default"
-                                ? undefined
-                                : Number(schemaSelection)
-                        }
+                        schemaVersion={schemaSelection === "default" ? undefined : Number(schemaSelection)}
                         readTrigger={readTrigger}
                     />
                 </MnemonicProvider>
@@ -859,7 +875,9 @@ export function SchemaPlayground() {
             <div className="demo-sp-section">
                 <h3>Storage Inspector</h3>
                 {inspectorEntries.length === 0 ? (
-                    <p className="demo-muted" style={{ fontSize: "0.85rem" }}>Storage is empty.</p>
+                    <p className="demo-muted" style={{ fontSize: "0.85rem" }}>
+                        Storage is empty.
+                    </p>
                 ) : (
                     <div style={{ overflowX: "auto" }}>
                         <table className="demo-table">
@@ -875,7 +893,9 @@ export function SchemaPlayground() {
                                     <tr key={entry.key}>
                                         <td>{entry.key}</td>
                                         <td>{entry.version}</td>
-                                        <td><code>{entry.payload}</code></td>
+                                        <td>
+                                            <code>{entry.payload}</code>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -898,7 +918,9 @@ export function SchemaPlayground() {
                 </h3>
                 <div className="demo-log">
                     {log.length === 0 && (
-                        <p className="demo-muted" style={{ fontSize: "0.85rem" }}>No events yet.</p>
+                        <p className="demo-muted" style={{ fontSize: "0.85rem" }}>
+                            No events yet.
+                        </p>
                     )}
                     {log.map((entry) => (
                         <div
