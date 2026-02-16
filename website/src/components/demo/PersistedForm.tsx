@@ -20,10 +20,6 @@ const defaultForm: FormData = {
     newsletter: false,
 };
 
-/**
- * Error-aware default factory.
- * Defined at module level for a stable reference (avoids re-renders).
- */
 const getDefaultForm = (error?: CodecError | SchemaError): FormData => {
     if (error) {
         console.warn("[PersistedForm] Using defaults due to:", error.message);
@@ -54,8 +50,8 @@ export function PersistedForm() {
     useEffect(() => () => clearTimeout(timeout.current), []);
 
     return (
-        <div className="persisted-form">
-            <div className="form-row">
+        <div className="demo-form">
+            <div className="demo-form-row">
                 <label htmlFor="pf-name">Name</label>
                 <input
                     id="pf-name"
@@ -65,7 +61,7 @@ export function PersistedForm() {
                     placeholder="Jane Doe"
                 />
             </div>
-            <div className="form-row">
+            <div className="demo-form-row">
                 <label htmlFor="pf-email">Email</label>
                 <input
                     id="pf-email"
@@ -75,7 +71,7 @@ export function PersistedForm() {
                     placeholder="jane@example.com"
                 />
             </div>
-            <div className="form-row">
+            <div className="demo-form-row">
                 <label htmlFor="pf-bio">Bio</label>
                 <textarea
                     id="pf-bio"
@@ -84,16 +80,20 @@ export function PersistedForm() {
                     placeholder="Tell us about yourself…"
                 />
             </div>
-            <div className="form-row">
+            <div className="demo-form-row">
                 <label htmlFor="pf-role">Role</label>
-                <select id="pf-role" value={form.role} onChange={(e) => update("role", e.target.value)}>
+                <select
+                    id="pf-role"
+                    value={form.role}
+                    onChange={(e) => update("role", e.target.value)}
+                >
                     <option value="developer">Developer</option>
                     <option value="designer">Designer</option>
                     <option value="manager">Manager</option>
                     <option value="other">Other</option>
                 </select>
             </div>
-            <div className="form-row form-checkbox">
+            <div className="demo-form-row demo-form-checkbox">
                 <input
                     id="pf-newsletter"
                     type="checkbox"
@@ -102,11 +102,21 @@ export function PersistedForm() {
                 />
                 <label htmlFor="pf-newsletter">Subscribe to newsletter</label>
             </div>
-            <div className="form-footer">
-                <button className="btn btn-danger btn-sm" onClick={() => remove()}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+                <button className="button button--sm button--danger" onClick={() => remove()}>
                     Clear all fields
                 </button>
-                <span className={`saved-indicator${showSaved ? " visible" : ""}`}>Saved</span>
+                <span
+                    style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        color: "var(--ifm-color-success)",
+                        opacity: showSaved ? 1 : 0,
+                        transition: "opacity 0.3s",
+                    }}
+                >
+                    Saved
+                </span>
             </div>
         </div>
     );

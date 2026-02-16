@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { MnemonicProvider, useMnemonicKey, JSONCodec } from "react-mnemonic";
 import type { StorageLike } from "react-mnemonic";
-import { createIdbStorage } from "../storage/idb-storage";
+import { createIdbStorage } from "./idb-storage";
 
 interface CartItem {
     id: string;
@@ -34,14 +34,20 @@ function CartContents() {
         set((prev) => {
             const existing = prev.find((i) => i.id === product.id);
             if (existing) {
-                return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
+                return prev.map((i) =>
+                    i.id === product.id ? { ...i, qty: i.qty + 1 } : i,
+                );
             }
             return [...prev, { ...product, qty: 1 }];
         });
     };
 
     const updateQty = (id: string, delta: number) => {
-        set((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0));
+        set((prev) =>
+            prev
+                .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
+                .filter((i) => i.qty > 0),
+        );
     };
 
     const removeItem = (id: string) => {
@@ -52,12 +58,17 @@ function CartContents() {
 
     return (
         <div>
-            <div className="cart-catalog">
+            <div className="demo-cart-catalog">
                 {catalog.map((p) => (
-                    <div key={p.id} className="catalog-item">
-                        <span className="item-name">{p.name}</span>
-                        <span className="item-price">${p.price.toFixed(2)}</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => addItem(p)}>
+                    <div key={p.id} className="demo-catalog-item">
+                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                            {p.name}
+                        </span>
+                        <span className="demo-muted">${p.price.toFixed(2)}</span>
+                        <button
+                            className="button button--sm button--primary"
+                            onClick={() => addItem(p)}
+                        >
                             Add to Cart
                         </button>
                     </div>
@@ -65,10 +76,12 @@ function CartContents() {
             </div>
 
             {items.length === 0 ? (
-                <p className="cart-empty">Your cart is empty.</p>
+                <p className="demo-muted" style={{ textAlign: "center", padding: 24 }}>
+                    Your cart is empty.
+                </p>
             ) : (
                 <>
-                    <table className="cart-table">
+                    <table className="demo-table">
                         <thead>
                             <tr>
                                 <th>Item</th>
@@ -84,16 +97,18 @@ function CartContents() {
                                     <td>{item.name}</td>
                                     <td>${item.price.toFixed(2)}</td>
                                     <td>
-                                        <div className="qty-controls">
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                             <button
-                                                className="btn btn-ghost btn-sm"
+                                                className="button button--sm button--outline button--secondary"
                                                 onClick={() => updateQty(item.id, -1)}
                                             >
                                                 &minus;
                                             </button>
-                                            <span>{item.qty}</span>
+                                            <span style={{ minWidth: 24, textAlign: "center", fontWeight: 600 }}>
+                                                {item.qty}
+                                            </span>
                                             <button
-                                                className="btn btn-ghost btn-sm"
+                                                className="button button--sm button--outline button--secondary"
                                                 onClick={() => updateQty(item.id, 1)}
                                             >
                                                 +
@@ -102,7 +117,10 @@ function CartContents() {
                                     </td>
                                     <td>${(item.price * item.qty).toFixed(2)}</td>
                                     <td>
-                                        <button className="btn btn-danger btn-sm" onClick={() => removeItem(item.id)}>
+                                        <button
+                                            className="button button--sm button--danger"
+                                            onClick={() => removeItem(item.id)}
+                                        >
                                             Remove
                                         </button>
                                     </td>
@@ -110,12 +128,21 @@ function CartContents() {
                             ))}
                         </tbody>
                     </table>
-                    <div className="cart-total">
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginTop: 12,
+                            paddingTop: 12,
+                            borderTop: "2px solid var(--ifm-color-emphasis-200)",
+                            fontWeight: 700,
+                        }}
+                    >
                         <span>Total</span>
                         <span>${total.toFixed(2)}</span>
                     </div>
                     <div style={{ marginTop: 8 }}>
-                        <button className="btn btn-danger btn-sm" onClick={() => remove()}>
+                        <button className="button button--sm button--danger" onClick={() => remove()}>
                             Clear Cart
                         </button>
                     </div>
@@ -136,11 +163,19 @@ export function ShoppingCart() {
     }, []);
 
     if (error) {
-        return <p className="cart-error">Failed to load IndexedDB: {error}</p>;
+        return (
+            <p style={{ color: "var(--ifm-color-danger)", textAlign: "center", padding: 24 }}>
+                Failed to load IndexedDB: {error}
+            </p>
+        );
     }
 
     if (!storage) {
-        return <p className="cart-loading">Loading cart from IndexedDB…</p>;
+        return (
+            <p className="demo-muted" style={{ textAlign: "center", padding: 24 }}>
+                Loading cart from IndexedDB…
+            </p>
+        );
     }
 
     return (

@@ -1,0 +1,319 @@
+/* Demo page styles — scoped under .demo-page */
+
+.demo-page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.demo-page h1 {
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.demo-subtitle {
+    text-align: center;
+    color: var(--ifm-color-emphasis-600);
+    margin-bottom: 2rem;
+}
+
+/* ---- Section cards ---- */
+
+.demo-section {
+    background: var(--ifm-card-background-color, var(--ifm-background-surface-color));
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: var(--ifm-global-radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.demo-section h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.125rem;
+}
+
+.demo-section > p:first-of-type {
+    color: var(--ifm-color-emphasis-600);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+/* ---- Resizable panel ---- */
+
+.demo-resizable-wrapper {
+    position: relative;
+    user-select: none;
+}
+
+.demo-resizable-panel {
+    background: var(--ifm-color-emphasis-100);
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: var(--ifm-global-radius);
+    padding: 1rem;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-width-label {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ifm-color-primary);
+}
+
+.demo-drag-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    background: var(--ifm-color-emphasis-400);
+    border-radius: 0 var(--ifm-global-radius) var(--ifm-global-radius) 0;
+    transition: background-color 0.15s;
+}
+
+.demo-drag-handle:hover,
+.demo-drag-handle.dragging {
+    background: var(--ifm-color-emphasis-600);
+}
+
+/* ---- Form elements ---- */
+
+.demo-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.demo-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.demo-form-row label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ifm-color-emphasis-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.demo-form-row input[type="text"],
+.demo-form-row input[type="email"],
+.demo-form-row input[type="number"],
+.demo-form-row textarea,
+.demo-form-row select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ifm-color-emphasis-300);
+    border-radius: var(--ifm-global-radius);
+    background: var(--ifm-background-color);
+    color: var(--ifm-font-color-base);
+    font-size: 0.9rem;
+    font-family: inherit;
+    transition: border-color 0.15s;
+}
+
+.demo-form-row input:focus,
+.demo-form-row textarea:focus,
+.demo-form-row select:focus {
+    outline: none;
+    border-color: var(--ifm-color-primary);
+}
+
+.demo-form-row textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.demo-form-checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-form-checkbox label {
+    text-transform: none;
+    font-weight: normal;
+    font-size: 0.9rem;
+    color: var(--ifm-font-color-base);
+}
+
+/* ---- Cart ---- */
+
+.demo-cart-catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.demo-catalog-item {
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: var(--ifm-global-radius);
+    padding: 0.75rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+/* ---- Tables ---- */
+
+.demo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.demo-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--ifm-color-emphasis-200);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ifm-color-emphasis-600);
+}
+
+.demo-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--ifm-color-emphasis-200);
+    vertical-align: middle;
+}
+
+/* ---- Muted text ---- */
+
+.demo-muted {
+    color: var(--ifm-color-emphasis-600);
+}
+
+/* ---- Schema Playground ---- */
+
+.demo-sp {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.demo-sp-section {
+    background: var(--ifm-color-emphasis-100);
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: var(--ifm-global-radius);
+    padding: 1rem;
+}
+
+.demo-sp-section h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+}
+
+.demo-sp-section h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* ---- Alerts ---- */
+
+.demo-alert {
+    padding: 0.75rem;
+    border-radius: var(--ifm-global-radius);
+    font-size: 0.8rem;
+    font-family: var(--ifm-font-family-monospace);
+    margin-top: 0.5rem;
+}
+
+.demo-alert--success {
+    border: 1px solid var(--ifm-color-success);
+    color: var(--ifm-color-success);
+    background: var(--ifm-background-color);
+}
+
+.demo-alert--error {
+    border: 1px solid var(--ifm-color-danger);
+    color: var(--ifm-color-danger);
+    background: var(--ifm-background-color);
+}
+
+/* ---- Result pre ---- */
+
+.demo-result {
+    padding: 0.75rem;
+    background: var(--ifm-background-color);
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: var(--ifm-global-radius);
+    font-size: 0.8rem;
+    font-family: var(--ifm-font-family-monospace);
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+}
+
+/* ---- Registry list ---- */
+
+.demo-registry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.demo-registry-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    background: var(--ifm-background-color);
+    border-radius: 4px;
+    font-family: var(--ifm-font-family-monospace);
+    font-size: 0.8rem;
+}
+
+/* ---- Event log ---- */
+
+.demo-log {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.demo-log-entry {
+    font-size: 0.8rem;
+    font-family: var(--ifm-font-family-monospace);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.demo-log--error {
+    color: var(--ifm-color-danger);
+}
+
+.demo-log--success {
+    color: var(--ifm-color-success);
+}
+
+/* ---- Danger button ---- */
+
+.button--danger {
+    --ifm-button-background-color: var(--ifm-color-danger);
+    --ifm-button-border-color: var(--ifm-color-danger);
+    --ifm-button-color: #fff;
+    background-color: var(--ifm-color-danger);
+    border-color: var(--ifm-color-danger);
+    color: #fff;
+}
+
+.button--danger:hover {
+    --ifm-button-background-color: var(--ifm-color-danger-dark);
+    --ifm-button-border-color: var(--ifm-color-danger-dark);
+    background-color: var(--ifm-color-danger-dark);
+    border-color: var(--ifm-color-danger-dark);
+    color: #fff;
+}

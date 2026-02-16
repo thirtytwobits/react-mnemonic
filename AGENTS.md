@@ -2,8 +2,7 @@
 
 ## Project Structure & Module Organization
 - `src/` holds the library source. Public exports are in `src/index.ts` and the main module lives in `src/Mnemonic/` (`provider.tsx`, `use.ts`, `codecs.ts`, `types.ts`, `json-schema.ts`, `schema.ts`).
-- `example/` contains a Vite + React demo app that imports the library via `"file:.."`. It has its own `package.json`, `tsconfig.json`, and `vite.config.ts`.
-- Build outputs are emitted to `dist/` (published via `package.json` `files`). **Rebuild `dist/` after source changes** (`npm run build`) before the example app or consumers can see them.
+- Build outputs are emitted to `dist/` (published via `package.json` `files`). **Rebuild `dist/` after source changes** (`npm run build`) before consumers can see them.
 - Configuration lives at the repo root: `tsconfig.json`, `tsup.config.ts`, `vitest.config.ts`, `vitest.setup.ts`.
 - `website/` contains the Docusaurus documentation site with its own `package.json`. API reference is auto-generated from TypeDoc. Deployed to GitHub Pages via `.github/workflows/deploy-docs.yml`.
 - `README.md` contains the public usage example.

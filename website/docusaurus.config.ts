@@ -89,6 +89,11 @@ const config: Config = {
                     position: "left",
                 },
                 {
+                    to: "demo",
+                    label: "Demo",
+                    position: "left",
+                },
+                {
                     href: "https://github.com/thirtytwobits/react-mnemonic",
                     label: "GitHub",
                     position: "right",
