@@ -27,7 +27,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
+    "docs:watch": "typedoc --watch",
+    "docs:site": "npm --prefix website run build",
+    "docs:site:start": "npm --prefix website start"
   },
   "keywords": [
     "react",

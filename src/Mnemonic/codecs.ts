@@ -96,7 +96,7 @@ export const JSONCodec: Codec<any> = {
 /**
  * Factory function for creating custom codecs.
  *
- * Creates a Codec<T> from separate encode and decode functions. This is
+ * Creates a `Codec<T>` from separate encode and decode functions. This is
  * useful for implementing custom serialization strategies for types that
  * aren't supported by JSONCodec. Using a custom codec on a key opts out
  * of JSON Schema validation for that key.
@@ -105,7 +105,7 @@ export const JSONCodec: Codec<any> = {
  *
  * @param encode - Function that converts a typed value to a string
  * @param decode - Function that converts a string back to a typed value
- * @returns A Codec<T> object compatible with useMnemonicKey
+ * @returns A `Codec<T>` object compatible with useMnemonicKey
  *
  * @example
  * ```typescript

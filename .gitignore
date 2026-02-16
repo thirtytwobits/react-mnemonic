@@ -8,3 +8,7 @@ coverage
 *.tsbuildinfo
 build-ts
 docs
+website/build
+website/.docusaurus
+website/docs/api
+website/node_modules

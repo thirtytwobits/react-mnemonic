@@ -5,6 +5,7 @@
 - `example/` contains a Vite + React demo app that imports the library via `"file:.."`. It has its own `package.json`, `tsconfig.json`, and `vite.config.ts`.
 - Build outputs are emitted to `dist/` (published via `package.json` `files`). **Rebuild `dist/` after source changes** (`npm run build`) before the example app or consumers can see them.
 - Configuration lives at the repo root: `tsconfig.json`, `tsup.config.ts`, `vitest.config.ts`, `vitest.setup.ts`.
+- `website/` contains the Docusaurus documentation site with its own `package.json`. API reference is auto-generated from TypeDoc. Deployed to GitHub Pages via `.github/workflows/deploy-docs.yml`.
 - `README.md` contains the public usage example.
 
 ## Build, Test, and Development Commands
@@ -19,6 +20,8 @@
 - `npm run format:check` checks formatting without writing.
 - `npm run docs` generates API documentation with TypeDoc into `docs/`.
 - `npm run docs:watch` runs TypeDoc in watch mode for live preview.
+- `npm run docs:site` builds the Docusaurus documentation site (`website/build/`).
+- `npm run docs:site:start` starts the Docusaurus dev server for live editing.
 
 ## Coding Style & Naming Conventions
 - TypeScript, ES modules (`"type": "module"`).
