@@ -256,13 +256,12 @@ function PlaygroundWorkbench({
     readTrigger: number;
 }) {
     const errorRef = useRef<Error | null>(null);
-    errorRef.current = null;
 
     const [writeResult, setWriteResult] = useState<WriteResultState | null>(null);
 
     const defaultFactory = useCallback(
         (error?: CodecError | SchemaError) => {
-            if (error) errorRef.current = error;
+            errorRef.current = error ?? null;
             return undefined as unknown;
         },
         [],
@@ -273,7 +272,10 @@ function PlaygroundWorkbench({
         ...(schemaVersion !== undefined ? { schema: { version: schemaVersion } } : {}),
     });
 
-    const readError = errorRef.current;
+    // Error is only meaningful when value is undefined (fallback was used).
+    // Derived from value rather than reset on every render, so it survives
+    // re-renders where the hook's internal useMemo does not recompute.
+    const readError = value === undefined ? errorRef.current : null;
 
     // Report result to parent after render.
     const reportedRef = useRef<{ value: unknown; error: Error | null } | null>(null);
@@ -572,8 +574,21 @@ export function SchemaPlayground() {
             setDecoded(value);
             setReadError(error);
             refreshStorage();
+
+            // Sync the display list with schemas that the hook may have
+            // auto-registered into the MutableRegistry (autoschema mode).
+            setSchemas((prev) => {
+                const prevIds = new Set(prev.map((s) => `${s.key}:${s.version}`));
+                const added: SchemaDisplay[] = [];
+                for (const [id, ks] of registry._schemas) {
+                    if (!prevIds.has(id)) {
+                        added.push({ key: ks.key, version: ks.version, schema: ks.schema });
+                    }
+                }
+                return added.length > 0 ? [...prev, ...added] : prev;
+            });
         },
-        [refreshStorage],
+        [refreshStorage, registry],
     );
 
     const schemaOptions = useMemo(() => {
