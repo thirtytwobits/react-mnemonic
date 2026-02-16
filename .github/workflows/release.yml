@@ -5,6 +5,10 @@ on:
         tags:
             - "v*"
 
+permissions:
+    id-token: write # Required for OIDC authentication
+    contents: read # Allows checking out code
+
 jobs:
     publish:
         runs-on: ubuntu-latest
