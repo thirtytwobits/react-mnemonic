@@ -1,0 +1,12 @@
+{
+    "manifest_version": 3,
+    "name": "react-mnemonic DevTools",
+    "description": "DevTools extension panel for react-mnemonic.",
+    "version": "0.0.1",
+    "devtools_page": "devtools.html",
+    "permissions": ["tabs", "scripting", "activeTab"],
+    "action": {
+        "default_title": "react-mnemonic DevTools",
+        "default_popup": "popup.html"
+    }
+}

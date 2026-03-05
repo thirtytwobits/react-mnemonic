@@ -114,8 +114,13 @@ export interface MnemonicProviderOptions {
     /**
      * Enable DevTools debugging interface.
      *
-     * When enabled, exposes the store on `window.__REACT_MNEMONIC_DEVTOOLS__[namespace]`
-     * with methods to inspect, modify, and dump storage state from the console.
+     * When enabled, registers this provider in the global
+     * `window.__REACT_MNEMONIC_DEVTOOLS__` registry.
+     *
+     * The registry stores providers as weak references and exposes:
+     * - `resolve(namespace)` to strengthen a provider reference and access
+     *   inspection methods.
+     * - `list()` to enumerate provider availability.
      *
      * @default false
      *
@@ -125,9 +130,10 @@ export interface MnemonicProviderOptions {
      * enableDevTools: process.env.NODE_ENV === 'development'
      *
      * // Then in browser console:
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.dump()
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.get('user')
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.set('user', { name: 'Test' })
+     * const provider = window.__REACT_MNEMONIC_DEVTOOLS__.resolve('myApp')
+     * provider?.dump()
+     * provider?.get('user')
+     * provider?.set('user', { name: 'Test' })
      * ```
      */
     enableDevTools?: boolean;
@@ -201,6 +207,118 @@ export interface MnemonicProviderOptions {
  * @see {@link KeySchema} - Individual schema definition
  */
 export type SchemaMode = "strict" | "default" | "autoschema";
+
+/**
+ * Weak-reference shape used by the devtools registry.
+ *
+ * Matches the standard `WeakRef` API while keeping the public type surface
+ * compatible with ES2020 TypeScript lib targets.
+ */
+export interface MnemonicDevToolsWeakRef<T extends object> {
+    /**
+     * Attempts to strengthen the weak reference.
+     *
+     * @returns The live object, or undefined if it was garbage-collected.
+     */
+    deref: () => T | undefined;
+}
+
+/**
+ * Provider inspection API exposed through devtools registry resolution.
+ *
+ * Resolve a provider from the registry, then invoke these methods for manual
+ * inspection/mutation from the browser console.
+ */
+export interface MnemonicDevToolsProviderApi {
+    /** Access the underlying store instance. */
+    getStore: () => Mnemonic;
+    /** Dump all raw key-value pairs for the provider namespace. */
+    dump: () => Record<string, string>;
+    /** Read decoded value for an unprefixed key. */
+    get: (key: string) => unknown;
+    /** Write value for an unprefixed key (JSON-encoded). */
+    set: (key: string, value: unknown) => void;
+    /** Remove a single unprefixed key. */
+    remove: (key: string) => void;
+    /** Remove all keys in this provider namespace. */
+    clear: () => void;
+    /** List all unprefixed keys in this provider namespace. */
+    keys: () => string[];
+}
+
+/**
+ * Registry entry for a single provider namespace.
+ */
+export interface MnemonicDevToolsProviderEntry {
+    /** Namespace key for this provider entry. */
+    namespace: string;
+    /** Weak reference to the provider inspection API. */
+    weakRef: MnemonicDevToolsWeakRef<MnemonicDevToolsProviderApi>;
+    /** Timestamp when this namespace was registered. */
+    registeredAt: number;
+    /** Timestamp when provider was last confirmed live. */
+    lastSeenAt: number;
+    /** Timestamp when provider was first observed unavailable, or null when live. */
+    staleSince: number | null;
+}
+
+/**
+ * Lightweight provider status returned by `list()`.
+ */
+export interface MnemonicDevToolsProviderDescriptor {
+    /** Namespace registered by the provider. */
+    namespace: string;
+    /** Whether the provider can currently be resolved to a live API instance. */
+    available: boolean;
+    /** Timestamp when the provider namespace was first registered. */
+    registeredAt: number;
+    /** Timestamp when the provider was last observed as live. */
+    lastSeenAt: number;
+    /** Timestamp when the provider first became unavailable, or `null` when live. */
+    staleSince: number | null;
+}
+
+/**
+ * Environment capabilities reported by devtools registry.
+ */
+export interface MnemonicDevToolsCapabilities {
+    /** Whether the runtime supports `WeakRef`. */
+    weakRef: boolean;
+    /** Whether the runtime supports `FinalizationRegistry`. */
+    finalizationRegistry: boolean;
+}
+
+/**
+ * Polling metadata for extension synchronization.
+ */
+export interface MnemonicDevToolsMeta {
+    /** Monotonic registry version incremented on register and mutation events. */
+    version: number;
+    /** Timestamp of the most recent registry update. */
+    lastUpdated: number;
+    /** Short label describing the most recent registry change. */
+    lastChange: string;
+}
+
+/**
+ * Global devtools registry contract available on window.
+ *
+ * This is registry-only. Direct namespace access
+ * (`window.__REACT_MNEMONIC_DEVTOOLS__.myNamespace`) is not part of the
+ * public API.
+ */
+export interface MnemonicDevToolsRegistry {
+    /** Provider entries keyed by namespace. */
+    providers: Record<string, MnemonicDevToolsProviderEntry>;
+    /** Resolve a namespace to a live provider API when one is available. */
+    resolve: (namespace: string) => MnemonicDevToolsProviderApi | null;
+    /** List provider availability without strengthening weak references manually. */
+    list: () => MnemonicDevToolsProviderDescriptor[];
+    /** Runtime capabilities relevant to the registry implementation. */
+    capabilities: MnemonicDevToolsCapabilities;
+    /** Versioning metadata used by polling devtools integrations. */
+    __meta: MnemonicDevToolsMeta;
+}
 
 /**
  * Schema definition for a single key at a specific version.
@@ -587,9 +705,9 @@ export type Listener = () => void;
  *
  * @remarks
  * This implements the React `useSyncExternalStore` contract for efficient,
- * tearing-free state synchronization.
- *
- * @internal
+ * tearing-free state synchronization. Most application code should still
+ * prefer `useMnemonicKey`; this type mainly appears in the DevTools API via
+ * `MnemonicDevToolsProviderApi.getStore()`.
  */
 export type Mnemonic = {
     /**
@@ -789,6 +907,40 @@ export type UseMnemonicKeyOptions<T> = {
     codec?: Codec<T>;
 
     /**
+     * Optional read-time reconciliation hook for persisted values.
+     *
+     * Runs after a stored value has been decoded and any read-time migrations
+     * have completed, but before the hook exposes the value to React. This is
+     * useful for selectively enforcing newly shipped defaults or normalizing
+     * legacy persisted values without discarding the whole key.
+     *
+     * If the reconciled value would persist differently from the pre-reconcile
+     * value, the hook rewrites storage once using the normal write path.
+     *
+     * @remarks
+     * Prefer schema migrations for structural changes that must always happen
+     * between explicit versions. Use `reconcile` for conditional, field-level
+     * adjustments that depend on application policy rather than a strict schema
+     * upgrade step.
+     *
+     * If `reconcile` throws a `SchemaError`, that error is preserved and passed
+     * to `defaultValue`. Any other thrown error is wrapped as
+     * `SchemaError("RECONCILE_FAILED")`.
+     *
+     * @param value - The decoded persisted value
+     * @param context - Metadata about the stored and latest schema versions
+     *
+     * @example
+     * ```typescript
+     * reconcile: (value, { persistedVersion }) => ({
+     *   ...value,
+     *   theme: persistedVersion < 2 ? "dark" : value.theme,
+     * })
+     * ```
+     */
+    reconcile?: (value: T, context: ReconcileContext) => T;
+
+    /**
      * Callback invoked once when the hook is first mounted.
      *
      * Receives the initial value (either from storage or the default).
@@ -880,4 +1032,24 @@ export type UseMnemonicKeyOptions<T> = {
          */
         version?: number;
     };
+};
+
+/**
+ * Metadata passed to `UseMnemonicKeyOptions.reconcile`.
+ */
+export type ReconcileContext = {
+    /**
+     * The unprefixed storage key being reconciled.
+     */
+    key: string;
+
+    /**
+     * The version found in the persisted envelope that was read.
+     */
+    persistedVersion: number;
+
+    /**
+     * The latest registered schema version for the key, when available.
+     */
+    latestVersion?: number;
 };

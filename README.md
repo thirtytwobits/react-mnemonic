@@ -25,6 +25,7 @@ through a single hook that works like `useState`.
 - **Cross-tab sync** -- opt-in `listenCrossTab` uses the browser `storage` event
 - **Pluggable storage** -- bring your own backend via the `StorageLike` interface (IndexedDB, sessionStorage, etc.)
 - **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
+- **Read-time reconciliation** -- selectively enforce new defaults on persisted values without clearing the whole key
 - **Write-time normalization** -- migrations where `fromVersion === toVersion` run on every write
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
 - **DevTools** -- inspect and mutate state from the browser console
@@ -127,14 +128,15 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 #### Options
 
-| Option           | Type                                              | Default     | Description                                         |
-| ---------------- | ------------------------------------------------- | ----------- | --------------------------------------------------- |
-| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | _required_  | Fallback value or error-aware factory               |
-| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation) |
-| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value                  |
-| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                        |
-| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                |
-| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version             |
+| Option           | Type                                              | Default     | Description                                                   |
+| ---------------- | ------------------------------------------------- | ----------- | ------------------------------------------------------------- |
+| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | _required_  | Fallback value or error-aware factory                         |
+| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation)           |
+| `reconcile`      | `(value: T, context: ReconcileContext) => T`      | --          | Adjust a persisted value after read and persist if it changes |
+| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value                            |
+| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                                  |
+| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                          |
+| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version                       |
 
 ### Codecs
 
@@ -317,6 +319,26 @@ const normalizer: MigrationRule = {
     migrate: (value) => String(value).trim().toLowerCase(),
 };
 ```
+
+### Reconciliation
+
+Use `reconcile` when you want to keep persisted data but selectively enforce
+new application defaults after the value has been decoded and any read-time
+migrations have already run.
+
+```ts
+const { value } = useMnemonicKey("preferences", {
+    defaultValue: { theme: "dark", density: "comfortable", accents: true },
+    reconcile: (persisted, { persistedVersion }) => ({
+        ...persisted,
+        accents: persistedVersion === 0 ? true : persisted.accents,
+    }),
+});
+```
+
+Use a schema migration when the stored shape must move from one explicit version
+to another. Use `reconcile` for conditional, field-level policy changes such as
+rolling out a new default while preserving the rest of a user's stored data.
 
 ### Example schema registry
 

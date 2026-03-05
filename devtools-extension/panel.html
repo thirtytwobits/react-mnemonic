@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>react-mnemonic Panel</title>
+        <link rel="stylesheet" href="./panel.css" />
+    </head>
+    <body>
+        <main class="panel" role="main">
+            <header class="panel-header">
+                <div class="title-wrap">
+                    <img src="./assets/logo.svg" alt="react-mnemonic logo" class="logo" width="28" height="28" />
+                    <h1>react-mnemonic Storage</h1>
+                </div>
+                <div class="controls">
+                    <label class="auto-refresh-control" for="auto-refresh-toggle">
+                        <input id="auto-refresh-toggle" type="checkbox" />
+                        Auto-refresh
+                    </label>
+                    <button id="refresh-button" type="button">Refresh</button>
+                </div>
+            </header>
+            <p id="status" class="status" aria-live="polite">Loading Mnemonic DevTools...</p>
+            <section class="table-wrap" aria-label="mnemonic storage table">
+                <table class="storage-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Key</th>
+                            <th scope="col">Value</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="storage-table-body"></tbody>
+                </table>
+            </section>
+        </main>
+        <script src="./panel.js"></script>
+    </body>
+</html>

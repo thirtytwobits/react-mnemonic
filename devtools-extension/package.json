@@ -1,0 +1,10 @@
+{
+    "name": "react-mnemonic-devtools-extension",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Chrome DevTools extension for react-mnemonic",
+    "scripts": {
+        "build": "rm -rf dist && mkdir -p dist && cp -R manifest.json devtools.html devtools.js panel.html panel.css panel.js popup.html popup.css popup.js assets dist/",
+        "clean": "rm -rf dist"
+    }
+}

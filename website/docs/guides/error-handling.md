@@ -1,7 +1,7 @@
 ---
 sidebar_position: 8
 title: Error Handling
-description: Handle decode, validation, and migration errors gracefully.
+description: Handle decode, validation, migration, and reconciliation errors gracefully.
 ---
 
 # Error Handling
@@ -12,10 +12,10 @@ failure reason.
 
 ## Error classes
 
-| Class         | When thrown                                             |
-| ------------- | ------------------------------------------------------- |
-| `CodecError`  | Encoding or decoding fails (custom codec)               |
-| `SchemaError` | Schema validation, migration, or envelope parsing fails |
+| Class         | When thrown                                                             |
+| ------------- | ----------------------------------------------------------------------- |
+| `CodecError`  | Encoding or decoding fails (custom codec)                               |
+| `SchemaError` | Schema validation, migration, reconciliation, or envelope parsing fails |
 
 ## Error-aware defaults
 
@@ -30,7 +30,7 @@ const getDefault = (error?: CodecError | SchemaError) => {
         console.warn("Corrupt stored data:", error.message);
     }
     if (error instanceof SchemaError) {
-        console.warn("Schema validation failed:", error.message);
+        console.warn(`Schema issue [${error.code}]:`, error.message);
     }
     return { count: 0 };
 };
@@ -47,12 +47,38 @@ storage — the nominal "first visit" path. No error occurred.
 
 `SchemaError` includes a `code` property for programmatic handling:
 
-| Code                | Meaning                                       |
-| ------------------- | --------------------------------------------- |
-| `INVALID_ENVELOPE`  | Stored JSON doesn't match the envelope format |
-| `MISSING_SCHEMA`    | No schema registered for this key/version     |
-| `MIGRATION_FAILED`  | A migration rule threw or returned bad data   |
-| `VALIDATION_FAILED` | Value doesn't pass JSON Schema validation     |
+| Code                           | Meaning                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `INVALID_ENVELOPE`             | Stored JSON doesn't match the envelope format                    |
+| `SCHEMA_NOT_FOUND`             | No schema is registered for the stored key/version               |
+| `WRITE_SCHEMA_REQUIRED`        | Strict-mode writes require a schema, but none could be resolved  |
+| `MIGRATION_PATH_NOT_FOUND`     | No contiguous migration path exists to the latest schema         |
+| `MIGRATION_FAILED`             | A migration or write-time normalizer threw                       |
+| `RECONCILE_FAILED`             | A `reconcile` hook threw or returned an unpersistable value      |
+| `SCHEMA_REGISTRATION_CONFLICT` | A schema registration conflicted with an existing definition     |
+| `TYPE_MISMATCH`                | The decoded value failed JSON Schema validation                  |
+| `MODE_CONFIGURATION_INVALID`   | The active schema mode is missing a required registry capability |
+
+## Reconciliation failures
+
+If a `reconcile` hook throws a `SchemaError`, that error is passed through to
+`defaultValue` unchanged. Any other thrown error is normalized to a
+`SchemaError` whose `code` is `RECONCILE_FAILED`.
+
+```tsx
+const { value } = useMnemonicKey("preferences", {
+    defaultValue: (error) => {
+        if (error instanceof SchemaError && error.code === "RECONCILE_FAILED") {
+            return { theme: "dark", accents: true };
+        }
+        return { theme: "light", accents: false };
+    },
+    reconcile: (persisted) => {
+        if (!persisted) throw new Error("bad persisted state");
+        return persisted;
+    },
+});
+```
 
 ## Write errors
 

@@ -2,7 +2,7 @@
 // Copyright Scott Dixon
 
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MnemonicProvider, useMnemonic } from "./provider";
 import type { StorageLike } from "./types";
@@ -556,31 +556,137 @@ describe("MnemonicProvider – DOMException/SecurityError logging", () => {
 });
 
 describe("MnemonicProvider – DevTools", () => {
+    const originalWeakRef = (globalThis as any).WeakRef;
+    const originalFinalizationRegistry = (globalThis as any).FinalizationRegistry;
+    const originalProcess = (globalThis as any).process;
+
+    const setNodeEnv = (value: string) => {
+        const currentProcess = (globalThis as any).process ?? {};
+        const currentEnv = currentProcess.env ?? {};
+        (globalThis as any).process = {
+            ...currentProcess,
+            env: {
+                ...currentEnv,
+                NODE_ENV: value,
+            },
+        };
+    };
+
     beforeEach(() => {
         delete (window as any).__REACT_MNEMONIC_DEVTOOLS__;
+        (globalThis as any).WeakRef = originalWeakRef;
+        (globalThis as any).FinalizationRegistry = originalFinalizationRegistry;
+        (globalThis as any).process = originalProcess;
     });
 
-    it("registers DevTools on window when enableDevTools is true", () => {
+    afterEach(() => {
+        (globalThis as any).WeakRef = originalWeakRef;
+        (globalThis as any).FinalizationRegistry = originalFinalizationRegistry;
+        (globalThis as any).process = originalProcess;
+    });
+
+    function getRegistry() {
+        return (window as any).__REACT_MNEMONIC_DEVTOOLS__;
+    }
+
+    it("registers devtools registry root when enableDevTools is true", () => {
         const storage = createMockStorage();
         render(
             <MnemonicProvider namespace="dt" storage={storage} enableDevTools={true}>
                 <div />
             </MnemonicProvider>,
         );
-        expect((window as any).__REACT_MNEMONIC_DEVTOOLS__).toBeDefined();
-        expect((window as any).__REACT_MNEMONIC_DEVTOOLS__.dt).toBeDefined();
+        const registry = getRegistry();
+        expect(registry).toBeDefined();
+        expect(registry.providers).toBeDefined();
+        expect(typeof registry.resolve).toBe("function");
+        expect(typeof registry.list).toBe("function");
+        expect(typeof registry.capabilities).toBe("object");
+        expect(typeof registry.__meta).toBe("object");
     });
 
-    it("does not register DevTools when enableDevTools is false", () => {
+    it("does not register devtools registry when enableDevTools is false", () => {
         render(
             <MnemonicProvider namespace="dt" storage={createMockStorage()}>
                 <div />
             </MnemonicProvider>,
         );
-        expect((window as any).__REACT_MNEMONIC_DEVTOOLS__).toBeUndefined();
+        expect(getRegistry()).toBeUndefined();
     });
 
-    it("DevTools.get returns decoded value", () => {
+    it("does not attach provider API hold when enableDevTools is false", () => {
+        let capturedStore: ReturnType<typeof useMnemonic> | undefined;
+        const onStore = vi.fn((s) => {
+            capturedStore = s;
+        });
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        expect(capturedStore).toBeDefined();
+        expect((capturedStore as any).__devToolsProviderApiHold).toBeUndefined();
+        expect(getRegistry()).toBeUndefined();
+    });
+
+    it("resolve(namespace) returns provider API", () => {
+        const storage = createMockStorage();
+        render(
+            <MnemonicProvider namespace="dt" storage={storage} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+        const registry = getRegistry();
+        const provider = registry.resolve("dt");
+        expect(provider).toBeDefined();
+        expect(typeof provider.get).toBe("function");
+        expect(typeof provider.set).toBe("function");
+        expect(typeof provider.dump).toBe("function");
+    });
+
+    it("registry provider entries contain weak refs and metadata only", () => {
+        let capturedStore: ReturnType<typeof useMnemonic> | undefined;
+        const onStore = vi.fn((s) => {
+            capturedStore = s;
+        });
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        const entry = registry.providers.dt;
+        expect(entry).toBeDefined();
+        expect(Object.keys(entry).sort()).toEqual(["lastSeenAt", "namespace", "registeredAt", "staleSince", "weakRef"]);
+        expect("provider" in entry).toBe(false);
+        expect("api" in entry).toBe(false);
+
+        const provider = registry.resolve("dt");
+        expect(entry.weakRef.deref()).toBe(provider);
+        expect(capturedStore).toBeDefined();
+        expect((capturedStore as any).__devToolsProviderApiHold).toBe(provider);
+    });
+
+    it("list() reports provider descriptor and availability", () => {
+        const storage = createMockStorage();
+        render(
+            <MnemonicProvider namespace="dt" storage={storage} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+        const registry = getRegistry();
+        const list = registry.list();
+        expect(list).toHaveLength(1);
+        expect(list[0]!.namespace).toBe("dt");
+        expect(list[0]!.available).toBe(true);
+        expect(typeof list[0]!.registeredAt).toBe("number");
+    });
+
+    it("resolved devtools get returns decoded value", () => {
         const storage = createMockStorage();
         storage.store.set("dt.user", JSON.stringify({ name: "Alice" }));
         render(
@@ -588,21 +694,21 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         expect(devtools.get("user")).toEqual({ name: "Alice" });
     });
 
-    it("DevTools.get returns undefined for missing key", () => {
+    it("resolved devtools get returns undefined for missing key", () => {
         render(
             <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         expect(devtools.get("missing")).toBeUndefined();
     });
 
-    it("DevTools.get returns raw string for non-JSON values", () => {
+    it("resolved devtools get returns raw string for non-JSON values", () => {
         const storage = createMockStorage();
         storage.store.set("dt.plain", "not json");
         render(
@@ -610,23 +716,23 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         expect(devtools.get("plain")).toBe("not json");
     });
 
-    it("DevTools.set writes JSON-encoded value", () => {
+    it("resolved devtools set writes JSON-encoded value", () => {
         const storage = createMockStorage();
         render(
             <MnemonicProvider namespace="dt" storage={storage} enableDevTools={true}>
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         devtools.set("theme", "dark");
         expect(storage.store.get("dt.theme")).toBe(JSON.stringify("dark"));
     });
 
-    it("DevTools.remove removes the key", () => {
+    it("resolved devtools remove removes the key", () => {
         const storage = createMockStorage();
         storage.store.set("dt.k", "v");
         render(
@@ -634,12 +740,12 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         devtools.remove("k");
         expect(storage.store.has("dt.k")).toBe(false);
     });
 
-    it("DevTools.keys lists namespace keys", () => {
+    it("resolved devtools keys lists namespace keys", () => {
         const storage = createMockStorage();
         storage.store.set("dt.a", "1");
         storage.store.set("dt.b", "2");
@@ -648,11 +754,11 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         expect(devtools.keys()).toEqual(expect.arrayContaining(["a", "b"]));
     });
 
-    it("DevTools.clear removes all namespace keys", () => {
+    it("resolved devtools clear removes all namespace keys", () => {
         const storage = createMockStorage();
         storage.store.set("dt.a", "1");
         storage.store.set("dt.b", "2");
@@ -662,7 +768,7 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         devtools.clear();
         expect(storage.store.has("dt.a")).toBe(false);
         expect(storage.store.has("dt.b")).toBe(false);
@@ -670,7 +776,7 @@ describe("MnemonicProvider – DevTools", () => {
         expect(storage.store.has("other.c")).toBe(true);
     });
 
-    it("DevTools.dump returns all key-value pairs", () => {
+    it("resolved devtools dump returns all key-value pairs", () => {
         const storage = createMockStorage();
         storage.store.set("dt.x", "10");
         storage.store.set("dt.y", "20");
@@ -679,7 +785,7 @@ describe("MnemonicProvider – DevTools", () => {
                 <div />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         const spy = vi.spyOn(console, "table").mockImplementation(() => {});
         const result = devtools.dump();
         expect(result).toEqual({ x: "10", y: "20" });
@@ -687,7 +793,7 @@ describe("MnemonicProvider – DevTools", () => {
         spy.mockRestore();
     });
 
-    it("DevTools.getStore returns the store instance", () => {
+    it("resolved devtools getStore returns the store instance", () => {
         const storage = createMockStorage();
         let capturedStore: ReturnType<typeof useMnemonic>;
         const onStore = vi.fn((s) => {
@@ -698,8 +804,183 @@ describe("MnemonicProvider – DevTools", () => {
                 <StoreConsumer onStore={onStore} />
             </MnemonicProvider>,
         );
-        const devtools = (window as any).__REACT_MNEMONIC_DEVTOOLS__.dt;
+        const devtools = getRegistry().resolve("dt");
         expect(devtools.getStore()).toBe(capturedStore!);
+    });
+
+    it("throws in non-production when duplicate namespace is registered and live", () => {
+        setNodeEnv("development");
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const renderDuplicate = () =>
+            render(
+                <>
+                    <MnemonicProvider namespace="dupe" storage={storageA} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                    <MnemonicProvider namespace="dupe" storage={storageB} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                </>,
+            );
+        expect(renderDuplicate).toThrow(/Duplicate provider namespace "dupe"/);
+        errorSpy.mockRestore();
+    });
+
+    it("keeps first provider in production when duplicate namespace is registered", () => {
+        setNodeEnv("production");
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        render(
+            <>
+                <MnemonicProvider namespace="dupe" storage={storageA} enableDevTools={true}>
+                    <div />
+                </MnemonicProvider>
+                <MnemonicProvider namespace="dupe" storage={storageB} enableDevTools={true}>
+                    <div />
+                </MnemonicProvider>
+            </>,
+        );
+
+        const provider = getRegistry().resolve("dupe");
+        provider.set("k", "v");
+        expect(storageA.store.get("dupe.k")).toBe(JSON.stringify("v"));
+        expect(storageB.store.get("dupe.k")).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
+    it("treats missing NODE_ENV as production-safe for duplicate namespaces", () => {
+        (globalThis as any).process = undefined;
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        expect(() =>
+            render(
+                <>
+                    <MnemonicProvider namespace="dupe" storage={storageA} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                    <MnemonicProvider namespace="dupe" storage={storageB} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                </>,
+            ),
+        ).not.toThrow();
+
+        const provider = getRegistry().resolve("dupe");
+        provider.set("k", "v");
+        expect(storageA.store.get("dupe.k")).toBe(JSON.stringify("v"));
+        expect(storageB.store.get("dupe.k")).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
+    it("replaces stale namespace entries", () => {
+        const fakeStaleEntry = {
+            namespace: "stale",
+            weakRef: { deref: () => undefined },
+            registeredAt: 1,
+            lastSeenAt: 1,
+            staleSince: 1,
+        };
+
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
+            providers: { stale: fakeStaleEntry },
+            capabilities: { weakRef: true, finalizationRegistry: true },
+            __meta: { version: 0, lastUpdated: 0, lastChange: "" },
+            resolve: (ns: string) => {
+                const entry = (window as any).__REACT_MNEMONIC_DEVTOOLS__.providers[ns];
+                return entry?.weakRef?.deref?.() ?? null;
+            },
+            list: () => [],
+        };
+
+        const storage = createMockStorage();
+        render(
+            <MnemonicProvider namespace="stale" storage={storage} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const resolved = getRegistry().resolve("stale");
+        expect(resolved).toBeTruthy();
+        expect(getRegistry().providers.stale).not.toBe(fakeStaleEntry);
+    });
+
+    it("cleans legacy direct namespace fields from existing registry object", () => {
+        const legacyProvider = { get: () => "legacy" };
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
+            demo: legacyProvider,
+        };
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        expect(registry.demo).toBeUndefined();
+        expect(registry.providers.dt).toBeDefined();
+    });
+
+    it("ignores undeletable legacy namespace fields when initializing the registry", () => {
+        const root: Record<string, unknown> = {};
+        Object.defineProperty(root, "demo", {
+            configurable: false,
+            enumerable: true,
+            value: { get: () => "legacy" },
+        });
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = root;
+
+        expect(() =>
+            render(
+                <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                    <div />
+                </MnemonicProvider>,
+            ),
+        ).not.toThrow();
+
+        const registry = getRegistry();
+        expect(registry.demo).toBeDefined();
+        expect(registry.providers.dt).toBeDefined();
+    });
+
+    it("marks capabilities and skips provider registration when WeakRef is unavailable", () => {
+        (globalThis as any).WeakRef = undefined;
+        const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="no-weak" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        expect(registry.capabilities.weakRef).toBe(false);
+        expect(registry.resolve("no-weak")).toBeNull();
+        expect(registry.list()).toEqual([]);
+        expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('registry provider "no-weak" was not registered'));
+        infoSpy.mockRestore();
+    });
+
+    it("bumps __meta.version for register and mutation events", () => {
+        const storage = createMockStorage();
+        render(
+            <MnemonicProvider namespace="versioned" storage={storage} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+        const registry = getRegistry();
+        const initial = registry.__meta.version;
+        const provider = registry.resolve("versioned");
+        provider.set("alpha", "1");
+        provider.remove("alpha");
+        expect(registry.__meta.version).toBeGreaterThan(initial + 1);
     });
 });
 

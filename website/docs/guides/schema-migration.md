@@ -7,7 +7,8 @@ description: Version your stored data and migrate between schema versions.
 # Schema Migration
 
 When your data shape changes between app versions, Mnemonic's schema registry
-and migration rules handle the upgrade automatically.
+and migration rules handle the upgrade automatically. For field-level policy
+changes that should apply after reading persisted data, use `reconcile`.
 
 ## Schema registry
 
@@ -103,6 +104,26 @@ migrations.push({
 When a component reads a v1 profile from storage, Mnemonic automatically runs
 the migration to produce a v2 value.
 
+## Reconciliation vs. migration
+
+Use a schema migration when the stored shape must move from one explicit schema
+version to another. Use `reconcile` when you want to keep the stored shape but
+selectively enforce newer application defaults or normalize a subset of fields
+after decode and migration have already completed.
+
+```tsx
+const { value } = useMnemonicKey("profile", {
+    defaultValue: { name: "", email: "", marketingOptIn: true },
+    reconcile: (persisted, { persistedVersion, latestVersion }) => ({
+        ...persisted,
+        marketingOptIn: persistedVersion < (latestVersion ?? persistedVersion) ? true : persisted.marketingOptIn,
+    }),
+});
+```
+
+Mnemonic persists the reconciled value once when it changes, so subsequent
+reads see the updated value directly.
+
 ## Write-time normalizers
 
 A migration where `fromVersion === toVersion` runs on **every write**, acting as
@@ -136,3 +157,10 @@ const { value, set } = useMnemonicKey("profile", {
     schema: { version: 1 },
 });
 ```
+
+## Practical rule of thumb
+
+- Use migrations for structural compatibility between versions.
+- Use write-time normalizers for every-write cleanup like trimming or lowercasing.
+- Use `reconcile` for conditional, read-time default enforcement that should not
+  require a full key reset.

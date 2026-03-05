@@ -11,6 +11,7 @@ import {
     validateJsonSchema,
 } from "react-mnemonic";
 import type { SchemaRegistry, KeySchema, MigrationRule, SchemaMode, JsonSchema } from "react-mnemonic";
+import { enableDemoDevTools } from "./devtools";
 
 // ---------------------------------------------------------------------------
 // JSON Schema templates
@@ -849,6 +850,7 @@ export function SchemaPlayground() {
                 <MnemonicProvider
                     key={mountKey}
                     namespace={NAMESPACE}
+                    enableDevTools={enableDemoDevTools}
                     schemaMode={schemaMode}
                     schemaRegistry={registry}
                 >

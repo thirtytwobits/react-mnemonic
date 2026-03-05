@@ -25,6 +25,7 @@
  * | `WRITE_SCHEMA_REQUIRED`         | Strict mode requires a schema to write, but none was found.     |
  * | `MIGRATION_PATH_NOT_FOUND`      | No contiguous migration path between the stored and latest version. |
  * | `MIGRATION_FAILED`              | A migration step threw during execution.                        |
+ * | `RECONCILE_FAILED`             | A read-time reconciliation hook threw or returned an unpersistable value. |
  * | `SCHEMA_REGISTRATION_CONFLICT`  | `registerSchema` was called with a conflicting definition.      |
  * | `TYPE_MISMATCH`                 | The decoded value failed JSON Schema validation.                |
  * | `MODE_CONFIGURATION_INVALID`    | The schema mode requires a capability the registry doesn't provide. |
@@ -52,6 +53,7 @@ export class SchemaError extends Error {
         | "WRITE_SCHEMA_REQUIRED"
         | "MIGRATION_PATH_NOT_FOUND"
         | "MIGRATION_FAILED"
+        | "RECONCILE_FAILED"
         | "SCHEMA_REGISTRATION_CONFLICT"
         | "TYPE_MISMATCH"
         | "MODE_CONFIGURATION_INVALID";

@@ -4,6 +4,7 @@
 import Layout from "@theme/Layout";
 import BrowserOnly from "@docusaurus/BrowserOnly";
 import { MnemonicProvider } from "react-mnemonic";
+import { enableDemoDevTools } from "../components/demo/devtools";
 
 import "../css/demo.css";
 
@@ -15,7 +16,7 @@ function DemoContent() {
     const { SchemaPlayground } = require("../components/demo/SchemaPlayground");
 
     return (
-        <MnemonicProvider namespace="demo" enableDevTools>
+        <MnemonicProvider namespace="demo" enableDevTools={enableDemoDevTools}>
             <section className="demo-section">
                 <h2>Resizable Panel</h2>
                 <p>

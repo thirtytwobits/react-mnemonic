@@ -15,7 +15,7 @@ import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { validateJsonSchema, inferJsonSchema } from "./json-schema";
 import type { JsonSchema } from "./json-schema";
-import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
+import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext } from "./types";
 
 /**
  * React hook for persistent, type-safe state management.
@@ -39,7 +39,7 @@ import type { UseMnemonicKeyOptions, KeySchema, MigrationPath } from "./types";
 export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>) {
     const api = useMnemonic();
 
-    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema } = options;
+    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = options;
     const codec = codecOpt ?? JSONCodec;
     const schemaMode = api.schemaMode;
     const schemaRegistry = api.schemaRegistry;
@@ -166,165 +166,6 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         [schemaRegistry, registryCache, key],
     );
 
-    const decodeForRead = useCallback(
-        (rawText: string | null): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
-            if (rawText == null) return { value: getFallback() };
-
-            const parsed = parseEnvelope(rawText);
-            if (!parsed.ok) return { value: getFallback(parsed.error) };
-            const envelope = parsed.envelope;
-
-            const schemaForVersion = getSchemaForVersion(envelope.version);
-            const latestSchema = getLatestSchemaForKey();
-
-            // Strict mode always requires schema for the stored version.
-            if (schemaMode === "strict" && !schemaForVersion) {
-                return {
-                    value: getFallback(
-                        new SchemaError("SCHEMA_NOT_FOUND", `No schema for key "${key}" v${envelope.version}`),
-                    ),
-                };
-            }
-
-            // Autoschema only infers when no schema exists yet for this key.
-            if (schemaMode === "autoschema" && !schemaForVersion) {
-                if (latestSchema) {
-                    return {
-                        value: getFallback(
-                            new SchemaError("SCHEMA_NOT_FOUND", `No schema for key "${key}" v${envelope.version}`),
-                        ),
-                    };
-                }
-                if (!schemaRegistry || typeof schemaRegistry.registerSchema !== "function") {
-                    return {
-                        value: getFallback(
-                            new SchemaError(
-                                "MODE_CONFIGURATION_INVALID",
-                                `Autoschema mode requires schema registry registration for key "${key}"`,
-                            ),
-                        ),
-                    };
-                }
-                try {
-                    // Payload may be a codec string or already a JSON value (seeded data).
-                    const decoded =
-                        typeof envelope.payload === "string"
-                            ? decodeStringPayload<T>(envelope.payload, codec)
-                            : (envelope.payload as T);
-                    const inferredJsonSchema = inferJsonSchema(decoded);
-                    const inferred: KeySchema = {
-                        key,
-                        version: 1,
-                        schema: inferredJsonSchema,
-                    };
-                    // Rewrite as a schema-managed envelope (payload is JSON value directly)
-                    const rewriteEnvelope: MnemonicEnvelope = {
-                        version: inferred.version,
-                        payload: decoded,
-                    };
-                    return {
-                        value: decoded,
-                        pendingSchema: inferred,
-                        rewriteRaw: JSON.stringify(rewriteEnvelope),
-                    };
-                } catch (err) {
-                    const typedErr =
-                        err instanceof SchemaError || err instanceof CodecError
-                            ? err
-                            : new SchemaError("TYPE_MISMATCH", `Autoschema inference failed for key "${key}"`, err);
-                    return { value: getFallback(typedErr) };
-                }
-            }
-
-            // No schema found: default mode ignores version and uses hook codec.
-            if (!schemaForVersion) {
-                // If payload is already a non-string JSON value (e.g. seeded data,
-                // or previously schema-managed data whose schema was removed),
-                // return it directly without codec decoding.
-                if (typeof envelope.payload !== "string") {
-                    return { value: envelope.payload as T };
-                }
-                try {
-                    const decoded = decodeStringPayload<T>(envelope.payload, codec);
-                    return { value: decoded };
-                } catch (err) {
-                    const typedErr =
-                        err instanceof SchemaError || err instanceof CodecError
-                            ? err
-                            : new CodecError(`Codec decode failed for key "${key}"`, err);
-                    return { value: getFallback(typedErr) };
-                }
-            }
-
-            // Schema exists for stored version.
-            // Payload is a JSON value directly (no codec decoding needed).
-            let current: unknown;
-            try {
-                current = envelope.payload;
-                validateAgainstSchema(current, schemaForVersion.schema);
-            } catch (err) {
-                const typedErr =
-                    err instanceof SchemaError || err instanceof CodecError
-                        ? err
-                        : new SchemaError("TYPE_MISMATCH", `Schema decode failed for key "${key}"`, err);
-                return { value: getFallback(typedErr) };
-            }
-
-            // No migration needed.
-            if (!latestSchema || envelope.version >= latestSchema.version) {
-                return { value: current as T };
-            }
-
-            const path = getMigrationPathForKey(envelope.version, latestSchema.version);
-            if (!path) {
-                return {
-                    value: getFallback(
-                        new SchemaError(
-                            "MIGRATION_PATH_NOT_FOUND",
-                            `No migration path for key "${key}" from v${envelope.version} to v${latestSchema.version}`,
-                        ),
-                    ),
-                };
-            }
-
-            try {
-                let migrated = current;
-                for (const step of path) {
-                    migrated = step.migrate(migrated);
-                }
-                validateAgainstSchema(migrated, latestSchema.schema);
-                // Rewrite as schema-managed envelope (payload is JSON value)
-                const rewriteEnvelope: MnemonicEnvelope = {
-                    version: latestSchema.version,
-                    payload: migrated,
-                };
-                return {
-                    value: migrated as T,
-                    rewriteRaw: JSON.stringify(rewriteEnvelope),
-                };
-            } catch (err) {
-                const typedErr =
-                    err instanceof SchemaError || err instanceof CodecError
-                        ? err
-                        : new SchemaError("MIGRATION_FAILED", `Migration failed for key "${key}"`, err);
-                return { value: getFallback(typedErr) };
-            }
-        },
-        [
-            codec,
-            decodeStringPayload,
-            getFallback,
-            key,
-            parseEnvelope,
-            schemaMode,
-            schemaRegistry,
-            getSchemaForVersion,
-            getLatestSchemaForKey,
-            getMigrationPathForKey,
-            validateAgainstSchema,
-        ],
-    );
-
     const encodeForWrite = useCallback(
         (nextValue: T): string => {
             const explicitVersion = schema?.version;
@@ -391,6 +232,259 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
             validateAgainstSchema,
             getLatestSchemaForKey,
             getSchemaForVersion,
+        ],
+    );
+
+    const applyReconcile = useCallback(
+        ({
+            value,
+            rewriteRaw,
+            pendingSchema,
+            persistedVersion,
+            latestVersion,
+            serializeForPersist,
+            derivePendingSchema,
+        }: {
+            value: T;
+            rewriteRaw?: string;
+            pendingSchema?: KeySchema;
+            persistedVersion: number;
+            latestVersion?: number;
+            serializeForPersist?: (value: T) => string;
+            derivePendingSchema?: (value: T) => KeySchema;
+        }): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
+            if (!reconcile) {
+                const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value };
+                if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
+                if (pendingSchema !== undefined) result.pendingSchema = pendingSchema;
+                return result;
+            }
+
+            const context: ReconcileContext = {
+                key,
+                persistedVersion,
+                ...(latestVersion === undefined ? {} : { latestVersion }),
+            };
+
+            let baselineSerialized: string | undefined;
+            if (serializeForPersist) {
+                try {
+                    baselineSerialized = serializeForPersist(value);
+                } catch {
+                    baselineSerialized = rewriteRaw;
+                }
+            }
+
+            try {
+                const reconciled = reconcile(value, context);
+                const nextPendingSchema = derivePendingSchema ? derivePendingSchema(reconciled) : pendingSchema;
+
+                if (!serializeForPersist) {
+                    const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value: reconciled };
+                    if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
+                    if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;
+                    return result;
+                }
+
+                const nextSerialized = serializeForPersist(reconciled);
+                const nextRewriteRaw =
+                    baselineSerialized === undefined || nextSerialized !== baselineSerialized
+                        ? nextSerialized
+                        : rewriteRaw;
+                const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value: reconciled };
+                if (nextRewriteRaw !== undefined) result.rewriteRaw = nextRewriteRaw;
+                if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;
+                return result;
+            } catch (err) {
+                const typedErr =
+                    err instanceof SchemaError
+                        ? err
+                        : new SchemaError("RECONCILE_FAILED", `Reconciliation failed for key "${key}"`, err);
+                return { value: getFallback(typedErr) };
+            }
+        },
+        [getFallback, key, reconcile],
+    );
+
+    const decodeForRead = useCallback(
+        (rawText: string | null): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
+            if (rawText == null) return { value: getFallback() };
+
+            const parsed = parseEnvelope(rawText);
+            if (!parsed.ok) return { value: getFallback(parsed.error) };
+            const envelope = parsed.envelope;
+
+            const schemaForVersion = getSchemaForVersion(envelope.version);
+            const latestSchema = getLatestSchemaForKey();
+
+            // Strict mode always requires schema for the stored version.
+            if (schemaMode === "strict" && !schemaForVersion) {
+                return {
+                    value: getFallback(
+                        new SchemaError("SCHEMA_NOT_FOUND", `No schema for key "${key}" v${envelope.version}`),
+                    ),
+                };
+            }
+
+            // Autoschema only infers when no schema exists yet for this key.
+            if (schemaMode === "autoschema" && !schemaForVersion) {
+                if (latestSchema) {
+                    return {
+                        value: getFallback(
+                            new SchemaError("SCHEMA_NOT_FOUND", `No schema for key "${key}" v${envelope.version}`),
+                        ),
+                    };
+                }
+                if (!schemaRegistry || typeof schemaRegistry.registerSchema !== "function") {
+                    return {
+                        value: getFallback(
+                            new SchemaError(
+                                "MODE_CONFIGURATION_INVALID",
+                                `Autoschema mode requires schema registry registration for key "${key}"`,
+                            ),
+                        ),
+                    };
+                }
+                try {
+                    // Payload may be a codec string or already a JSON value (seeded data).
+                    const decoded =
+                        typeof envelope.payload === "string"
+                            ? decodeStringPayload<T>(envelope.payload, codec)
+                            : (envelope.payload as T);
+                    const inferSchemaForValue = (value: T): KeySchema => ({
+                        key,
+                        version: 1,
+                        schema: inferJsonSchema(value),
+                    });
+                    const inferred = inferSchemaForValue(decoded);
+                    return applyReconcile({
+                        value: decoded,
+                        pendingSchema: inferred,
+                        rewriteRaw: JSON.stringify({
+                            version: inferred.version,
+                            payload: decoded,
+                        } satisfies MnemonicEnvelope),
+                        persistedVersion: envelope.version,
+                        serializeForPersist: (value) =>
+                            JSON.stringify({
+                                version: inferred.version,
+                                payload: value,
+                            } satisfies MnemonicEnvelope),
+                        derivePendingSchema: inferSchemaForValue,
+                    });
+                } catch (err) {
+                    const typedErr =
+                        err instanceof SchemaError || err instanceof CodecError
+                            ? err
+                            : new SchemaError("TYPE_MISMATCH", `Autoschema inference failed for key "${key}"`, err);
+                    return { value: getFallback(typedErr) };
+                }
+            }
+
+            // No schema found: default mode ignores version and uses hook codec.
+            if (!schemaForVersion) {
+                // If payload is already a non-string JSON value (e.g. seeded data,
+                // or previously schema-managed data whose schema was removed),
+                // return it directly without codec decoding.
+                if (typeof envelope.payload !== "string") {
+                    return applyReconcile({
+                        value: envelope.payload as T,
+                        persistedVersion: envelope.version,
+                        ...(latestSchema ? { latestVersion: latestSchema.version } : {}),
+                        serializeForPersist: encodeForWrite,
+                    });
+                }
+                try {
+                    const decoded = decodeStringPayload<T>(envelope.payload, codec);
+                    return applyReconcile({
+                        value: decoded,
+                        persistedVersion: envelope.version,
+                        ...(latestSchema ? { latestVersion: latestSchema.version } : {}),
+                        serializeForPersist: encodeForWrite,
+                    });
+                } catch (err) {
+                    const typedErr =
+                        err instanceof SchemaError || err instanceof CodecError
+                            ? err
+                            : new CodecError(`Codec decode failed for key "${key}"`, err);
+                    return { value: getFallback(typedErr) };
+                }
+            }
+
+            // Schema exists for stored version.
+            // Payload is a JSON value directly (no codec decoding needed).
+            let current: unknown;
+            try {
+                current = envelope.payload;
+                validateAgainstSchema(current, schemaForVersion.schema);
+            } catch (err) {
+                const typedErr =
+                    err instanceof SchemaError || err instanceof CodecError
+                        ? err
+                        : new SchemaError("TYPE_MISMATCH", `Schema decode failed for key "${key}"`, err);
+                return { value: getFallback(typedErr) };
+            }
+
+            // No migration needed.
+            if (!latestSchema || envelope.version >= latestSchema.version) {
+                return applyReconcile({
+                    value: current as T,
+                    persistedVersion: envelope.version,
+                    ...(latestSchema ? { latestVersion: latestSchema.version } : {}),
+                    serializeForPersist: encodeForWrite,
+                });
+            }
+
+            const path = getMigrationPathForKey(envelope.version, latestSchema.version);
+            if (!path) {
+                return {
+                    value: getFallback(
+                        new SchemaError(
+                            "MIGRATION_PATH_NOT_FOUND",
+                            `No migration path for key "${key}" from v${envelope.version} to v${latestSchema.version}`,
+                        ),
+                    ),
+                };
+            }
+
+            try {
+                let migrated = current;
+                for (const step of path) {
+                    migrated = step.migrate(migrated);
+                }
+                validateAgainstSchema(migrated, latestSchema.schema);
+                return applyReconcile({
+                    value: migrated as T,
+                    rewriteRaw: JSON.stringify({
+                        version: latestSchema.version,
+                        payload: migrated,
+                    } satisfies MnemonicEnvelope),
+                    persistedVersion: envelope.version,
+                    latestVersion: latestSchema.version,
+                    serializeForPersist: encodeForWrite,
+                });
+            } catch (err) {
+                const typedErr =
+                    err instanceof SchemaError || err instanceof CodecError
+                        ? err
+                        : new SchemaError("MIGRATION_FAILED", `Migration failed for key "${key}"`, err);
+                return { value: getFallback(typedErr) };
+            }
+        },
+        [
+            applyReconcile,
+            codec,
+            decodeStringPayload,
+            encodeForWrite,
+            getFallback,
+            key,
+            parseEnvelope,
+            schemaMode,
+            schemaRegistry,
+            getSchemaForVersion,
+            getLatestSchemaForKey,
+            getMigrationPathForKey,
+            validateAgainstSchema,
         ],
     );
 

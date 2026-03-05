@@ -2,12 +2,12 @@
 // Copyright Scott Dixon
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render, act, waitFor } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
 import { createCodec, CodecError } from "./codecs";
 import { SchemaError } from "./schema";
-import type { StorageLike, Codec } from "./types";
+import type { StorageLike, Codec, ReconcileContext } from "./types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,6 +35,55 @@ function createMockStorage(): StorageLike & { store: Map<string, string> } {
 
 function env(payload: string, version = 0): string {
     return JSON.stringify({ version, payload });
+}
+
+function createSeededRandom(seed: number) {
+    let state = seed >>> 0;
+    return () => {
+        state = (state * 1664525 + 1013904223) >>> 0;
+        return state / 0x100000000;
+    };
+}
+
+function buildInvalidEnvelopeFuzzCases(count: number): string[] {
+    const random = createSeededRandom(0xc0ffee);
+    const cases = new Set<string>([
+        "",
+        "not-json",
+        "{",
+        JSON.stringify(null),
+        JSON.stringify([]),
+        JSON.stringify({}),
+        JSON.stringify({ version: -1, payload: "x" }),
+        JSON.stringify({ version: 1.5, payload: "x" }),
+        JSON.stringify({ version: "1", payload: "x" }),
+        JSON.stringify({ version: 1 }),
+        JSON.stringify({ payload: "x" }),
+    ]);
+
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz{}[]:,"';
+    while (cases.size < count) {
+        const mode = Math.floor(random() * 4);
+        if (mode === 0) {
+            const length = 1 + Math.floor(random() * 12);
+            let raw = "";
+            for (let index = 0; index < length; index++) {
+                raw += alphabet[Math.floor(random() * alphabet.length)] ?? "x";
+            }
+            cases.add(raw);
+            continue;
+        }
+
+        const candidate =
+            mode === 1
+                ? { version: Math.floor(random() * 5) + 0.25, payload: Math.floor(random() * 10) }
+                : mode === 2
+                  ? { version: -1 - Math.floor(random() * 5), payload: { nested: true } }
+                  : { version: Math.floor(random() * 5), extra: "missing-payload" };
+        cases.add(JSON.stringify(candidate));
+    }
+
+    return Array.from(cases);
 }
 
 /** Renders a hook within MnemonicProvider and returns accessor for the result. */
@@ -161,6 +210,83 @@ describe("useMnemonicKey – codecs", () => {
         expect(result.current.value).toBe(0);
     });
 
+    it("reads seeded non-string payloads directly when no schema is available", () => {
+        const decode = vi.fn(() => {
+            throw new Error("decode should not run");
+        });
+        storage.store.set("ns.legacy", JSON.stringify({ version: 0, payload: { enabled: true, retries: 3 } }));
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("legacy", {
+                defaultValue: { enabled: false, retries: 0 },
+                codec: {
+                    encode: JSON.stringify,
+                    decode,
+                },
+            }),
+        );
+
+        expect(result.current.value).toEqual({ enabled: true, retries: 3 });
+        expect(decode).not.toHaveBeenCalled();
+    });
+
+    it("reconciles codec-managed persisted values and rewrites once when changed", async () => {
+        storage.store.set(
+            "ns.preferences",
+            env(
+                JSON.stringify({
+                    theme: "light",
+                    density: "comfortable",
+                }),
+            ),
+        );
+
+        const reconcile = vi.fn(
+            (value: { theme: string; density: string; accents?: boolean }, context: { persistedVersion: number }) => ({
+                ...value,
+                accents: context.persistedVersion === 0 ? true : (value.accents ?? true),
+            }),
+        );
+
+        const { result, rerender } = renderHook(storage, "ns", () =>
+            useMnemonicKey("preferences", {
+                defaultValue: { theme: "dark", density: "comfortable", accents: true },
+                reconcile,
+            }),
+        );
+
+        expect(result.current.value).toEqual({
+            theme: "light",
+            density: "comfortable",
+            accents: true,
+        });
+
+        await waitFor(() => {
+            expect(storage.store.get("ns.preferences")).toBe(
+                env(
+                    JSON.stringify({
+                        theme: "light",
+                        density: "comfortable",
+                        accents: true,
+                    }),
+                ),
+            );
+        });
+
+        const callsAfterInitialRewrite = reconcile.mock.calls.length;
+        rerender();
+        expect(reconcile).toHaveBeenCalledTimes(callsAfterInitialRewrite + 1);
+        expect(storage.store.get("ns.preferences")).toBe(
+            env(
+                JSON.stringify({
+                    theme: "light",
+                    density: "comfortable",
+                    accents: true,
+                }),
+            ),
+        );
+    });
+
     it("handles encode failure gracefully", () => {
         const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         const BadCodec: Codec<string> = {
@@ -177,6 +303,24 @@ describe("useMnemonicKey – codecs", () => {
         expect(result.current.value).toBe("x");
         expect(errorSpy).toHaveBeenCalled();
         errorSpy.mockRestore();
+    });
+
+    it("passes persisted version context into reconcile for codec-managed values", () => {
+        storage.store.set("ns.counter", env(JSON.stringify({ value: 5 }), 0));
+        const reconcile = vi.fn((value: { value: number }, context: ReconcileContext) => {
+            expect(context).toEqual({ persistedVersion: 0, key: "counter" });
+            return value;
+        });
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("counter", {
+                defaultValue: { value: 0 },
+                reconcile,
+            }),
+        );
+
+        expect(result.current.value).toEqual({ value: 5 });
+        expect(reconcile).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -532,5 +676,88 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
         renderHook(storage, "ns", () => useMnemonicKey("count", { defaultValue: 0 }));
         expect(errorSpy).not.toHaveBeenCalled();
         errorSpy.mockRestore();
+    });
+
+    it("passes RECONCILE_FAILED to the fallback factory when reconcile throws", () => {
+        const factory = vi.fn((_error?: CodecError | SchemaError) => ({ theme: "dark" }));
+        storage.store.set("ns.preferences", env(JSON.stringify({ theme: "light" })));
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("preferences", {
+                defaultValue: factory,
+                reconcile: () => {
+                    throw new Error("cannot reconcile");
+                },
+            }),
+        );
+
+        expect(result.current.value).toEqual({ theme: "dark" });
+        expect(factory).toHaveBeenCalledWith(expect.any(SchemaError));
+        const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0];
+        expect(receivedError).toBeInstanceOf(SchemaError);
+        expect((receivedError as SchemaError).code).toBe("RECONCILE_FAILED");
+    });
+
+    it("wraps CodecError instances thrown by reconcile as RECONCILE_FAILED", () => {
+        const factory = vi.fn((_error?: CodecError | SchemaError) => "fallback");
+        storage.store.set("ns.name", env(JSON.stringify("alice")));
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("name", {
+                defaultValue: factory,
+                reconcile: () => {
+                    throw new CodecError("codec-shaped error");
+                },
+            }),
+        );
+
+        expect(result.current.value).toBe("fallback");
+        const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0];
+        expect(receivedError).toBeInstanceOf(SchemaError);
+        expect((receivedError as SchemaError).code).toBe("RECONCILE_FAILED");
+    });
+
+    it("passes through SchemaError instances thrown by reconcile", () => {
+        const factory = vi.fn((_error?: CodecError | SchemaError) => "fallback");
+        storage.store.set("ns.name", env(JSON.stringify("alice")));
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("name", {
+                defaultValue: factory,
+                reconcile: () => {
+                    throw new SchemaError("TYPE_MISMATCH", "schema mismatch");
+                },
+            }),
+        );
+
+        expect(result.current.value).toBe("fallback");
+        expect(factory).toHaveBeenCalledWith(expect.any(SchemaError));
+        const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0] as SchemaError;
+        expect(receivedError.code).toBe("TYPE_MISMATCH");
+    });
+
+    it("fuzzes malformed persisted envelopes and always falls back with INVALID_ENVELOPE", () => {
+        const invalidRawValues = buildInvalidEnvelopeFuzzCases(24);
+
+        for (const [index, raw] of invalidRawValues.entries()) {
+            const localStorage = createMockStorage();
+            let receivedError: SchemaError | undefined;
+            localStorage.store.set(`ns${index}.corrupt`, raw);
+
+            const { result } = renderHook(localStorage, `ns${index}`, () =>
+                useMnemonicKey("corrupt", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return "fallback";
+                    },
+                }),
+            );
+
+            expect(result.current.value).toBe("fallback");
+            expect(receivedError).toBeInstanceOf(SchemaError);
+            expect(receivedError?.code).toBe("INVALID_ENVELOPE");
+        }
     });
 });
