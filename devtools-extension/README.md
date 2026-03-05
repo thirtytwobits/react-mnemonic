@@ -42,9 +42,7 @@ warning.
 1. Open Chrome and go to `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
-4. Select this folder:
-
-   `/Users/thirtytwobits/workspace/github/thirtytwobits/react-mnemonic/devtools-extension`
+4. Select the `devtools-extension/` directory in this repository.
 
 5. Open DevTools on any page and select the **react-mnemonic** tab.
 

@@ -284,8 +284,13 @@ export function MnemonicProvider({
         /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
         let accessErrorLogged = false;
 
-        const isProductionRuntime = () =>
-            Boolean((globalThis as any)?.process?.env?.NODE_ENV === "production");
+        const isProductionRuntime = () => {
+            const env = (globalThis as any)?.process?.env?.NODE_ENV;
+            if (typeof env !== "string") {
+                return true;
+            }
+            return env === "production";
+        };
 
         const weakRefConstructor = (): WeakRefConstructorLike | null => {
             const ctor = (globalThis as any)?.WeakRef;
@@ -312,7 +317,14 @@ export function MnemonicProvider({
             const reserved = new Set(["providers", "resolve", "list", "capabilities", "__meta"]);
             for (const key of Object.keys(root)) {
                 if (!reserved.has(key)) {
-                    delete root[key];
+                    const descriptor = Object.getOwnPropertyDescriptor(root, key);
+                    if (!descriptor || descriptor.configurable) {
+                        try {
+                            delete root[key];
+                        } catch {
+                            // Ignore hostile legacy properties so devtools init stays fail-safe.
+                        }
+                    }
                 }
             }
 

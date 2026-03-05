@@ -858,6 +858,33 @@ describe("MnemonicProvider – DevTools", () => {
         warnSpy.mockRestore();
     });
 
+    it("treats missing NODE_ENV as production-safe for duplicate namespaces", () => {
+        (globalThis as any).process = undefined;
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        expect(() =>
+            render(
+                <>
+                    <MnemonicProvider namespace="dupe" storage={storageA} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                    <MnemonicProvider namespace="dupe" storage={storageB} enableDevTools={true}>
+                        <div />
+                    </MnemonicProvider>
+                </>,
+            ),
+        ).not.toThrow();
+
+        const provider = getRegistry().resolve("dupe");
+        provider.set("k", "v");
+        expect(storageA.store.get("dupe.k")).toBe(JSON.stringify("v"));
+        expect(storageB.store.get("dupe.k")).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
     it("replaces stale namespace entries", () => {
         const fakeStaleEntry = {
             namespace: "stale",
@@ -904,6 +931,28 @@ describe("MnemonicProvider – DevTools", () => {
 
         const registry = getRegistry();
         expect(registry.demo).toBeUndefined();
+        expect(registry.providers.dt).toBeDefined();
+    });
+
+    it("ignores undeletable legacy namespace fields when initializing the registry", () => {
+        const root: Record<string, unknown> = {};
+        Object.defineProperty(root, "demo", {
+            configurable: false,
+            enumerable: true,
+            value: { get: () => "legacy" },
+        });
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = root;
+
+        expect(() =>
+            render(
+                <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                    <div />
+                </MnemonicProvider>,
+            ),
+        ).not.toThrow();
+
+        const registry = getRegistry();
+        expect(registry.demo).toBeDefined();
         expect(registry.providers.dt).toBeDefined();
     });
 

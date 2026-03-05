@@ -923,6 +923,10 @@ export type UseMnemonicKeyOptions<T> = {
      * adjustments that depend on application policy rather than a strict schema
      * upgrade step.
      *
+     * If `reconcile` throws a `SchemaError`, that error is preserved and passed
+     * to `defaultValue`. Any other thrown error is wrapped as
+     * `SchemaError("RECONCILE_FAILED")`.
+     *
      * @param value - The decoded persisted value
      * @param context - Metadata about the stored and latest schema versions
      *

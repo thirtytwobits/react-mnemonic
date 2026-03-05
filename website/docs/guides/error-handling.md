@@ -61,7 +61,8 @@ storage — the nominal "first visit" path. No error occurred.
 
 ## Reconciliation failures
 
-If a `reconcile` hook throws, the hook falls back through `defaultValue` with a
+If a `reconcile` hook throws a `SchemaError`, that error is passed through to
+`defaultValue` unchanged. Any other thrown error is normalized to a
 `SchemaError` whose `code` is `RECONCILE_FAILED`.
 
 ```tsx

@@ -9,6 +9,9 @@ description: Inspect and mutate persistent state from the browser console.
 Mnemonic provides a built-in console inspector for debugging persistent state
 during development.
 
+The public documentation site keeps DevTools disabled in production builds, so
+the hosted demos do not expose a writable global registry.
+
 ## Enabling DevTools
 
 ```tsx

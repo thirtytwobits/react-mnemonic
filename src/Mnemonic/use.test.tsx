@@ -7,7 +7,7 @@ import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
 import { createCodec, CodecError } from "./codecs";
 import { SchemaError } from "./schema";
-import type { StorageLike, Codec } from "./types";
+import type { StorageLike, Codec, ReconcileContext } from "./types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -307,7 +307,7 @@ describe("useMnemonicKey – codecs", () => {
 
     it("passes persisted version context into reconcile for codec-managed values", () => {
         storage.store.set("ns.counter", env(JSON.stringify({ value: 5 }), 0));
-        const reconcile = vi.fn((value: { value: number }, context: { persistedVersion: number; latestVersion?: number }) => {
+        const reconcile = vi.fn((value: { value: number }, context: ReconcileContext) => {
             expect(context).toEqual({ persistedVersion: 0, key: "counter" });
             return value;
         });
@@ -693,6 +693,25 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
 
         expect(result.current.value).toEqual({ theme: "dark" });
         expect(factory).toHaveBeenCalledWith(expect.any(SchemaError));
+        const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0];
+        expect(receivedError).toBeInstanceOf(SchemaError);
+        expect((receivedError as SchemaError).code).toBe("RECONCILE_FAILED");
+    });
+
+    it("wraps CodecError instances thrown by reconcile as RECONCILE_FAILED", () => {
+        const factory = vi.fn((_error?: CodecError | SchemaError) => "fallback");
+        storage.store.set("ns.name", env(JSON.stringify("alice")));
+
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("name", {
+                defaultValue: factory,
+                reconcile: () => {
+                    throw new CodecError("codec-shaped error");
+                },
+            }),
+        );
+
+        expect(result.current.value).toBe("fallback");
         const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0];
         expect(receivedError).toBeInstanceOf(SchemaError);
         expect((receivedError as SchemaError).code).toBe("RECONCILE_FAILED");

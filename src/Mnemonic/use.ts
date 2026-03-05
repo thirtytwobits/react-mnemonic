@@ -295,7 +295,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
                 return result;
             } catch (err) {
                 const typedErr =
-                    err instanceof SchemaError || err instanceof CodecError
+                    err instanceof SchemaError
                         ? err
                         : new SchemaError("RECONCILE_FAILED", `Reconciliation failed for key "${key}"`, err);
                 return { value: getFallback(typedErr) };

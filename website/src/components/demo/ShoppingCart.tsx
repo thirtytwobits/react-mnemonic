@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { MnemonicProvider, useMnemonicKey, JSONCodec } from "react-mnemonic";
 import type { StorageLike } from "react-mnemonic";
 import { createIdbStorage } from "./idb-storage";
+import { enableDemoDevTools } from "./devtools";
 
 interface CartItem {
     id: string;
@@ -168,7 +169,7 @@ export function ShoppingCart() {
     }
 
     return (
-        <MnemonicProvider namespace="cart" storage={storage} enableDevTools>
+        <MnemonicProvider namespace="cart" storage={storage} enableDevTools={enableDemoDevTools}>
             <CartContents />
         </MnemonicProvider>
     );
