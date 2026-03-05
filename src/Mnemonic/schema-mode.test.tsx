@@ -4,9 +4,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { MnemonicProvider } from "./provider";
+import { MnemonicProvider, useMnemonic } from "./provider";
 import { useMnemonicKey } from "./use";
 import { SchemaError } from "./schema";
+import { CodecError } from "./codecs";
 import type { StorageLike, KeySchema, MigrationRule, SchemaRegistry } from "./types";
 
 function createMockStorage(): StorageLike & { store: Map<string, string> } {
@@ -94,6 +95,30 @@ function renderHook<T>(ui: () => T, providerProps: Omit<ComponentProps<typeof Mn
     return resultRef;
 }
 
+function renderHookWithStore<T>(
+    ui: () => T,
+    providerProps: Omit<ComponentProps<typeof MnemonicProvider>, "children">,
+): { result: { current: T }; store: { current: ReturnType<typeof useMnemonic> } } {
+    const resultRef: { current: T } = { current: undefined as T };
+    const storeRef: { current: ReturnType<typeof useMnemonic> } = {
+        current: undefined as unknown as ReturnType<typeof useMnemonic>,
+    };
+
+    function TestComponent() {
+        storeRef.current = useMnemonic();
+        resultRef.current = ui();
+        return null;
+    }
+
+    render(
+        <MnemonicProvider {...providerProps}>
+            <TestComponent />
+        </MnemonicProvider>,
+    );
+
+    return { result: resultRef, store: storeRef };
+}
+
 describe("schema mode behavior", () => {
     it("strict mode requires schemaRegistry", () => {
         const spy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -152,6 +177,31 @@ describe("schema mode behavior", () => {
         expect(storage.store.get("ns.count")).toBe(schemaEnv(7, 3));
     });
 
+    it("default mode falls back to the latest schema when an explicit write version is missing", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([{ key: "count", version: 3, schema: { type: "number" } }]);
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: 0,
+                    schema: { version: 99 },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        act(() => {
+            result.current.set(7);
+        });
+
+        expect(storage.store.get("ns.count")).toBe(schemaEnv(7, 3));
+    });
+
     it("strict mode writes version 0 when no schemas are registered", () => {
         const storage = createMockStorage();
         const registry = createRegistry();
@@ -198,6 +248,71 @@ describe("schema mode behavior", () => {
             result.current.set(9);
         });
         expect(storage.store.get("ns.count")).toBe(schemaEnv(9, 2));
+    });
+
+    it("reconciles schema-managed values after migration and persists the reconciled result", async () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [
+                {
+                    key: "settings",
+                    version: 1,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            theme: { type: "string" },
+                        },
+                        required: ["theme"],
+                        additionalProperties: false,
+                    },
+                },
+                {
+                    key: "settings",
+                    version: 2,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            theme: { type: "string" },
+                        },
+                        required: ["theme"],
+                        additionalProperties: false,
+                    },
+                },
+            ],
+            [
+                {
+                    key: "settings",
+                    fromVersion: 1,
+                    toVersion: 2,
+                    migrate: (value) => value,
+                },
+            ],
+        );
+
+        storage.store.set("ns.settings", schemaEnv({ theme: "light" }, 1));
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("settings", {
+                    defaultValue: { theme: "dark" },
+                    reconcile: (value, context) => ({
+                        ...value,
+                        theme: context.latestVersion === 2 ? "dark" : value.theme,
+                    }),
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toEqual({ theme: "dark" });
+
+        await waitFor(() => {
+            expect(storage.store.get("ns.settings")).toBe(schemaEnv({ theme: "dark" }, 2));
+        });
     });
 
     it("v0 schema is accepted on read", () => {
@@ -267,6 +382,34 @@ describe("schema mode behavior", () => {
         expect(result.current.value).toBe("fallback");
     });
 
+    it("strict mode falls back with SCHEMA_NOT_FOUND when the stored version has no schema", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([{ key: "profile", version: 1, schema: { type: "string" } }]);
+        storage.store.set("ns.profile", schemaEnv("legacy", 9));
+
+        let receivedError: SchemaError | undefined;
+        const result = renderHook(
+            () =>
+                useMnemonicKey("profile", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return "fallback";
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "strict",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe("fallback");
+        expect(receivedError?.code).toBe("SCHEMA_NOT_FOUND");
+    });
+
     it("strict mode migrates and rewrites to latest schema", async () => {
         const storage = createMockStorage();
         const registry = createRegistry(
@@ -304,6 +447,49 @@ describe("schema mode behavior", () => {
         });
     });
 
+    it("falls back with MIGRATION_FAILED when a migration step throws", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [
+                { key: "name", version: 1, schema: { type: "string" } },
+                { key: "name", version: 2, schema: { type: "string" } },
+            ],
+            [
+                {
+                    key: "name",
+                    fromVersion: 1,
+                    toVersion: 2,
+                    migrate: () => {
+                        throw new Error("migration exploded");
+                    },
+                },
+            ],
+        );
+        storage.store.set("ns.name", schemaEnv("alice", 1));
+
+        let receivedError: SchemaError | undefined;
+        const result = renderHook(
+            () =>
+                useMnemonicKey("name", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return "fallback";
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe("fallback");
+        expect(receivedError?.code).toBe("MIGRATION_FAILED");
+    });
+
     it("write-time migration normalizes value on write", () => {
         const storage = createMockStorage();
         const registry = createRegistry(
@@ -335,6 +521,90 @@ describe("schema mode behavior", () => {
         });
         expect(result.current.value).toBe("hello world");
         expect(storage.store.get("ns.name")).toBe(schemaEnv("hello world", 1));
+    });
+
+    it("surfaces write-time migration failures as schema errors on set", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [{ key: "name", version: 1, schema: { type: "string" } }],
+            [
+                {
+                    key: "name",
+                    fromVersion: 1,
+                    toVersion: 1,
+                    migrate: () => {
+                        throw new Error("normalize failed");
+                    },
+                },
+            ],
+        );
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("name", {
+                    defaultValue: "fallback",
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        act(() => {
+            result.current.set("Alice");
+        });
+
+        expect(result.current.value).toBe("fallback");
+        expect(errorSpy).toHaveBeenCalledWith(
+            '[Mnemonic] Schema error for key "name" (MIGRATION_FAILED):',
+            'Write-time migration failed for key "name"',
+        );
+        errorSpy.mockRestore();
+    });
+
+    it("passes through SchemaError instances from write-time migrations", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [{ key: "name", version: 1, schema: { type: "string" } }],
+            [
+                {
+                    key: "name",
+                    fromVersion: 1,
+                    toVersion: 1,
+                    migrate: () => {
+                        throw new SchemaError("TYPE_MISMATCH", "write schema mismatch");
+                    },
+                },
+            ],
+        );
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("name", {
+                    defaultValue: "fallback",
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        act(() => {
+            result.current.set("Alice");
+        });
+
+        expect(result.current.value).toBe("fallback");
+        expect(errorSpy).toHaveBeenCalledWith(
+            '[Mnemonic] Schema error for key "name" (TYPE_MISMATCH):',
+            "write schema mismatch",
+        );
+        errorSpy.mockRestore();
     });
 
     it("autoschema: first read wins and incompatible subsequent writes are rejected", async () => {
@@ -382,6 +652,152 @@ describe("schema mode behavior", () => {
         expect(storage.store.get("ns.foo")).toBe(schemaEnv(123, 1));
         expect(errSpy).toHaveBeenCalled();
         errSpy.mockRestore();
+    });
+
+    it("autoschema reconciles inferred values before registering and rewriting them", async () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+        storage.store.set("ns.foo", env(JSON.stringify({ count: 7 }), 0));
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("foo", {
+                    defaultValue: { count: 0, enabled: false },
+                    reconcile: (value) => ({
+                        ...value,
+                        enabled: true,
+                    }),
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toEqual({ count: 7, enabled: true });
+        await waitFor(() => {
+            expect(storage.store.get("ns.foo")).toBe(schemaEnv({ count: 7, enabled: true }, 1));
+        });
+        expect(registry.getSchema("foo", 1)?.schema).toEqual(expect.objectContaining({ type: "object" }));
+    });
+
+    it("autoschema falls back when the key already has schemas but the stored version is unknown", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([{ key: "foo", version: 1, schema: { type: "number" } }]);
+        storage.store.set("ns.foo", env("123", 9));
+
+        let receivedError: SchemaError | undefined;
+        const result = renderHook(
+            () =>
+                useMnemonicKey("foo", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return 0;
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe(0);
+        expect(receivedError?.code).toBe("SCHEMA_NOT_FOUND");
+    });
+
+    it("autoschema ignores registerSchema races and still exposes the decoded value", async () => {
+        const storage = createMockStorage();
+        storage.store.set("ns.foo", env("7", 0));
+
+        const registry = createRegistry();
+        const registerSchema = vi.fn(() => {
+            throw new Error("duplicate schema");
+        });
+        registry.registerSchema = registerSchema;
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("foo", {
+                    defaultValue: 0,
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe(7);
+        await waitFor(() => {
+            expect(storage.store.get("ns.foo")).toBe(schemaEnv(7, 1));
+        });
+        expect(registerSchema.mock.calls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("autoschema reports decode failures through the fallback factory", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+        storage.store.set("ns.foo", env("not-json{", 0));
+
+        let receivedError: CodecError | SchemaError | undefined;
+        const result = renderHook(
+            () =>
+                useMnemonicKey("foo", {
+                    defaultValue: (error) => {
+                        receivedError = error;
+                        return 0;
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe(0);
+        expect(receivedError).toBeInstanceOf(CodecError);
+    });
+
+    it("autoschema reports configuration errors if registration becomes unavailable at read time", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+
+        let receivedError: SchemaError | undefined;
+        const { result, store } = renderHookWithStore(
+            () =>
+                useMnemonicKey("foo", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return 0;
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        delete (registry as { registerSchema?: SchemaRegistry["registerSchema"] }).registerSchema;
+
+        act(() => {
+            store.current.setRaw("foo", env("5", 0));
+        });
+
+        expect(result.current.value).toBe(0);
+        expect(receivedError?.code).toBe("MODE_CONFIGURATION_INVALID");
     });
 
     it("schema validation rejects values that do not match the schema", () => {
@@ -451,5 +867,160 @@ describe("schema mode behavior", () => {
         expect(result.current.value).toBe(0);
         expect(receivedError).toBeInstanceOf(SchemaError);
         expect(receivedError?.code).toBe("TYPE_MISMATCH");
+    });
+
+    it("passes through SchemaError instances thrown by migrations", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [
+                { key: "count", version: 1, schema: { type: "number" } },
+                { key: "count", version: 2, schema: { type: "number" } },
+            ],
+            [
+                {
+                    key: "count",
+                    fromVersion: 1,
+                    toVersion: 2,
+                    migrate: () => {
+                        throw new SchemaError("TYPE_MISMATCH", "already typed");
+                    },
+                },
+            ],
+        );
+        storage.store.set("ns.count", schemaEnv(1, 1));
+
+        let receivedError: SchemaError | undefined;
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: (error) => {
+                        if (error instanceof SchemaError) {
+                            receivedError = error;
+                        }
+                        return 0;
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toBe(0);
+        expect(receivedError?.code).toBe("TYPE_MISMATCH");
+    });
+
+    it("caches migration path lookups across repeated reads in immutable schema modes", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [
+                { key: "name", version: 1, schema: { type: "string" } },
+                { key: "name", version: 2, schema: { type: "string" } },
+            ],
+            [
+                {
+                    key: "name",
+                    fromVersion: 1,
+                    toVersion: 2,
+                    migrate: (value) => `v2:${String(value)}`,
+                },
+            ],
+        );
+        const getMigrationPathSpy = vi.spyOn(registry, "getMigrationPath");
+        storage.store.set("ns.name", schemaEnv("alice", 1));
+
+        const { store } = renderHookWithStore(
+            () =>
+                useMnemonicKey("name", {
+                    defaultValue: "fallback",
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        act(() => {
+            store.current.setRaw("name", schemaEnv("alice", 1));
+        });
+
+        expect(getMigrationPathSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("can reconcile legacy seeded JSON into the latest schema when no schema matches the stored version", async () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            {
+                key: "settings",
+                version: 1,
+                schema: {
+                    type: "object",
+                    properties: {
+                        theme: { type: "string" },
+                        accents: { type: "boolean" },
+                    },
+                    required: ["theme", "accents"],
+                    additionalProperties: false,
+                },
+            },
+        ]);
+        storage.store.set("ns.settings", JSON.stringify({ version: 0, payload: { theme: "light" } }));
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("settings", {
+                    defaultValue: { theme: "dark", accents: true },
+                    reconcile: (value: { theme: string; accents?: boolean }) => ({
+                        ...value,
+                        accents: value.accents ?? true,
+                    }),
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toEqual({ theme: "light", accents: true });
+        await waitFor(() => {
+            expect(storage.store.get("ns.settings")).toBe(schemaEnv({ theme: "light", accents: true }, 1));
+        });
+    });
+
+    it("reset logs schema errors when strict mode cannot resolve an explicit write schema", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("count", {
+                    defaultValue: 42,
+                    schema: { version: 2 },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "strict",
+                schemaRegistry: registry,
+            },
+        );
+
+        act(() => {
+            result.current.reset();
+        });
+
+        expect(storage.store.get("ns.count")).toBeUndefined();
+        expect(errorSpy).toHaveBeenCalledWith(
+            '[Mnemonic] Schema error for key "count" (WRITE_SCHEMA_REQUIRED):',
+            "Write requires schema for key \"count\" in strict mode",
+        );
+        errorSpy.mockRestore();
     });
 });

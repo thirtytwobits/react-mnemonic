@@ -9,8 +9,11 @@ export { validateJsonSchema, compileSchema } from "./Mnemonic/json-schema";
 export type { JsonSchema, JsonSchemaType, JsonSchemaValidationError, CompiledValidator } from "./Mnemonic/json-schema";
 export type {
     Codec,
+    Listener,
+    Mnemonic,
     MnemonicProviderOptions,
     UseMnemonicKeyOptions,
+    ReconcileContext,
     StorageLike,
     SchemaMode,
     KeySchema,
@@ -24,4 +27,5 @@ export type {
     MnemonicDevToolsCapabilities,
     MnemonicDevToolsMeta,
     MnemonicDevToolsRegistry,
+    Unsubscribe,
 } from "./Mnemonic/types";

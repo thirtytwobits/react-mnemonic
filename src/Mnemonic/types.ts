@@ -266,10 +266,15 @@ export interface MnemonicDevToolsProviderEntry {
  * Lightweight provider status returned by `list()`.
  */
 export interface MnemonicDevToolsProviderDescriptor {
+    /** Namespace registered by the provider. */
     namespace: string;
+    /** Whether the provider can currently be resolved to a live API instance. */
     available: boolean;
+    /** Timestamp when the provider namespace was first registered. */
     registeredAt: number;
+    /** Timestamp when the provider was last observed as live. */
     lastSeenAt: number;
+    /** Timestamp when the provider first became unavailable, or `null` when live. */
     staleSince: number | null;
 }
 
@@ -277,7 +282,9 @@ export interface MnemonicDevToolsProviderDescriptor {
  * Environment capabilities reported by devtools registry.
  */
 export interface MnemonicDevToolsCapabilities {
+    /** Whether the runtime supports `WeakRef`. */
     weakRef: boolean;
+    /** Whether the runtime supports `FinalizationRegistry`. */
     finalizationRegistry: boolean;
 }
 
@@ -285,8 +292,11 @@ export interface MnemonicDevToolsCapabilities {
  * Polling metadata for extension synchronization.
  */
 export interface MnemonicDevToolsMeta {
+    /** Monotonic registry version incremented on register and mutation events. */
     version: number;
+    /** Timestamp of the most recent registry update. */
     lastUpdated: number;
+    /** Short label describing the most recent registry change. */
     lastChange: string;
 }
 
@@ -298,10 +308,15 @@ export interface MnemonicDevToolsMeta {
  * public API.
  */
 export interface MnemonicDevToolsRegistry {
+    /** Provider entries keyed by namespace. */
     providers: Record<string, MnemonicDevToolsProviderEntry>;
+    /** Resolve a namespace to a live provider API when one is available. */
     resolve: (namespace: string) => MnemonicDevToolsProviderApi | null;
+    /** List provider availability without strengthening weak references manually. */
     list: () => MnemonicDevToolsProviderDescriptor[];
+    /** Runtime capabilities relevant to the registry implementation. */
     capabilities: MnemonicDevToolsCapabilities;
+    /** Versioning metadata used by polling devtools integrations. */
     __meta: MnemonicDevToolsMeta;
 }
 
@@ -690,9 +705,9 @@ export type Listener = () => void;
  *
  * @remarks
  * This implements the React `useSyncExternalStore` contract for efficient,
- * tearing-free state synchronization.
- *
- * @internal
+ * tearing-free state synchronization. Most application code should still
+ * prefer `useMnemonicKey`; this type mainly appears in the DevTools API via
+ * `MnemonicDevToolsProviderApi.getStore()`.
  */
 export type Mnemonic = {
     /**
@@ -892,6 +907,36 @@ export type UseMnemonicKeyOptions<T> = {
     codec?: Codec<T>;
 
     /**
+     * Optional read-time reconciliation hook for persisted values.
+     *
+     * Runs after a stored value has been decoded and any read-time migrations
+     * have completed, but before the hook exposes the value to React. This is
+     * useful for selectively enforcing newly shipped defaults or normalizing
+     * legacy persisted values without discarding the whole key.
+     *
+     * If the reconciled value would persist differently from the pre-reconcile
+     * value, the hook rewrites storage once using the normal write path.
+     *
+     * @remarks
+     * Prefer schema migrations for structural changes that must always happen
+     * between explicit versions. Use `reconcile` for conditional, field-level
+     * adjustments that depend on application policy rather than a strict schema
+     * upgrade step.
+     *
+     * @param value - The decoded persisted value
+     * @param context - Metadata about the stored and latest schema versions
+     *
+     * @example
+     * ```typescript
+     * reconcile: (value, { persistedVersion }) => ({
+     *   ...value,
+     *   theme: persistedVersion < 2 ? "dark" : value.theme,
+     * })
+     * ```
+     */
+    reconcile?: (value: T, context: ReconcileContext) => T;
+
+    /**
      * Callback invoked once when the hook is first mounted.
      *
      * Receives the initial value (either from storage or the default).
@@ -983,4 +1028,24 @@ export type UseMnemonicKeyOptions<T> = {
          */
         version?: number;
     };
+};
+
+/**
+ * Metadata passed to `UseMnemonicKeyOptions.reconcile`.
+ */
+export type ReconcileContext = {
+    /**
+     * The unprefixed storage key being reconciled.
+     */
+    key: string;
+
+    /**
+     * The version found in the persisted envelope that was read.
+     */
+    persistedVersion: number;
+
+    /**
+     * The latest registered schema version for the key, when available.
+     */
+    latestVersion?: number;
 };
