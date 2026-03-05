@@ -165,7 +165,7 @@ function runProviderMutation(action) {
             }
 
             fetchMnemonicRows({ silent: true });
-        }
+        },
     );
 }
 
@@ -220,8 +220,8 @@ function renderNamespaceRows(namespaces) {
                             namespace: namespaceEntry.namespace,
                         });
                     },
-                    { danger: true }
-                )
+                    { danger: true },
+                ),
             );
         } else {
             groupActionCell.appendChild(renderActionPlaceholder());
@@ -237,8 +237,8 @@ function renderNamespaceRows(namespaces) {
                     "td",
                     "stale-note-cell",
                     "Provider no longer available. Showing last captured snapshot.",
-                    TABLE_COLUMN_COUNT
-                )
+                    TABLE_COLUMN_COUNT,
+                ),
             );
             storageTableBody.appendChild(staleInfoRow);
         }
@@ -251,8 +251,8 @@ function renderNamespaceRows(namespaces) {
                     "td",
                     "empty-cell",
                     namespaceEntry.available ? "(no keys)" : "(no snapshot available)",
-                    TABLE_COLUMN_COUNT
-                )
+                    TABLE_COLUMN_COUNT,
+                ),
             );
             storageTableBody.appendChild(row);
             continue;
@@ -277,8 +277,8 @@ function renderNamespaceRows(namespaces) {
                                 key: entry.key,
                             });
                         },
-                        { danger: true }
-                    )
+                        { danger: true },
+                    ),
                 );
             } else {
                 actionCell.appendChild(renderActionPlaceholder());
@@ -480,7 +480,9 @@ function fetchMnemonicRows(options = {}) {
             if (!result?.ok) {
                 if (result?.reason === "MISSING_REGISTRY") {
                     setStatus("Mnemonic DevTools registry is not exposed on this page.", true);
-                    renderEmptyState("This site is not using react-mnemonic, or MnemonicProvider enableDevTools is disabled.");
+                    renderEmptyState(
+                        "This site is not using react-mnemonic, or MnemonicProvider enableDevTools is disabled.",
+                    );
                     lastSeenLivenessSignature = null;
                     return;
                 }
@@ -528,9 +530,9 @@ function fetchMnemonicRows(options = {}) {
                     namespaces.length === 1 ? "" : "s"
                 } (${liveCount} live, ${staleCount} unavailable). Auto-refresh ${
                     supportsMetaVersion ? (autoRefreshEnabled ? "on" : "off") : "unavailable (__meta.version missing)"
-                }.`
+                }.`,
             );
-        }
+        },
     );
 }
 
@@ -576,8 +578,7 @@ function pollForChanges() {
             }
 
             const version = Number.isFinite(result.version) ? result.version : 0;
-            const livenessSignature =
-                typeof result.livenessSignature === "string" ? result.livenessSignature : "";
+            const livenessSignature = typeof result.livenessSignature === "string" ? result.livenessSignature : "";
 
             if (lastSeenVersion === null) {
                 lastSeenVersion = version;
@@ -589,7 +590,7 @@ function pollForChanges() {
             if (version !== lastSeenVersion || livenessSignature !== lastSeenLivenessSignature) {
                 fetchMnemonicRows({ silent: true });
             }
-        }
+        },
     );
 }
 

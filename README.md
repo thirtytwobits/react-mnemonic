@@ -128,15 +128,15 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 #### Options
 
-| Option           | Type                                              | Default     | Description                                         |
-| ---------------- | ------------------------------------------------- | ----------- | --------------------------------------------------- |
-| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | _required_  | Fallback value or error-aware factory               |
-| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation) |
+| Option           | Type                                              | Default     | Description                                                   |
+| ---------------- | ------------------------------------------------- | ----------- | ------------------------------------------------------------- |
+| `defaultValue`   | `T \| ((error?: CodecError \| SchemaError) => T)` | _required_  | Fallback value or error-aware factory                         |
+| `codec`          | `Codec<T>`                                        | `JSONCodec` | Encode/decode strategy (bypasses schema validation)           |
 | `reconcile`      | `(value: T, context: ReconcileContext) => T`      | --          | Adjust a persisted value after read and persist if it changes |
-| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value                  |
-| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                        |
-| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                |
-| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version             |
+| `onMount`        | `(value: T) => void`                              | --          | Called once with the initial value                            |
+| `onChange`       | `(value: T, prev: T) => void`                     | --          | Called on every value change                                  |
+| `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                          |
+| `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version                       |
 
 ### Codecs
 

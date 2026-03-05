@@ -297,8 +297,7 @@ export function MnemonicProvider({
             return typeof ctor === "function" ? (ctor as WeakRefConstructorLike) : null;
         };
 
-        const hasFinalizationRegistry = () =>
-            typeof (globalThis as any)?.FinalizationRegistry === "function";
+        const hasFinalizationRegistry = () => typeof (globalThis as any)?.FinalizationRegistry === "function";
 
         /**
          * Returns the global Mnemonic DevTools registry root when devtools are enabled.
@@ -311,8 +310,7 @@ export function MnemonicProvider({
             const finalizationRegistrySupported = hasFinalizationRegistry();
             const globalWindow = window as any;
             const rawExisting = globalWindow.__REACT_MNEMONIC_DEVTOOLS__;
-            const root: Record<string, any> =
-                rawExisting && typeof rawExisting === "object" ? rawExisting : {};
+            const root: Record<string, any> = rawExisting && typeof rawExisting === "object" ? rawExisting : {};
 
             const reserved = new Set(["providers", "resolve", "list", "capabilities", "__meta"]);
             for (const key of Object.keys(root)) {
@@ -710,12 +708,10 @@ export function MnemonicProvider({
          */
         if (enableDevTools && typeof window !== "undefined") {
             const root = ensureDevToolsRoot();
-            let infoMessage =
-                `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+            let infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
             if (root) {
                 if (!root.capabilities.weakRef) {
-                    infoMessage =
-                        `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
+                    infoMessage = `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
                 } else {
                     const existingLive = root.resolve(namespace);
                     if (existingLive) {
@@ -724,14 +720,13 @@ export function MnemonicProvider({
                             throw new Error(duplicateMessage);
                         }
                         console.warn(`${duplicateMessage} Keeping the first provider and ignoring the duplicate.`);
-                        infoMessage =
-                            `[Mnemonic DevTools] Namespace "${namespace}" already registered. Keeping existing provider reference.`;
+                        infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" already registered. Keeping existing provider reference.`;
                     } else {
                         const providerApi: DevToolsProviderApi = {
-                    /** Access the underlying store instance */
+                            /** Access the underlying store instance */
                             getStore: () => store,
 
-                    /** Dump all key-value pairs and display as a console table */
+                            /** Dump all key-value pairs and display as a console table */
                             dump: () => {
                                 const data = dump();
                                 console.table(
@@ -750,7 +745,7 @@ export function MnemonicProvider({
                                 return data;
                             },
 
-                    /** Get a decoded value by key */
+                            /** Get a decoded value by key */
                             get: (key: string) => {
                                 const raw = readThrough(key);
                                 if (raw == null) return undefined;
@@ -761,29 +756,28 @@ export function MnemonicProvider({
                                 }
                             },
 
-                    /** Set a value by key (automatically JSON-encoded) */
+                            /** Set a value by key (automatically JSON-encoded) */
                             set: (key: string, value: any) => {
                                 writeRaw(key, JSON.stringify(value));
                             },
 
-                    /** Remove a key from storage */
+                            /** Remove a key from storage */
                             remove: (key: string) => removeRaw(key),
 
-                    /** Clear all keys in this namespace */
+                            /** Clear all keys in this namespace */
                             clear: () => {
                                 for (const k of keys()) {
                                     removeRaw(k);
                                 }
                             },
 
-                    /** List all keys in this namespace */
+                            /** List all keys in this namespace */
                             keys,
                         };
 
                         const WeakRefCtor = weakRefConstructor();
                         if (!WeakRefCtor) {
-                            infoMessage =
-                                `[Mnemonic DevTools] WeakRef became unavailable while registering "${namespace}".`;
+                            infoMessage = `[Mnemonic DevTools] WeakRef became unavailable while registering "${namespace}".`;
                         } else {
                             // Keep a strong reference for the mounted provider lifetime.
                             // The global registry still only exposes a WeakRef, but this
@@ -798,8 +792,7 @@ export function MnemonicProvider({
                                 staleSince: null,
                             };
                             bumpDevToolsVersion("registry:namespace-registered");
-                            infoMessage =
-                                `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+                            infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
                         }
                     }
                 }

@@ -1019,7 +1019,7 @@ describe("schema mode behavior", () => {
         expect(storage.store.get("ns.count")).toBeUndefined();
         expect(errorSpy).toHaveBeenCalledWith(
             '[Mnemonic] Schema error for key "count" (WRITE_SCHEMA_REQUIRED):',
-            "Write requires schema for key \"count\" in strict mode",
+            'Write requires schema for key "count" in strict mode',
         );
         errorSpy.mockRestore();
     });

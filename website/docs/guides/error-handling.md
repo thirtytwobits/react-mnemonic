@@ -12,9 +12,9 @@ failure reason.
 
 ## Error classes
 
-| Class         | When thrown                                             |
-| ------------- | ------------------------------------------------------- |
-| `CodecError`  | Encoding or decoding fails (custom codec)               |
+| Class         | When thrown                                                             |
+| ------------- | ----------------------------------------------------------------------- |
+| `CodecError`  | Encoding or decoding fails (custom codec)                               |
 | `SchemaError` | Schema validation, migration, reconciliation, or envelope parsing fails |
 
 ## Error-aware defaults
@@ -47,17 +47,17 @@ storage — the nominal "first visit" path. No error occurred.
 
 `SchemaError` includes a `code` property for programmatic handling:
 
-| Code                         | Meaning                                                         |
-| ---------------------------- | --------------------------------------------------------------- |
-| `INVALID_ENVELOPE`           | Stored JSON doesn't match the envelope format                   |
-| `SCHEMA_NOT_FOUND`           | No schema is registered for the stored key/version              |
-| `WRITE_SCHEMA_REQUIRED`      | Strict-mode writes require a schema, but none could be resolved |
-| `MIGRATION_PATH_NOT_FOUND`   | No contiguous migration path exists to the latest schema        |
-| `MIGRATION_FAILED`           | A migration or write-time normalizer threw                      |
-| `RECONCILE_FAILED`           | A `reconcile` hook threw or returned an unpersistable value     |
-| `SCHEMA_REGISTRATION_CONFLICT` | A schema registration conflicted with an existing definition  |
-| `TYPE_MISMATCH`              | The decoded value failed JSON Schema validation                 |
-| `MODE_CONFIGURATION_INVALID` | The active schema mode is missing a required registry capability |
+| Code                           | Meaning                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `INVALID_ENVELOPE`             | Stored JSON doesn't match the envelope format                    |
+| `SCHEMA_NOT_FOUND`             | No schema is registered for the stored key/version               |
+| `WRITE_SCHEMA_REQUIRED`        | Strict-mode writes require a schema, but none could be resolved  |
+| `MIGRATION_PATH_NOT_FOUND`     | No contiguous migration path exists to the latest schema         |
+| `MIGRATION_FAILED`             | A migration or write-time normalizer threw                       |
+| `RECONCILE_FAILED`             | A `reconcile` hook threw or returned an unpersistable value      |
+| `SCHEMA_REGISTRATION_CONFLICT` | A schema registration conflicted with an existing definition     |
+| `TYPE_MISMATCH`                | The decoded value failed JSON Schema validation                  |
+| `MODE_CONFIGURATION_INVALID`   | The active schema mode is missing a required registry capability |
 
 ## Reconciliation failures
 

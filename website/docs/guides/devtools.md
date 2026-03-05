@@ -89,8 +89,8 @@ global registry:
 ```js
 const providers = __REACT_MNEMONIC_DEVTOOLS__.list();
 for (const provider of providers) {
-  const api = __REACT_MNEMONIC_DEVTOOLS__.resolve(provider.namespace);
-  console.log(provider.namespace, provider.available, api?.dump());
+    const api = __REACT_MNEMONIC_DEVTOOLS__.resolve(provider.namespace);
+    console.log(provider.namespace, provider.available, api?.dump());
 }
 ```
 

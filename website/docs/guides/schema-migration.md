@@ -116,10 +116,7 @@ const { value } = useMnemonicKey("profile", {
     defaultValue: { name: "", email: "", marketingOptIn: true },
     reconcile: (persisted, { persistedVersion, latestVersion }) => ({
         ...persisted,
-        marketingOptIn:
-            persistedVersion < (latestVersion ?? persistedVersion)
-                ? true
-                : persisted.marketingOptIn,
+        marketingOptIn: persistedVersion < (latestVersion ?? persistedVersion) ? true : persisted.marketingOptIn,
     }),
 });
 ```

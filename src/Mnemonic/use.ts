@@ -288,7 +288,9 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
 
                 const nextSerialized = serializeForPersist(reconciled);
                 const nextRewriteRaw =
-                    baselineSerialized === undefined || nextSerialized !== baselineSerialized ? nextSerialized : rewriteRaw;
+                    baselineSerialized === undefined || nextSerialized !== baselineSerialized
+                        ? nextSerialized
+                        : rewriteRaw;
                 const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value: reconciled };
                 if (nextRewriteRaw !== undefined) result.rewriteRaw = nextRewriteRaw;
                 if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;

@@ -661,13 +661,7 @@ describe("MnemonicProvider – DevTools", () => {
         const registry = getRegistry();
         const entry = registry.providers.dt;
         expect(entry).toBeDefined();
-        expect(Object.keys(entry).sort()).toEqual([
-            "lastSeenAt",
-            "namespace",
-            "registeredAt",
-            "staleSince",
-            "weakRef",
-        ]);
+        expect(Object.keys(entry).sort()).toEqual(["lastSeenAt", "namespace", "registeredAt", "staleSince", "weakRef"]);
         expect("provider" in entry).toBe(false);
         expect("api" in entry).toBe(false);
 
@@ -970,9 +964,7 @@ describe("MnemonicProvider – DevTools", () => {
         expect(registry.capabilities.weakRef).toBe(false);
         expect(registry.resolve("no-weak")).toBeNull();
         expect(registry.list()).toEqual([]);
-        expect(infoSpy).toHaveBeenCalledWith(
-            expect.stringContaining('registry provider "no-weak" was not registered'),
-        );
+        expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('registry provider "no-weak" was not registered'));
         infoSpy.mockRestore();
     });
 

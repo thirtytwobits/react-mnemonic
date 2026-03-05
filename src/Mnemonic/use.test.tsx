@@ -61,7 +61,7 @@ function buildInvalidEnvelopeFuzzCases(count: number): string[] {
         JSON.stringify({ payload: "x" }),
     ]);
 
-    const alphabet = "abcdefghijklmnopqrstuvwxyz{}[]:,\"";
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz{}[]:,"';
     while (cases.size < count) {
         const mode = Math.floor(random() * 4);
         if (mode === 0) {

@@ -82,9 +82,7 @@ async function updatePopupMessage() {
                 }
 
                 const weakRefSupported = Boolean(registry.capabilities?.weakRef);
-                const finalizationRegistrySupported = Boolean(
-                    registry.capabilities?.finalizationRegistry
-                );
+                const finalizationRegistrySupported = Boolean(registry.capabilities?.finalizationRegistry);
 
                 const descriptors = Array.isArray(registry.list()) ? registry.list() : [];
                 const providerStatuses = descriptors.map((entry) => ({
@@ -156,7 +154,7 @@ async function updatePopupMessage() {
             setMessage({
                 title: "No live Mnemonic providers available.",
                 body: `Providers are stale/unavailable: ${staleNamespaces.join(
-                    ", "
+                    ", ",
                 )}. Open a route where providers are mounted.`,
                 pageUrl,
                 restricted: false,
@@ -164,8 +162,7 @@ async function updatePopupMessage() {
             return;
         }
 
-        const staleSuffix =
-            staleNamespaces.length > 0 ? ` Stale: ${staleNamespaces.join(", ")}.` : "";
+        const staleSuffix = staleNamespaces.length > 0 ? ` Stale: ${staleNamespaces.join(", ")}.` : "";
         setMessage({
             title: "Mnemonic providers detected.",
             body: `Live: ${liveNamespaces.join(", ")}.${staleSuffix} Open DevTools and select the "react-mnemonic" tab.`,
