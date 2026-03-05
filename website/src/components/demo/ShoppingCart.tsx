@@ -168,7 +168,7 @@ export function ShoppingCart() {
     }
 
     return (
-        <MnemonicProvider namespace="cart" storage={storage}>
+        <MnemonicProvider namespace="cart" storage={storage} enableDevTools>
             <CartContents />
         </MnemonicProvider>
     );

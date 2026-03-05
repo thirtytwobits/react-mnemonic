@@ -849,6 +849,7 @@ export function SchemaPlayground() {
                 <MnemonicProvider
                     key={mountKey}
                     namespace={NAMESPACE}
+                    enableDevTools
                     schemaMode={schemaMode}
                     schemaRegistry={registry}
                 >

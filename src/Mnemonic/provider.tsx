@@ -101,6 +101,59 @@ type MnemonicInternal = Mnemonic & {
     reloadFromStorage: (changedKeys?: string[]) => void;
 };
 
+/** Internal store extension to retain a strong provider API reference while mounted. */
+type MnemonicInternalWithDevToolsHold = MnemonicInternal & {
+    __devToolsProviderApiHold?: DevToolsProviderApi;
+};
+
+/** Minimal WeakRef shape so we can compile against ES2020 libs. */
+type WeakRefLike<T extends object> = {
+    deref: () => T | undefined;
+};
+
+type WeakRefConstructorLike = new <T extends object>(target: T) => WeakRefLike<T>;
+
+type DevToolsProviderApi = {
+    getStore: () => MnemonicInternal;
+    dump: () => Record<string, string>;
+    get: (key: string) => unknown;
+    set: (key: string, value: unknown) => void;
+    remove: (key: string) => void;
+    clear: () => void;
+    keys: () => string[];
+};
+
+type DevToolsProviderEntry = {
+    namespace: string;
+    weakRef: WeakRefLike<DevToolsProviderApi>;
+    registeredAt: number;
+    lastSeenAt: number;
+    staleSince: number | null;
+};
+
+type DevToolsProviderDescriptor = {
+    namespace: string;
+    available: boolean;
+    registeredAt: number;
+    lastSeenAt: number;
+    staleSince: number | null;
+};
+
+type DevToolsRegistryRoot = {
+    providers: Record<string, DevToolsProviderEntry>;
+    resolve: (namespace: string) => DevToolsProviderApi | null;
+    list: () => DevToolsProviderDescriptor[];
+    capabilities: {
+        weakRef: boolean;
+        finalizationRegistry: boolean;
+    };
+    __meta: {
+        version: number;
+        lastUpdated: number;
+        lastChange: string;
+    };
+};
+
 /**
  * React Context provider for namespace-isolated persistent state.
  *
@@ -161,9 +214,10 @@ type MnemonicInternal = Mnemonic & {
  * }
  *
  * // Then in browser console:
- * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.dump()
- * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.get('user')
- * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.set('theme', 'dark')
+ * const dt = window.__REACT_MNEMONIC_DEVTOOLS__.resolve('myApp')
+ * dt?.dump()
+ * dt?.get('user')
+ * dt?.set('theme', 'dark')
  * ```
  *
  * @example
@@ -229,6 +283,130 @@ export function MnemonicProvider({
 
         /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
         let accessErrorLogged = false;
+
+        const isProductionRuntime = () =>
+            Boolean((globalThis as any)?.process?.env?.NODE_ENV === "production");
+
+        const weakRefConstructor = (): WeakRefConstructorLike | null => {
+            const ctor = (globalThis as any)?.WeakRef;
+            return typeof ctor === "function" ? (ctor as WeakRefConstructorLike) : null;
+        };
+
+        const hasFinalizationRegistry = () =>
+            typeof (globalThis as any)?.FinalizationRegistry === "function";
+
+        /**
+         * Returns the global Mnemonic DevTools registry root when devtools are enabled.
+         * Lazily initializes registry methods and metadata.
+         */
+        const ensureDevToolsRoot = (): DevToolsRegistryRoot | null => {
+            if (!enableDevTools || typeof window === "undefined") return null;
+
+            const weakRefSupported = weakRefConstructor() !== null;
+            const finalizationRegistrySupported = hasFinalizationRegistry();
+            const globalWindow = window as any;
+            const rawExisting = globalWindow.__REACT_MNEMONIC_DEVTOOLS__;
+            const root: Record<string, any> =
+                rawExisting && typeof rawExisting === "object" ? rawExisting : {};
+
+            const reserved = new Set(["providers", "resolve", "list", "capabilities", "__meta"]);
+            for (const key of Object.keys(root)) {
+                if (!reserved.has(key)) {
+                    delete root[key];
+                }
+            }
+
+            if (!root.providers || typeof root.providers !== "object") {
+                root.providers = {};
+            }
+
+            if (!root.capabilities || typeof root.capabilities !== "object") {
+                root.capabilities = {};
+            }
+            root.capabilities.weakRef = weakRefSupported;
+            root.capabilities.finalizationRegistry = finalizationRegistrySupported;
+
+            if (!root.__meta || typeof root.__meta !== "object") {
+                root.__meta = {
+                    version: 0,
+                    lastUpdated: Date.now(),
+                    lastChange: "",
+                };
+            }
+            if (typeof root.__meta.version !== "number" || !Number.isFinite(root.__meta.version)) {
+                root.__meta.version = 0;
+            }
+            if (typeof root.__meta.lastUpdated !== "number" || !Number.isFinite(root.__meta.lastUpdated)) {
+                root.__meta.lastUpdated = Date.now();
+            }
+            if (typeof root.__meta.lastChange !== "string") {
+                root.__meta.lastChange = "";
+            }
+
+            if (typeof root.resolve !== "function") {
+                root.resolve = (ns: string): DevToolsProviderApi | null => {
+                    const entry = (root.providers as Record<string, DevToolsProviderEntry>)[ns];
+                    if (!entry || !entry.weakRef || typeof entry.weakRef.deref !== "function") return null;
+
+                    const live = entry.weakRef.deref();
+                    if (live) {
+                        entry.lastSeenAt = Date.now();
+                        entry.staleSince = null;
+                        return live;
+                    }
+
+                    if (entry.staleSince === null) {
+                        entry.staleSince = Date.now();
+                    }
+                    return null;
+                };
+            }
+
+            if (typeof root.list !== "function") {
+                root.list = (): DevToolsProviderDescriptor[] => {
+                    const entries = root.providers as Record<string, DevToolsProviderEntry>;
+                    const out: DevToolsProviderDescriptor[] = [];
+                    for (const [ns, entry] of Object.entries(entries)) {
+                        const live =
+                            entry && entry.weakRef && typeof entry.weakRef.deref === "function"
+                                ? entry.weakRef.deref()
+                                : undefined;
+                        const available = Boolean(live);
+                        if (available) {
+                            entry.lastSeenAt = Date.now();
+                            entry.staleSince = null;
+                        } else if (entry.staleSince === null) {
+                            entry.staleSince = Date.now();
+                        }
+                        out.push({
+                            namespace: ns,
+                            available,
+                            registeredAt: entry.registeredAt,
+                            lastSeenAt: entry.lastSeenAt,
+                            staleSince: entry.staleSince,
+                        });
+                    }
+                    out.sort((a, b) => a.namespace.localeCompare(b.namespace));
+                    return out;
+                };
+            }
+
+            globalWindow.__REACT_MNEMONIC_DEVTOOLS__ = root;
+            return root as DevToolsRegistryRoot;
+        };
+
+        /**
+         * Bumps the global devtools registry revision counter.
+         * Consumers can poll this for lightweight change detection.
+         */
+        const bumpDevToolsVersion = (reason: string) => {
+            const root = ensureDevToolsRoot();
+            if (!root) return;
+
+            root.__meta.version += 1;
+            root.__meta.lastUpdated = Date.now();
+            root.__meta.lastChange = `${namespace}.${reason}`;
+        };
 
         /**
          * Converts an unprefixed key to a fully-qualified storage key.
@@ -317,6 +495,7 @@ export function MnemonicProvider({
                 }
             }
             emit(key);
+            bumpDevToolsVersion(`set:${key}`);
         };
 
         /**
@@ -336,6 +515,7 @@ export function MnemonicProvider({
                 }
             }
             emit(key);
+            bumpDevToolsVersion(`remove:${key}`);
         };
 
         /**
@@ -424,6 +604,7 @@ export function MnemonicProvider({
          */
         const reloadFromStorage = (changedKeys?: string[]) => {
             if (!st) return;
+            let changed = false;
 
             // Empty array → explicit no-op
             if (changedKeys !== undefined && changedKeys.length === 0) return;
@@ -450,11 +631,15 @@ export function MnemonicProvider({
                         if (fresh !== cached) {
                             cache.set(key, fresh);
                             emit(key);
+                            changed = true;
                         }
                     } else if (cache.has(key)) {
                         // Cached but not subscribed: evict so next read is fresh
                         cache.delete(key);
                     }
+                }
+                if (changed) {
+                    bumpDevToolsVersion("reload:granular");
                 }
                 return;
             }
@@ -474,6 +659,7 @@ export function MnemonicProvider({
                 if (fresh !== cached) {
                     cache.set(key, fresh);
                     emit(key);
+                    changed = true;
                 }
             }
 
@@ -482,6 +668,10 @@ export function MnemonicProvider({
                 if (!listeners.has(key) || listeners.get(key)!.size === 0) {
                     cache.delete(key);
                 }
+            }
+
+            if (changed) {
+                bumpDevToolsVersion("reload:full");
             }
         };
 
@@ -504,65 +694,105 @@ export function MnemonicProvider({
 
         /**
          * DevTools integration.
-         * Exposes a debugging interface on the window object when enabled.
+         * Exposes a weak-provider registry on the window object when enabled.
          */
         if (enableDevTools && typeof window !== "undefined") {
-            (window as any).__REACT_MNEMONIC_DEVTOOLS__ = (window as any).__REACT_MNEMONIC_DEVTOOLS__ || {};
-            (window as any).__REACT_MNEMONIC_DEVTOOLS__[namespace] = {
-                /** Access the underlying store instance */
-                getStore: () => store,
+            const root = ensureDevToolsRoot();
+            let infoMessage =
+                `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+            if (root) {
+                if (!root.capabilities.weakRef) {
+                    infoMessage =
+                        `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
+                } else {
+                    const existingLive = root.resolve(namespace);
+                    if (existingLive) {
+                        const duplicateMessage = `[Mnemonic DevTools] Duplicate provider namespace "${namespace}" detected. Each window must have at most one live MnemonicProvider per namespace.`;
+                        if (!isProductionRuntime()) {
+                            throw new Error(duplicateMessage);
+                        }
+                        console.warn(`${duplicateMessage} Keeping the first provider and ignoring the duplicate.`);
+                        infoMessage =
+                            `[Mnemonic DevTools] Namespace "${namespace}" already registered. Keeping existing provider reference.`;
+                    } else {
+                        const providerApi: DevToolsProviderApi = {
+                    /** Access the underlying store instance */
+                            getStore: () => store,
 
-                /** Dump all key-value pairs and display as a console table */
-                dump: () => {
-                    const data = dump();
-                    console.table(
-                        Object.entries(data).map(([key, value]) => ({
-                            key,
-                            value,
-                            decoded: (() => {
+                    /** Dump all key-value pairs and display as a console table */
+                            dump: () => {
+                                const data = dump();
+                                console.table(
+                                    Object.entries(data).map(([key, value]) => ({
+                                        key,
+                                        value,
+                                        decoded: (() => {
+                                            try {
+                                                return JSON.parse(value);
+                                            } catch {
+                                                return value;
+                                            }
+                                        })(),
+                                    })),
+                                );
+                                return data;
+                            },
+
+                    /** Get a decoded value by key */
+                            get: (key: string) => {
+                                const raw = readThrough(key);
+                                if (raw == null) return undefined;
                                 try {
-                                    return JSON.parse(value);
+                                    return JSON.parse(raw);
                                 } catch {
-                                    return value;
+                                    return raw;
                                 }
-                            })(),
-                        })),
-                    );
-                    return data;
-                },
+                            },
 
-                /** Get a decoded value by key */
-                get: (key: string) => {
-                    const raw = readThrough(key);
-                    if (raw == null) return undefined;
-                    try {
-                        return JSON.parse(raw);
-                    } catch {
-                        return raw;
+                    /** Set a value by key (automatically JSON-encoded) */
+                            set: (key: string, value: any) => {
+                                writeRaw(key, JSON.stringify(value));
+                            },
+
+                    /** Remove a key from storage */
+                            remove: (key: string) => removeRaw(key),
+
+                    /** Clear all keys in this namespace */
+                            clear: () => {
+                                for (const k of keys()) {
+                                    removeRaw(k);
+                                }
+                            },
+
+                    /** List all keys in this namespace */
+                            keys,
+                        };
+
+                        const WeakRefCtor = weakRefConstructor();
+                        if (!WeakRefCtor) {
+                            infoMessage =
+                                `[Mnemonic DevTools] WeakRef became unavailable while registering "${namespace}".`;
+                        } else {
+                            // Keep a strong reference for the mounted provider lifetime.
+                            // The global registry still only exposes a WeakRef, but this
+                            // prevents premature collection while the provider is active.
+                            (store as MnemonicInternalWithDevToolsHold).__devToolsProviderApiHold = providerApi;
+
+                            root.providers[namespace] = {
+                                namespace,
+                                weakRef: new WeakRefCtor(providerApi),
+                                registeredAt: Date.now(),
+                                lastSeenAt: Date.now(),
+                                staleSince: null,
+                            };
+                            bumpDevToolsVersion("registry:namespace-registered");
+                            infoMessage =
+                                `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+                        }
                     }
-                },
-
-                /** Set a value by key (automatically JSON-encoded) */
-                set: (key: string, value: any) => {
-                    writeRaw(key, JSON.stringify(value));
-                },
-
-                /** Remove a key from storage */
-                remove: (key: string) => removeRaw(key),
-
-                /** Clear all keys in this namespace */
-                clear: () => {
-                    for (const k of keys()) {
-                        removeRaw(k);
-                    }
-                },
-
-                /** List all keys in this namespace */
-                keys,
-            };
-            console.info(
-                `[Mnemonic DevTools] Namespace "${namespace}" available at window.__REACT_MNEMONIC_DEVTOOLS__.${namespace}`,
-            );
+                }
+            }
+            console.info(infoMessage);
         }
 
         return store;

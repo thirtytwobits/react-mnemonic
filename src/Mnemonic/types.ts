@@ -114,8 +114,13 @@ export interface MnemonicProviderOptions {
     /**
      * Enable DevTools debugging interface.
      *
-     * When enabled, exposes the store on `window.__REACT_MNEMONIC_DEVTOOLS__[namespace]`
-     * with methods to inspect, modify, and dump storage state from the console.
+     * When enabled, registers this provider in the global
+     * `window.__REACT_MNEMONIC_DEVTOOLS__` registry.
+     *
+     * The registry stores providers as weak references and exposes:
+     * - `resolve(namespace)` to strengthen a provider reference and access
+     *   inspection methods.
+     * - `list()` to enumerate provider availability.
      *
      * @default false
      *
@@ -125,9 +130,10 @@ export interface MnemonicProviderOptions {
      * enableDevTools: process.env.NODE_ENV === 'development'
      *
      * // Then in browser console:
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.dump()
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.get('user')
-     * window.__REACT_MNEMONIC_DEVTOOLS__.myApp.set('user', { name: 'Test' })
+     * const provider = window.__REACT_MNEMONIC_DEVTOOLS__.resolve('myApp')
+     * provider?.dump()
+     * provider?.get('user')
+     * provider?.set('user', { name: 'Test' })
      * ```
      */
     enableDevTools?: boolean;
@@ -201,6 +207,103 @@ export interface MnemonicProviderOptions {
  * @see {@link KeySchema} - Individual schema definition
  */
 export type SchemaMode = "strict" | "default" | "autoschema";
+
+/**
+ * Weak-reference shape used by the devtools registry.
+ *
+ * Matches the standard `WeakRef` API while keeping the public type surface
+ * compatible with ES2020 TypeScript lib targets.
+ */
+export interface MnemonicDevToolsWeakRef<T extends object> {
+    /**
+     * Attempts to strengthen the weak reference.
+     *
+     * @returns The live object, or undefined if it was garbage-collected.
+     */
+    deref: () => T | undefined;
+}
+
+/**
+ * Provider inspection API exposed through devtools registry resolution.
+ *
+ * Resolve a provider from the registry, then invoke these methods for manual
+ * inspection/mutation from the browser console.
+ */
+export interface MnemonicDevToolsProviderApi {
+    /** Access the underlying store instance. */
+    getStore: () => Mnemonic;
+    /** Dump all raw key-value pairs for the provider namespace. */
+    dump: () => Record<string, string>;
+    /** Read decoded value for an unprefixed key. */
+    get: (key: string) => unknown;
+    /** Write value for an unprefixed key (JSON-encoded). */
+    set: (key: string, value: unknown) => void;
+    /** Remove a single unprefixed key. */
+    remove: (key: string) => void;
+    /** Remove all keys in this provider namespace. */
+    clear: () => void;
+    /** List all unprefixed keys in this provider namespace. */
+    keys: () => string[];
+}
+
+/**
+ * Registry entry for a single provider namespace.
+ */
+export interface MnemonicDevToolsProviderEntry {
+    /** Namespace key for this provider entry. */
+    namespace: string;
+    /** Weak reference to the provider inspection API. */
+    weakRef: MnemonicDevToolsWeakRef<MnemonicDevToolsProviderApi>;
+    /** Timestamp when this namespace was registered. */
+    registeredAt: number;
+    /** Timestamp when provider was last confirmed live. */
+    lastSeenAt: number;
+    /** Timestamp when provider was first observed unavailable, or null when live. */
+    staleSince: number | null;
+}
+
+/**
+ * Lightweight provider status returned by `list()`.
+ */
+export interface MnemonicDevToolsProviderDescriptor {
+    namespace: string;
+    available: boolean;
+    registeredAt: number;
+    lastSeenAt: number;
+    staleSince: number | null;
+}
+
+/**
+ * Environment capabilities reported by devtools registry.
+ */
+export interface MnemonicDevToolsCapabilities {
+    weakRef: boolean;
+    finalizationRegistry: boolean;
+}
+
+/**
+ * Polling metadata for extension synchronization.
+ */
+export interface MnemonicDevToolsMeta {
+    version: number;
+    lastUpdated: number;
+    lastChange: string;
+}
+
+/**
+ * Global devtools registry contract available on window.
+ *
+ * This is registry-only. Direct namespace access
+ * (`window.__REACT_MNEMONIC_DEVTOOLS__.myNamespace`) is not part of the
+ * public API.
+ */
+export interface MnemonicDevToolsRegistry {
+    providers: Record<string, MnemonicDevToolsProviderEntry>;
+    resolve: (namespace: string) => MnemonicDevToolsProviderApi | null;
+    list: () => MnemonicDevToolsProviderDescriptor[];
+    capabilities: MnemonicDevToolsCapabilities;
+    __meta: MnemonicDevToolsMeta;
+}
 
 /**
  * Schema definition for a single key at a specific version.

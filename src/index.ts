@@ -17,4 +17,11 @@ export type {
     MigrationRule,
     MigrationPath,
     SchemaRegistry,
+    MnemonicDevToolsWeakRef,
+    MnemonicDevToolsProviderApi,
+    MnemonicDevToolsProviderEntry,
+    MnemonicDevToolsProviderDescriptor,
+    MnemonicDevToolsCapabilities,
+    MnemonicDevToolsMeta,
+    MnemonicDevToolsRegistry,
 } from "./Mnemonic/types";
