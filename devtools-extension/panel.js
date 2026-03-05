@@ -2,6 +2,7 @@ const TABLE_BODY_ID = "storage-table-body";
 const STATUS_ID = "status";
 const REFRESH_BUTTON_ID = "refresh-button";
 const AUTO_REFRESH_TOGGLE_ID = "auto-refresh-toggle";
+const TABLE_COLUMN_COUNT = 3;
 
 const AUTO_REFRESH_STORAGE_KEY = "react-mnemonic:auto-refresh";
 const POLL_INTERVAL_MS = 500;
@@ -33,6 +34,7 @@ let lastSeenVersion = null;
 let lastSeenLivenessSignature = null;
 let autoRefreshEnabled = true;
 let supportsMetaVersion = false;
+let mutationInFlight = false;
 
 const lastSnapshotByNamespace = new Map();
 
@@ -54,8 +56,117 @@ function createCell(tagName, className, text, colSpan) {
 function renderEmptyState(message = "No mnemonic entries found.") {
     storageTableBody.replaceChildren();
     const row = document.createElement("tr");
-    row.appendChild(createCell("td", "empty-cell", message, 2));
+    row.appendChild(createCell("td", "empty-cell", message, TABLE_COLUMN_COUNT));
     storageTableBody.appendChild(row);
+}
+
+function createActionButton(label, title, handler, options = {}) {
+    const { danger = false } = options;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = danger ? "action-button danger" : "action-button";
+    button.textContent = label;
+    button.title = title;
+    button.addEventListener("click", handler);
+    return button;
+}
+
+function renderActionPlaceholder() {
+    const placeholder = document.createElement("span");
+    placeholder.className = "action-placeholder";
+    placeholder.textContent = "-";
+    return placeholder;
+}
+
+function runProviderMutation(action) {
+    if (mutationInFlight) return;
+    mutationInFlight = true;
+    refreshButton.disabled = true;
+
+    const verb =
+        action.type === "clear"
+            ? `Clearing all keys in "${action.namespace}"...`
+            : `Removing "${action.key}" from "${action.namespace}"...`;
+    setStatus(verb);
+
+    const namespaceLiteral = JSON.stringify(String(action.namespace));
+    const keyLiteral = action.type === "remove" ? JSON.stringify(String(action.key)) : "null";
+    const typeLiteral = JSON.stringify(action.type);
+
+    chrome.devtools.inspectedWindow.eval(
+        `(() => {
+            try {
+                const registry = window.__REACT_MNEMONIC_DEVTOOLS__;
+                if (!registry || typeof registry !== "object") {
+                    return { ok: false, reason: "MISSING_REGISTRY" };
+                }
+
+                const hasRegistryApi =
+                    typeof registry.list === "function" &&
+                    typeof registry.resolve === "function" &&
+                    registry.providers &&
+                    typeof registry.providers === "object";
+                if (!hasRegistryApi) {
+                    return { ok: false, reason: "INCOMPATIBLE_REGISTRY" };
+                }
+
+                const namespace = ${namespaceLiteral};
+                const key = ${keyLiteral};
+                const actionType = ${typeLiteral};
+                const provider = registry.resolve(namespace);
+                if (!provider) {
+                    return { ok: false, reason: "PROVIDER_UNAVAILABLE" };
+                }
+
+                if (actionType === "clear") {
+                    if (typeof provider.clear !== "function") {
+                        return { ok: false, reason: "MISSING_PROVIDER_METHOD", method: "clear" };
+                    }
+                    provider.clear();
+                    return { ok: true };
+                }
+
+                if (typeof provider.remove !== "function") {
+                    return { ok: false, reason: "MISSING_PROVIDER_METHOD", method: "remove" };
+                }
+                if (typeof key !== "string" || key.length === 0) {
+                    return { ok: false, reason: "INVALID_KEY" };
+                }
+
+                provider.remove(key);
+                return { ok: true };
+            } catch (error) {
+                return { ok: false, error: String(error) };
+            }
+        })()`,
+        (result, exceptionInfo) => {
+            mutationInFlight = false;
+            refreshButton.disabled = false;
+
+            if (exceptionInfo?.isException) {
+                const message = exceptionInfo.value || "Mutation failed in inspected page.";
+                setStatus(message, true);
+                return;
+            }
+
+            if (!result?.ok) {
+                if (result?.reason === "PROVIDER_UNAVAILABLE") {
+                    setStatus(`Provider "${action.namespace}" is no longer available.`, true);
+                    fetchMnemonicRows({ silent: true });
+                    return;
+                }
+                const message =
+                    result?.error ||
+                    (result?.reason
+                        ? `Unable to run action: ${result.reason}${result.method ? ` (${result.method})` : ""}.`
+                        : "Unable to run action.");
+                setStatus(message, true);
+                return;
+            }
+
+            fetchMnemonicRows({ silent: true });
+        }
+    );
 }
 
 function formatValueForTable(value) {
@@ -87,16 +198,35 @@ function renderNamespaceRows(namespaces) {
     for (const namespaceEntry of namespaces) {
         const groupRow = document.createElement("tr");
         groupRow.className = namespaceEntry.available ? "group-row" : "group-row stale-group-row";
-        groupRow.appendChild(
-            createCell(
-                "td",
-                "group-cell",
-                namespaceEntry.available
-                    ? `${namespaceEntry.namespace} (${namespaceEntry.rows.length})`
-                    : `${namespaceEntry.namespace} (provider unavailable)`,
-                2
-            )
-        );
+        const groupCell = createCell("td", "group-cell", "", 2);
+        const groupLabel = document.createElement("span");
+        groupLabel.className = "group-label";
+        groupLabel.textContent = namespaceEntry.available
+            ? `${namespaceEntry.namespace} (${namespaceEntry.rows.length})`
+            : `${namespaceEntry.namespace} (provider unavailable)`;
+        groupCell.appendChild(groupLabel);
+        groupRow.appendChild(groupCell);
+
+        const groupActionCell = document.createElement("td");
+        groupActionCell.className = "action-cell";
+        if (namespaceEntry.available) {
+            groupActionCell.appendChild(
+                createActionButton(
+                    "Clear",
+                    `Clear all keys in "${namespaceEntry.namespace}"`,
+                    () => {
+                        runProviderMutation({
+                            type: "clear",
+                            namespace: namespaceEntry.namespace,
+                        });
+                    },
+                    { danger: true }
+                )
+            );
+        } else {
+            groupActionCell.appendChild(renderActionPlaceholder());
+        }
+        groupRow.appendChild(groupActionCell);
         storageTableBody.appendChild(groupRow);
 
         if (!namespaceEntry.available && namespaceEntry.showingSnapshot) {
@@ -107,7 +237,7 @@ function renderNamespaceRows(namespaces) {
                     "td",
                     "stale-note-cell",
                     "Provider no longer available. Showing last captured snapshot.",
-                    2
+                    TABLE_COLUMN_COUNT
                 )
             );
             storageTableBody.appendChild(staleInfoRow);
@@ -121,7 +251,7 @@ function renderNamespaceRows(namespaces) {
                     "td",
                     "empty-cell",
                     namespaceEntry.available ? "(no keys)" : "(no snapshot available)",
-                    2
+                    TABLE_COLUMN_COUNT
                 )
             );
             storageTableBody.appendChild(row);
@@ -133,6 +263,27 @@ function renderNamespaceRows(namespaces) {
             row.className = namespaceEntry.available ? "" : "stale-row";
             row.appendChild(createCell("td", "key-cell", entry.key));
             row.appendChild(createCell("td", "value-cell", formatValueForTable(entry.value)));
+            const actionCell = document.createElement("td");
+            actionCell.className = "action-cell";
+            if (namespaceEntry.available) {
+                actionCell.appendChild(
+                    createActionButton(
+                        "Remove",
+                        `Remove "${entry.key}" from "${namespaceEntry.namespace}"`,
+                        () => {
+                            runProviderMutation({
+                                type: "remove",
+                                namespace: namespaceEntry.namespace,
+                                key: entry.key,
+                            });
+                        },
+                        { danger: true }
+                    )
+                );
+            } else {
+                actionCell.appendChild(renderActionPlaceholder());
+            }
+            row.appendChild(actionCell);
             storageTableBody.appendChild(row);
         }
     }
