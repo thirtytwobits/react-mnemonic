@@ -23,6 +23,8 @@ jobs:
                   node-version: 20
                   registry-url: https://registry.npmjs.org
                   cache: npm
+            - run: npm install -g npm@^11.5.1
+            - run: npm --version
             - run: npm ci
             - run: npm run lint
             - run: npm run format:check
@@ -40,3 +42,5 @@ jobs:
                   esac
                   echo "NPM_DIST_TAG=$TAG" >> "$GITHUB_ENV"
             - run: npm publish --tag "$NPM_DIST_TAG" --access public --provenance
+              env:
+                  NODE_AUTH_TOKEN: ""

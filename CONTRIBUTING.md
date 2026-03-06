@@ -232,6 +232,7 @@ Triggered by tagged releases matching `v*` (for example `v1.0.0-beta.0` or
 - Builds and tests the library
 - Generates the API docs and builds the docs site
 - Publishes beta prereleases to the npm `beta` tag and stable releases to `latest`
+- Uses npm trusted publishing via GitHub OIDC instead of a long-lived publish token
 - Includes npm provenance attestation
 
 ## License
