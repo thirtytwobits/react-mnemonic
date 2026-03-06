@@ -195,6 +195,13 @@
     color: #216e39;
 }
 
+html[data-theme='dark'] .demo-split-pill--warning {
+    color: var(--ifm-color-warning-light);
+}
+
+html[data-theme='dark'] .demo-split-pill--success {
+    color: var(--ifm-color-success-light);
+}
 .demo-split-summary {
     margin: 0.75rem 0;
     font-size: 0.85rem;
