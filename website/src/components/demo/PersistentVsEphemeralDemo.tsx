@@ -65,17 +65,12 @@ function usePersistentSlice<Persisted extends object, Ephemeral extends object>(
         setEphemeral((prev) => ({ ...prev, [field]: value }));
     };
 
-    const resetAll = () => {
-        resetPersisted();
-        setEphemeral(options.defaultEphemeral);
-    };
-
     return {
         persisted,
         ephemeral,
         updatePersisted,
         updateEphemeral,
-        resetAll,
+        resetPersisted,
     };
 }
 
