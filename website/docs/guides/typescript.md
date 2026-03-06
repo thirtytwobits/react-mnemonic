@@ -22,6 +22,7 @@ import type {
     MigrationRule,
     MigrationPath,
     SchemaRegistry,
+    StructuralTreeHelpers,
     SchemaMode,
     JsonSchema,
     JsonSchemaType,
@@ -101,6 +102,20 @@ interface SchemaRegistry {
     getMigrationPath(key: string, from: number, to: number): MigrationRule[] | null;
     getWriteMigration(key: string, version: number): MigrationRule | undefined;
     registerSchema(schema: KeySchema): void;
+}
+```
+
+### `StructuralTreeHelpers<T>`
+
+Adapter type for structural migration helpers when your tree does not use the
+default `id` / `children` fields:
+
+```ts
+interface StructuralTreeHelpers<T> {
+    getId: (node: T) => string;
+    getChildren: (node: T) => readonly T[] | undefined;
+    withChildren: (node: T, children: T[]) => T;
+    withId: (node: T, id: string) => T;
 }
 ```
 

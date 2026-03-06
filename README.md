@@ -25,6 +25,7 @@ through a single hook that works like `useState`.
 - **Cross-tab sync** -- opt-in `listenCrossTab` uses the browser `storage` event
 - **Pluggable storage** -- bring your own backend via the `StorageLike` interface (IndexedDB, sessionStorage, etc.)
 - **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
+- **Structural migration helpers** -- optional tree utilities for idempotent insert/rename/dedupe migration steps
 - **Read-time reconciliation** -- selectively enforce new defaults on persisted values without clearing the whole key
 - **Write-time normalization** -- migrations where `fromVersion === toVersion` run on every write
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
@@ -346,6 +347,25 @@ const { value } = useMnemonicKey("preferences", {
 Use a schema migration when the stored shape must move from one explicit version
 to another. Use `reconcile` for conditional, field-level policy changes such as
 rolling out a new default while preserving the rest of a user's stored data.
+
+### Structural migration helpers
+
+For layout-like data that already uses `id` and `children`, Mnemonic ships
+optional pure helpers for common idempotent migration steps:
+
+```ts
+import { insertChildIfMissing, renameNode, dedupeChildrenBy } from "react-mnemonic";
+
+const migrated = dedupeChildrenBy(
+    renameNode(insertChildIfMissing(layout, "sidebar", { id: "search", title: "Search" }), "prefs", "preferences"),
+    (node) => node.id,
+);
+```
+
+Use these inside your `MigrationRule.migrate` functions when you want repeatable
+tree edits without hand-writing the same traversal logic each time. See the
+[Schema Migration guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)
+for a cookbook example and custom adapter usage.
 
 ### Example schema registry
 
