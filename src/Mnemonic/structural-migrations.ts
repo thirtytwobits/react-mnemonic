@@ -154,10 +154,17 @@ export function renameNode<T>(root: T, currentId: string, nextId: string, helper
  * encountered for each key. The helper traverses the full tree and returns the
  * original root when no duplicates are removed.
  *
+ * Keys are tracked using a `Set`, so `getKey` should return a stable value with
+ * meaningful `Set` equality semantics (typically a primitive such as a
+ * string, number, or symbol). When returning objects, duplicates are only
+ * removed if the object references are identical.
+ *
  * @template T - Tree node type
  * @template K - Deduplication key type
  * @param root - Root node to normalize
- * @param getKey - Function that computes a dedupe key for each child
+ * @param getKey - Function that computes a dedupe key for each child; should
+ * return a stable primitive (string/number/symbol) or other value suitable for
+ * use as a `Set` key
  * @param helpers - Optional adapter for custom node shapes
  * @returns Updated tree with duplicate siblings removed
  */
