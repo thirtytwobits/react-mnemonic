@@ -284,6 +284,17 @@ export function MnemonicProvider({
         /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
         let accessErrorLogged = false;
 
+        const detectEnumerableStorage = () => {
+            if (!st) return false;
+            try {
+                return typeof st.length === "number" && typeof st.key === "function";
+            } catch {
+                return false;
+            }
+        };
+
+        const canEnumerateKeys = detectEnumerableStorage();
+
         const isProductionRuntime = () => {
             const env = (globalThis as any)?.process?.env?.NODE_ENV;
             if (typeof env !== "string") {
@@ -571,11 +582,14 @@ export function MnemonicProvider({
          * @returns Array of unprefixed key names
          */
         const keys = () => {
-            if (!st || typeof st.length !== "number" || typeof st.key !== "function") return [];
+            if (!canEnumerateKeys || !st) return [];
             const out: string[] = [];
             try {
-                for (let i = 0; i < st.length; i++) {
-                    const k = st.key(i);
+                const storageLength = st.length;
+                const getStorageKey = st.key;
+                if (typeof storageLength !== "number" || typeof getStorageKey !== "function") return [];
+                for (let i = 0; i < storageLength; i++) {
+                    const k = getStorageKey.call(st, i);
                     if (!k) continue;
                     if (k.startsWith(prefix)) out.push(k.slice(prefix.length));
                 }
@@ -691,6 +705,7 @@ export function MnemonicProvider({
          */
         const store = {
             prefix,
+            canEnumerateKeys,
             subscribeRaw,
             getRawSnapshot,
             setRaw: writeRaw,

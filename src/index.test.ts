@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import {
     MnemonicProvider,
     useMnemonicKey,
+    useMnemonicRecovery,
     JSONCodec,
     createCodec,
     CodecError,
@@ -12,7 +13,15 @@ import {
     validateJsonSchema,
     compileSchema,
 } from "./index";
-import type { Codec, MnemonicProviderOptions, UseMnemonicKeyOptions, JsonSchema, CompiledValidator } from "./index";
+import type {
+    Codec,
+    MnemonicProviderOptions,
+    UseMnemonicKeyOptions,
+    UseMnemonicRecoveryOptions,
+    MnemonicRecoveryEvent,
+    JsonSchema,
+    CompiledValidator,
+} from "./index";
 
 describe("Public API exports", () => {
     it("exports MnemonicProvider", () => {
@@ -23,6 +32,11 @@ describe("Public API exports", () => {
     it("exports useMnemonicKey", () => {
         expect(useMnemonicKey).toBeDefined();
         expect(typeof useMnemonicKey).toBe("function");
+    });
+
+    it("exports useMnemonicRecovery", () => {
+        expect(useMnemonicRecovery).toBeDefined();
+        expect(typeof useMnemonicRecovery).toBe("function");
     });
 
     it("exports JSONCodec", () => {
@@ -89,6 +103,20 @@ describe("Public API exports", () => {
             defaultValue: "hello",
         };
         expect(opts.defaultValue).toBe("hello");
+    });
+
+    it("type exports are usable (UseMnemonicRecoveryOptions)", () => {
+        const options: UseMnemonicRecoveryOptions = {
+            onRecover: (event: MnemonicRecoveryEvent) => {
+                expect(event.namespace).toBe("test");
+            },
+        };
+
+        options.onRecover?.({
+            action: "clear-all",
+            namespace: "test",
+            clearedKeys: ["theme"],
+        });
     });
 
     it("type exports are usable (JsonSchema)", () => {

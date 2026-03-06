@@ -718,6 +718,15 @@ export type Mnemonic = {
     prefix: string;
 
     /**
+     * Whether the active storage backend can enumerate keys in this namespace.
+     *
+     * This is `true` for `localStorage`-like backends that implement both
+     * `length` and `key(index)`. Namespace-wide recovery helpers rely on this
+     * capability unless the caller supplies an explicit key list.
+     */
+    canEnumerateKeys: boolean;
+
+    /**
      * Subscribe to changes for a specific key.
      *
      * Follows the React external store subscription contract. The listener
@@ -806,6 +815,94 @@ export type Mnemonic = {
      */
     schemaRegistry?: SchemaRegistry;
 };
+
+/**
+ * Recovery action names emitted by {@link useMnemonicRecovery}.
+ */
+export type MnemonicRecoveryAction = "clear-all" | "clear-keys" | "clear-matching";
+
+/**
+ * Recovery event payload emitted after a namespace recovery action completes.
+ */
+export interface MnemonicRecoveryEvent {
+    /**
+     * Recovery action that just ran.
+     */
+    action: MnemonicRecoveryAction;
+
+    /**
+     * Namespace where the recovery action ran.
+     */
+    namespace: string;
+
+    /**
+     * Unprefixed keys cleared by the action.
+     */
+    clearedKeys: string[];
+}
+
+/**
+ * Options for {@link useMnemonicRecovery}.
+ */
+export interface UseMnemonicRecoveryOptions {
+    /**
+     * Optional callback invoked after a recovery action completes.
+     *
+     * Useful for analytics, audit trails, support diagnostics, or user-facing
+     * confirmation toasts.
+     */
+    onRecover?: (event: MnemonicRecoveryEvent) => void;
+}
+
+/**
+ * Namespace-scoped recovery helpers returned by {@link useMnemonicRecovery}.
+ *
+ * These helpers operate on the current provider namespace and are intended for
+ * user-facing recovery UX such as "reset app data" or "clear stale filters".
+ */
+export interface MnemonicRecoveryHook {
+    /**
+     * Current provider namespace without the trailing storage prefix dot.
+     */
+    namespace: string;
+
+    /**
+     * Whether namespace keys can be enumerated automatically.
+     *
+     * `clearAll()` and `clearMatching()` require this to be `true`. If it is
+     * `false`, prefer `clearKeys([...])` with an explicit durable-key list.
+     */
+    canEnumerateKeys: boolean;
+
+    /**
+     * Lists all unprefixed keys currently visible in this namespace.
+     *
+     * Returns an empty array when no keys exist or when the storage backend
+     * cannot enumerate keys.
+     */
+    listKeys: () => string[];
+
+    /**
+     * Clears every key in the current namespace.
+     *
+     * @throws {Error} When the storage backend cannot enumerate namespace keys
+     */
+    clearAll: () => string[];
+
+    /**
+     * Clears a specific set of unprefixed keys in the current namespace.
+     *
+     * Duplicate keys are ignored.
+     */
+    clearKeys: (keys: readonly string[]) => string[];
+
+    /**
+     * Clears namespace keys whose names match the supplied predicate.
+     *
+     * @throws {Error} When the storage backend cannot enumerate namespace keys
+     */
+    clearMatching: (predicate: (key: string) => boolean) => string[];
+}
 
 /**
  * Configuration options for the useMnemonicKey hook.

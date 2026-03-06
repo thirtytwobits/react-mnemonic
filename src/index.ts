@@ -3,18 +3,23 @@
 
 export { MnemonicProvider, MnemonicProviderProps } from "./Mnemonic/provider";
 export { useMnemonicKey } from "./Mnemonic/use";
+export { useMnemonicRecovery } from "./Mnemonic/recovery";
 export { JSONCodec, createCodec, CodecError } from "./Mnemonic/codecs";
 export { SchemaError } from "./Mnemonic/schema";
 export { validateJsonSchema, compileSchema } from "./Mnemonic/json-schema";
 export { findNodeById, insertChildIfMissing, renameNode, dedupeChildrenBy } from "./Mnemonic/structural-migrations";
 export type { JsonSchema, JsonSchemaType, JsonSchemaValidationError, CompiledValidator } from "./Mnemonic/json-schema";
-export type { StructuralTreeHelpers } from "./Mnemonic/structural-migrations";
+export type { StructuralNode, StructuralTreeHelpers } from "./Mnemonic/structural-migrations";
 export type {
     Codec,
     Listener,
     Mnemonic,
+    MnemonicRecoveryAction,
+    MnemonicRecoveryEvent,
+    MnemonicRecoveryHook,
     MnemonicProviderOptions,
     UseMnemonicKeyOptions,
+    UseMnemonicRecoveryOptions,
     ReconcileContext,
     StorageLike,
     SchemaMode,
