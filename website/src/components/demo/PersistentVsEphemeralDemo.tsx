@@ -177,7 +177,8 @@ function GoodSplitCard() {
                 <span className="demo-split-pill demo-split-pill--success">Intentional reloads</span>
             </div>
             <p className="demo-muted">
-                Durable preferences stay in <code>useMnemonicKey</code>, while runtime-only UI fields stay in plain React state.
+                Durable preferences stay in <code>useMnemonicKey</code>, while runtime-only UI fields stay in plain
+                React state.
             </p>
 
             <div className="demo-form">
