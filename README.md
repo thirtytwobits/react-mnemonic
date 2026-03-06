@@ -91,6 +91,13 @@ export default function App() {
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
 
+Persist only the durable slice of your app state. `useMnemonicKey` stores
+whatever you pass to `set`, so keep transient UI state like loading flags,
+hover state, and draft search text in plain React state unless you explicitly
+want them to rehydrate after reload. See the
+[Persisted vs Ephemeral State guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/persisted-vs-ephemeral-state)
+for patterns and an interactive example.
+
 ## API
 
 ### `<MnemonicProvider>`

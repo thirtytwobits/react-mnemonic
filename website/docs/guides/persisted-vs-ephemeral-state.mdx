@@ -1,0 +1,148 @@
+---
+sidebar_position: 6
+title: Persisted vs Ephemeral State
+description: Avoid rehydrating transient UI state by persisting only durable slices.
+---
+
+import { PersistentVsEphemeralDemo } from "@site/src/components/demo/PersistentVsEphemeralDemo";
+
+# Persisted vs Ephemeral State
+
+`useMnemonicKey` will persist whatever you pass to `set`. That is powerful, but
+it also means complex UI modules can accidentally store runtime-only state that
+should have disappeared after a reload. Persist only the values you want to survive 
+reload and restore intentionally. If rehydrating a field would feel surprising, it
+should probably stay ephemeral.
+
+## The anti-pattern
+
+The most common mistake is storing one big UI object that mixes durable
+preferences with transient runtime details:
+
+```tsx
+const { value, set } = useMnemonicKey("inbox-ui", {
+    defaultValue: {
+        theme: "dark",
+        density: "comfortable",
+        sidebarOpen: false,
+        searchDraft: "",
+        hoveredMessageId: null,
+    },
+});
+```
+
+That looks convenient, but now `sidebarOpen`, `searchDraft`, and
+`hoveredMessageId` can come back after a full reload.
+
+## Recommended pattern
+
+Persist the durable slice, and keep transient UI state in plain React state:
+
+```tsx
+type PersistedInboxPrefs = {
+    theme: "light" | "dark";
+    density: "comfortable" | "compact";
+};
+
+type EphemeralInboxUi = {
+    sidebarOpen: boolean;
+    searchDraft: string;
+    hoveredMessageId: string | null;
+};
+
+const { value: prefs, set: setPrefs } = useMnemonicKey<PersistedInboxPrefs>("inbox-prefs", {
+    defaultValue: {
+        theme: "dark",
+        density: "comfortable",
+    },
+});
+
+const [ui, setUi] = useState<EphemeralInboxUi>({
+    sidebarOpen: false,
+    searchDraft: "",
+    hoveredMessageId: null,
+});
+```
+
+This keeps reload behavior intentional:
+
+- `prefs.theme` rehydrates
+- `prefs.density` rehydrates
+- `ui.sidebarOpen` resets
+- `ui.searchDraft` resets
+- `ui.hoveredMessageId` resets
+
+## Helper pattern: `usePersistentSlice`
+
+This is an application-level helper built on top of `useMnemonicKey`. It is
+not exported by `react-mnemonic`, but it is a useful pattern when many screens
+need the same durable-vs-ephemeral split.
+
+```tsx
+function usePersistentSlice<Persisted extends object, Ephemeral extends object>(
+    key: string,
+    options: {
+        defaultPersistent: Persisted;
+        defaultEphemeral: Ephemeral;
+    },
+) {
+    const {
+        value: persisted,
+        set: setPersisted,
+        reset: resetPersisted,
+    } = useMnemonicKey<Persisted>(key, {
+        defaultValue: options.defaultPersistent,
+    });
+
+    const [ephemeral, setEphemeral] = useState<Ephemeral>(options.defaultEphemeral);
+
+    const updatePersisted = <K extends keyof Persisted>(field: K, value: Persisted[K]) => {
+        setPersisted((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const updateEphemeral = <K extends keyof Ephemeral>(field: K, value: Ephemeral[K]) => {
+        setEphemeral((prev) => ({ ...prev, [field]: value }));
+    };
+
+    return {
+        persisted,
+        ephemeral,
+        updatePersisted,
+        updateEphemeral,
+        resetPersisted,
+    };
+}
+```
+
+Use this when you want a small reusable convention in app code without turning
+every runtime detail into persisted state.
+
+## Fields that should usually stay ephemeral
+
+- Loading flags and optimistic mutation status
+- Validation errors and “is dirty” form metadata
+- Hovered, focused, expanded, dragged, or selected UI state
+- Sort previews, drag position, and in-progress gestures
+- Temporary search drafts and filters unless they are explicitly user preferences
+- Server response caches or “last fetched at” timestamps unless you intentionally want them restored
+
+## Interactive example
+
+Type into both panels below, toggle the sidebar, then reload the page.
+
+- In the anti-pattern panel, the transient fields come back because they were stored with the durable fields.
+- In the recommended panel, only the persisted preferences come back.
+
+<PersistentVsEphemeralDemo />
+
+## What to persist
+
+Good candidates for persistence:
+
+- Theme, density, and layout preferences
+- Saved filters that users expect to restore intentionally
+- User-authored drafts that should survive reload
+- Last selected account, workspace, or durable navigation context
+
+When in doubt, start narrow. Persist the smallest durable slice first, then add
+more only when rehydration is clearly desirable.

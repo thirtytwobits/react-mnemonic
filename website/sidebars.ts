@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
                 "guides/schema-modes",
                 "guides/json-schema-validation",
                 "guides/schema-migration",
+                "guides/persisted-vs-ephemeral-state",
                 "guides/custom-codecs",
                 "guides/custom-storage",
                 "guides/cross-tab-sync",
