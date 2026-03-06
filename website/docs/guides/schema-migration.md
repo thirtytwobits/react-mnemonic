@@ -13,80 +13,50 @@ changes that should apply after reading persisted data, use `reconcile`.
 ## Schema registry
 
 A schema registry stores versioned schemas for each key and resolves migration
-paths to upgrade stored data. Schemas are plain JSON (serializable); migrations
-are procedural functions.
+paths to upgrade stored data. For the common immutable case, use
+`createSchemaRegistry(...)` instead of hand-rolling the indexing boilerplate.
 
 ```tsx
 import {
+    createSchemaRegistry,
     MnemonicProvider,
     useMnemonicKey,
     insertChildIfMissing,
     renameNode,
     dedupeChildrenBy,
-    type SchemaRegistry,
     type KeySchema,
     type MigrationRule,
     type StructuralTreeHelpers,
 } from "react-mnemonic";
-
-const schemas = new Map<string, KeySchema>();
-const migrations: MigrationRule[] = [];
-
-const registry: SchemaRegistry = {
-    getSchema: (key, version) => schemas.get(`${key}:${version}`),
-    getLatestSchema: (key) =>
-        Array.from(schemas.values())
-            .filter((schema) => schema.key === key)
-            .sort((a, b) => b.version - a.version)[0],
-    getMigrationPath: (key, fromVersion, toVersion) => {
-        const byKey = migrations.filter((rule) => rule.key === key);
-        const path: MigrationRule[] = [];
-        let cur = fromVersion;
-        while (cur < toVersion) {
-            const next = byKey.find((rule) => rule.fromVersion === cur);
-            if (!next) return null;
-            path.push(next);
-            cur = next.toVersion;
-        }
-        return path;
-    },
-    getWriteMigration: (key, version) => {
-        return migrations.find((r) => r.key === key && r.fromVersion === version && r.toVersion === version);
-    },
-    registerSchema: (schema) => {
-        const id = `${schema.key}:${schema.version}`;
-        if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
-        schemas.set(id, schema);
-    },
-};
 ```
 
 ## Registering schemas
 
 ```ts
-registry.registerSchema({
-    key: "profile",
-    version: 1,
-    schema: {
-        type: "object",
-        properties: { name: { type: "string" }, email: { type: "string" } },
-        required: ["name", "email"],
-    },
-});
-
-registry.registerSchema({
-    key: "profile",
-    version: 2,
-    schema: {
-        type: "object",
-        properties: {
-            name: { type: "string" },
-            email: { type: "string" },
-            migratedAt: { type: "string" },
+const schemas: KeySchema[] = [
+    {
+        key: "profile",
+        version: 1,
+        schema: {
+            type: "object",
+            properties: { name: { type: "string" }, email: { type: "string" } },
+            required: ["name", "email"],
         },
-        required: ["name", "email", "migratedAt"],
     },
-});
+    {
+        key: "profile",
+        version: 2,
+        schema: {
+            type: "object",
+            properties: {
+                name: { type: "string" },
+                email: { type: "string" },
+                migratedAt: { type: "string" },
+            },
+            required: ["name", "email", "migratedAt"],
+        },
+    },
+];
 ```
 
 ## Adding migrations
@@ -94,19 +64,31 @@ registry.registerSchema({
 Migrations define how to transform data from one version to the next:
 
 ```ts
-migrations.push({
-    key: "profile",
-    fromVersion: 1,
-    toVersion: 2,
-    migrate: (value) => {
-        const v1 = value as { name: string; email: string };
-        return { ...v1, migratedAt: new Date().toISOString() };
+const migrations: MigrationRule[] = [
+    {
+        key: "profile",
+        fromVersion: 1,
+        toVersion: 2,
+        migrate: (value) => {
+            const v1 = value as { name: string; email: string };
+            return { ...v1, migratedAt: new Date().toISOString() };
+        },
     },
+];
+
+const registry = createSchemaRegistry({
+    schemas,
+    migrations,
 });
 ```
 
 When a component reads a v1 profile from storage, Mnemonic automatically runs
 the migration to produce a v2 value.
+
+`createSchemaRegistry` validates duplicate schemas and ambiguous migration
+graphs up front. If you need runtime schema registration for
+`schemaMode="autoschema"`, keep a custom mutable `SchemaRegistry`
+implementation instead of the immutable helper.
 
 ## Structural migration cookbook
 
@@ -121,7 +103,7 @@ type LayoutNode = {
     children?: LayoutNode[];
 };
 
-migrations.push({
+const layoutMigration: MigrationRule = {
     key: "layout",
     fromVersion: 2,
     toVersion: 3,
@@ -139,7 +121,7 @@ migrations.push({
             (node) => node.id,
         );
     },
-});
+};
 ```
 
 The helper composition above is idempotent:
@@ -147,6 +129,9 @@ The helper composition above is idempotent:
 - `insertChildIfMissing` appends the child only once
 - `renameNode` renames only when the source id exists and the target id is unused
 - `dedupeChildrenBy` removes duplicate sibling ids while keeping the first match
+
+If you want that layout rule included in the immutable registry, add it before
+calling `createSchemaRegistry({ schemas, migrations: [...] })`.
 
 If your tree shape uses fields other than `id` and `children`, provide a custom
 adapter:

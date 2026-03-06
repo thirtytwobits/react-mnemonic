@@ -54,6 +54,7 @@ storage — the nominal "first visit" path. No error occurred.
 | `WRITE_SCHEMA_REQUIRED`        | Strict-mode writes require a schema, but none could be resolved  |
 | `MIGRATION_PATH_NOT_FOUND`     | No contiguous migration path exists to the latest schema         |
 | `MIGRATION_FAILED`             | A migration or write-time normalizer threw                       |
+| `MIGRATION_GRAPH_INVALID`      | A schema registry helper was created with an invalid graph       |
 | `RECONCILE_FAILED`             | A `reconcile` hook threw or returned an unpersistable value      |
 | `SCHEMA_REGISTRATION_CONFLICT` | A schema registration conflicted with an existing definition     |
 | `TYPE_MISMATCH`                | The decoded value failed JSON Schema validation                  |

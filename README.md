@@ -416,81 +416,67 @@ for a cookbook example and custom adapter usage.
 ### Example schema registry
 
 A schema registry stores versioned schemas for each key, and resolves migration
-paths to upgrade stored data. Schemas are plain JSON (serializable); migrations
-are procedural functions.
+paths to upgrade stored data. For the common immutable case, use
+`createSchemaRegistry(...)` instead of hand-rolling the indexing boilerplate.
 
 ```tsx
 import {
+    createSchemaRegistry,
     MnemonicProvider,
     useMnemonicKey,
-    type SchemaRegistry,
     type KeySchema,
     type MigrationRule,
 } from "react-mnemonic";
 
-const schemas = new Map<string, KeySchema>();
-const migrations: MigrationRule[] = [];
-
-const registry: SchemaRegistry = {
-    getSchema: (key, version) => schemas.get(`${key}:${version}`),
-    getLatestSchema: (key) =>
-        Array.from(schemas.values())
-            .filter((schema) => schema.key === key)
-            .sort((a, b) => b.version - a.version)[0],
-    getMigrationPath: (key, fromVersion, toVersion) => {
-        const byKey = migrations.filter((rule) => rule.key === key);
-        const path: MigrationRule[] = [];
-        let cur = fromVersion;
-        while (cur < toVersion) {
-            const next = byKey.find((rule) => rule.fromVersion === cur);
-            if (!next) return null;
-            path.push(next);
-            cur = next.toVersion;
-        }
-        return path;
-    },
-    getWriteMigration: (key, version) => {
-        return migrations.find((r) => r.key === key && r.fromVersion === version && r.toVersion === version);
-    },
-    registerSchema: (schema) => {
-        const id = `${schema.key}:${schema.version}`;
-        if (schemas.has(id)) throw new Error(`Schema already registered for ${id}`);
-        schemas.set(id, schema);
-    },
-};
-
-registry.registerSchema({
-    key: "profile",
-    version: 1,
-    schema: {
-        type: "object",
-        properties: { name: { type: "string" }, email: { type: "string" } },
-        required: ["name", "email"],
-    },
-});
-
-migrations.push({
-    key: "profile",
-    fromVersion: 1,
-    toVersion: 2,
-    migrate: (value) => {
-        const v1 = value as { name: string; email: string };
-        return { ...v1, migratedAt: new Date().toISOString() };
-    },
-});
-
-registry.registerSchema({
-    key: "profile",
-    version: 2,
-    schema: {
-        type: "object",
-        properties: {
-            name: { type: "string" },
-            email: { type: "string" },
-            migratedAt: { type: "string" },
+const schemas: KeySchema[] = [
+    {
+        key: "profile",
+        version: 1,
+        schema: {
+            type: "object",
+            properties: { name: { type: "string" }, email: { type: "string" } },
+            required: ["name", "email"],
         },
-        required: ["name", "email", "migratedAt"],
     },
+    {
+        key: "profile",
+        version: 2,
+        schema: {
+            type: "object",
+            properties: {
+                name: { type: "string" },
+                email: { type: "string" },
+                migratedAt: { type: "string" },
+            },
+            required: ["name", "email", "migratedAt"],
+        },
+    },
+];
+
+const migrations: MigrationRule[] = [
+    {
+        key: "profile",
+        fromVersion: 1,
+        toVersion: 2,
+        migrate: (value) => {
+            const v1 = value as { name: string; email: string };
+            return { ...v1, migratedAt: new Date().toISOString() };
+        },
+    },
+    {
+        key: "profile",
+        fromVersion: 2,
+        toVersion: 2,
+        migrate: (value) => {
+            const profile = value as { name: string; email: string; migratedAt: string };
+            return { ...profile, email: profile.email.trim().toLowerCase() };
+        },
+    },
+];
+
+const registry = createSchemaRegistry({
+    schemas,
+    migrations,
 });
 
 function ProfileEditor() {
@@ -504,6 +490,11 @@ function ProfileEditor() {
     <ProfileEditor />
 </MnemonicProvider>;
 ```
+
+`createSchemaRegistry` validates duplicate schemas and ambiguous migration
+graphs up front. If you need runtime schema registration for
+`schemaMode="autoschema"`, keep a custom mutable `SchemaRegistry`
+implementation.
 
 ### Registry immutability
 
