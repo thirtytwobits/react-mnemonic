@@ -19,7 +19,7 @@ function ClearableNullableFieldDemoInner() {
         displayName === null
             ? "Persisted null (clear intent survives reload)"
             : displayName === defaultDisplayName
-              ? "Default value is active"
+              ? "Value equals default"
               : "Custom value is active";
 
     return (
@@ -27,7 +27,9 @@ function ClearableNullableFieldDemoInner() {
             <div className="demo-split-card">
                 <div className="demo-split-card__header">
                     <h3>Clearable persisted field</h3>
-                    <span className="demo-split-pill demo-split-pill--success">`null` stays cleared</span>
+                    <span className="demo-split-pill demo-split-pill--success">
+                        <code>null</code> stays cleared
+                    </span>
                 </div>
                 <p className="demo-muted">
                     This field persists <code>string | null</code>. Empty input is normalized to <code>null</code>,
@@ -43,7 +45,7 @@ function ClearableNullableFieldDemoInner() {
                             value={displayName ?? ""}
                             onChange={(e) => {
                                 const nextValue = e.target.value.trim();
-                                set(nextValue === "" ? null : e.target.value);
+                                set(nextValue === "" ? null : nextValue);
                             }}
                             placeholder="Type a name or clear the field"
                         />

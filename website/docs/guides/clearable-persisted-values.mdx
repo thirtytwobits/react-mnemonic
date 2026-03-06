@@ -60,7 +60,7 @@ function DisplayNameField() {
                 value={displayName ?? ""}
                 onChange={(e) => {
                     const nextValue = e.target.value.trim();
-                    set(nextValue === "" ? null : e.target.value);
+                    set(nextValue === "" ? null : nextValue);
                 }}
             />
 
@@ -76,7 +76,7 @@ The important part is the normalization step:
 
 ```ts
 const nextValue = e.target.value.trim();
-set(nextValue === "" ? null : e.target.value);
+set(nextValue === "" ? null : nextValue);
 ```
 
 That turns "empty user input" into "persisted clear intent".
