@@ -42,7 +42,7 @@
         },
         "serve-handler": {
             ".": "^6.1.7",
-            "minimatch": "3.1.4"
+            "minimatch": "3.1.5"
         }
     },
     "browserslist": {
@@ -58,6 +58,6 @@
         ]
     },
     "engines": {
-        "node": ">=18.0"
+        "node": ">=20.0"
     }
 }

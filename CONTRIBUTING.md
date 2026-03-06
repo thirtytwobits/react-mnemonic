@@ -7,7 +7,7 @@ workflow, project layout, and conventions you'll need to get started.
 
 ## Prerequisites
 
-- **Node.js** >= 18
+- **Node.js** >= 18 for library work, **Node.js** >= 20 for the docs site
 - **npm** (ships with Node)
 - A modern browser for running the documentation site locally
 

@@ -533,7 +533,7 @@ Enable the console inspector in development:
 Then in the browser console:
 
 ```js
-const app = __REACT_MNEMONIC_DEVTOOLS__.resolve("app");
+const app = window.__REACT_MNEMONIC_DEVTOOLS__?.resolve("app");
 
 app?.dump(); // table of all keys
 app?.get("theme"); // read a decoded value
