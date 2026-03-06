@@ -20,9 +20,13 @@ are procedural functions.
 import {
     MnemonicProvider,
     useMnemonicKey,
+    insertChildIfMissing,
+    renameNode,
+    dedupeChildrenBy,
     type SchemaRegistry,
     type KeySchema,
     type MigrationRule,
+    type StructuralTreeHelpers,
 } from "react-mnemonic";
 
 const schemas = new Map<string, KeySchema>();
@@ -103,6 +107,66 @@ migrations.push({
 
 When a component reads a v1 profile from storage, Mnemonic automatically runs
 the migration to produce a v2 value.
+
+## Structural migration cookbook
+
+For layout-like data, repeated migration steps often boil down to the same
+patterns: find a node, insert a child once, rename an id, and dedupe siblings.
+Mnemonic ships optional helpers for these common idempotent edits.
+
+```ts
+type LayoutNode = {
+    id: string;
+    title: string;
+    children?: LayoutNode[];
+};
+
+migrations.push({
+    key: "layout",
+    fromVersion: 2,
+    toVersion: 3,
+    migrate: (value) => {
+        const layout = value as LayoutNode;
+        return dedupeChildrenBy(
+            renameNode(
+                insertChildIfMissing(layout, "sidebar", {
+                    id: "search",
+                    title: "Search",
+                }),
+                "prefs",
+                "preferences",
+            ),
+            (node) => node.id,
+        );
+    },
+});
+```
+
+The helper composition above is idempotent:
+
+- `insertChildIfMissing` appends the child only once
+- `renameNode` renames only when the source id exists and the target id is unused
+- `dedupeChildrenBy` removes duplicate sibling ids while keeping the first match
+
+If your tree shape uses fields other than `id` and `children`, provide a custom
+adapter:
+
+```ts
+type WidgetNode = {
+    key: string;
+    label: string;
+    nodes?: WidgetNode[];
+};
+
+const widgetTree: StructuralTreeHelpers<WidgetNode> = {
+    getId: (node) => node.key,
+    getChildren: (node) => node.nodes,
+    withChildren: (node, children) => ({ ...node, nodes: children }),
+    withId: (node, id) => ({ ...node, key: id }),
+};
+
+const migrated = renameNode(oldTree, "prefs", "preferences", widgetTree);
+```
 
 ## Reconciliation vs. migration
 
