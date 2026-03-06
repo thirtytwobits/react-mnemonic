@@ -37,6 +37,10 @@ export default function App() {
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
 
+Persist only values you want to restore intentionally. Runtime-only UI state
+like loading flags, open panels, and draft search text should usually stay in
+plain React state instead of the persisted key.
+
 ## How it works
 
 1. **`<MnemonicProvider>`** creates a namespaced storage scope. All keys written
@@ -68,6 +72,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 - [Schema Modes](/docs/guides/schema-modes) — add validation and versioning
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
+- [Persisted vs Ephemeral State](/docs/guides/persisted-vs-ephemeral-state) — keep durable preferences and runtime-only UI state separate
 - [Custom Codecs](/docs/guides/custom-codecs) — serialize `Date`, `Set`, `Map`, etc.
 - [Cross-Tab Sync](/docs/guides/cross-tab-sync) — keep tabs in sync
 - [API Reference](/docs/api) — full TypeDoc-generated API docs

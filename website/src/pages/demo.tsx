@@ -12,6 +12,7 @@ import "../css/demo.css";
 function DemoContent() {
     const { ResizablePanel } = require("../components/demo/ResizablePanel");
     const { PersistedForm } = require("../components/demo/PersistedForm");
+    const { PersistentVsEphemeralDemo } = require("../components/demo/PersistentVsEphemeralDemo");
     const { ShoppingCart } = require("../components/demo/ShoppingCart");
     const { SchemaPlayground } = require("../components/demo/SchemaPlayground");
 
@@ -31,6 +32,15 @@ function DemoContent() {
                     All field values persisted with <code>JSONCodec</code>. Try refreshing the page.
                 </p>
                 <PersistedForm />
+            </section>
+
+            <section className="demo-section">
+                <h2>Persistent vs Ephemeral State</h2>
+                <p>
+                    Compare an over-persisted UI object with a split-state pattern that keeps only durable preferences
+                    in storage.
+                </p>
+                <PersistentVsEphemeralDemo />
             </section>
 
             <section className="demo-section">
