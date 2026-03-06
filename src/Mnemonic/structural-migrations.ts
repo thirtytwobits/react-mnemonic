@@ -68,9 +68,9 @@ export function findNodeById<T>(root: T, id: string, helpers?: StructuralTreeHel
 }
 
 /**
- * Inserts a child under the target parent when no existing child shares the
- * same id. Returns the original tree when the parent is missing or the child is
- * already present.
+ * Inserts a child under the target parent when none of that parent's existing
+ * direct children share the same id. Returns the original tree when the parent
+ * is missing or the child is already present as a direct child.
  *
  * @template T - Tree node type
  * @param root - Root node to update
