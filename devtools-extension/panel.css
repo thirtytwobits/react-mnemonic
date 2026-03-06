@@ -199,6 +199,6 @@ body {
 
 .logo {
     display: block;
-    border-radius: 4px;
     box-sizing: border-box;
+    flex: 0 0 auto;
 }
