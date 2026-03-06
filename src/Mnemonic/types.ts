@@ -303,7 +303,8 @@ export interface MnemonicDevToolsMeta {
 /**
  * Global devtools registry contract available on window.
  *
- * This is registry-only. Direct namespace access
+ * This is an advanced public API used by the browser console integration and
+ * extension tooling. Direct namespace access
  * (`window.__REACT_MNEMONIC_DEVTOOLS__.myNamespace`) is not part of the
  * public API.
  */
@@ -721,11 +722,11 @@ export type Unsubscribe = () => void;
 export type Listener = () => void;
 
 /**
- * Internal Mnemonic store API provided via React Context.
+ * Low-level Mnemonic store API provided via React Context.
  *
- * This is the low-level storage interface that powers the MnemonicProvider.
- * Consumer code typically uses `useMnemonicKey` instead of calling these
- * methods directly.
+ * This interface powers `MnemonicProvider` internally and is also exposed to
+ * advanced consumers through `MnemonicDevToolsProviderApi.getStore()`. Typical
+ * application code should still prefer `useMnemonicKey`.
  *
  * All keys passed to these methods should be **unprefixed**. The store
  * automatically applies the namespace prefix internally.

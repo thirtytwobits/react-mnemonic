@@ -11,12 +11,16 @@ description: Install react-mnemonic and its peer dependencies.
 Install the npm package:
 
 ```bash npm2yarn
-npm install react-mnemonic
+npm install react-mnemonic@beta
 ```
+
+The current `1.0.0` release line is being published to the npm `beta` dist-tag
+until final release hardening is complete.
 
 ## Peer dependencies
 
-React 18 or later is required.
+React 18 or later is required. CI verifies packaged-consumer installs against
+React 18 and React 19.
 
 ```json
 {

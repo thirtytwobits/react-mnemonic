@@ -9,11 +9,14 @@ on:
 jobs:
     build-test:
         runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: [18, 20]
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
               with:
-                  node-version: 20
+                  node-version: ${{ matrix.node-version }}
                   cache: npm
             - run: npm ci
             - run: npm run lint
@@ -21,12 +24,34 @@ jobs:
             - run: npm run build
             - run: npm run test
 
+    docs-build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+            - run: npm ci
+            - run: npm run build
+            - run: npm --prefix website ci
+            - run: npm run docs
+            - run: npm run docs:site
+
     pack-install:
-        needs: build-test
+        needs: [build-test, docs-build]
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                pm: [npm, yarn, pnpm]
+                include:
+                    - pm: npm
+                      react-version: 18.3.1
+                    - pm: npm
+                      react-version: 19.2.4
+                    - pm: yarn
+                      react-version: 18.3.1
+                    - pm: pnpm
+                      react-version: 18.3.1
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
@@ -52,30 +77,115 @@ jobs:
                     "private": true,
                     "type": "module",
                     "dependencies": {
-                      "react": "^18.3.1",
-                      "react-dom": "^18.3.1"
+                      "react": "^${{ matrix.react-version }}",
+                      "react-dom": "^${{ matrix.react-version }}"
                     }
                   }
                   EOF
 
                   cat > test-esm.mjs << 'EOF'
-                  import { MnemonicProvider, useMnemonicKey, createCodec, JSONCodec, validateJsonSchema, compileSchema, CodecError, SchemaError } from "react-mnemonic";
-                  const fns = [MnemonicProvider, useMnemonicKey, createCodec, JSONCodec, validateJsonSchema, compileSchema, CodecError, SchemaError];
+                  import {
+                    MnemonicProvider,
+                    useMnemonicKey,
+                    useMnemonicRecovery,
+                    createSchemaRegistry,
+                    createCodec,
+                    JSONCodec,
+                    validateJsonSchema,
+                    compileSchema,
+                    CodecError,
+                    SchemaError,
+                    findNodeById,
+                    insertChildIfMissing,
+                    renameNode,
+                    dedupeChildrenBy
+                  } from "react-mnemonic";
+                  const fns = [
+                    MnemonicProvider,
+                    useMnemonicKey,
+                    useMnemonicRecovery,
+                    createSchemaRegistry,
+                    createCodec,
+                    JSONCodec,
+                    validateJsonSchema,
+                    compileSchema,
+                    CodecError,
+                    SchemaError,
+                    findNodeById,
+                    insertChildIfMissing,
+                    renameNode,
+                    dedupeChildrenBy
+                  ];
                   if (fns.some(f => f === undefined)) { console.error("ESM: missing export"); process.exit(1); }
+                  const registry = createSchemaRegistry({ schemas: [], migrations: [] });
+                  if (registry.getLatestSchema("profile") !== undefined) { console.error("ESM: registry smoke failed"); process.exit(1); }
+                  const tree = { id: "root", children: [{ id: "child" }] };
+                  if (findNodeById(tree, "child")?.id !== "child") { console.error("ESM: structural helper smoke failed"); process.exit(1); }
                   console.log("ESM imports OK —", fns.length, "exports verified");
                   EOF
 
                   cat > test-cjs.cjs << 'EOF'
                   const m = require("react-mnemonic");
-                  const keys = ["MnemonicProvider","useMnemonicKey","createCodec","JSONCodec","validateJsonSchema","compileSchema","CodecError","SchemaError"];
+                  const keys = [
+                    "MnemonicProvider",
+                    "useMnemonicKey",
+                    "useMnemonicRecovery",
+                    "createSchemaRegistry",
+                    "createCodec",
+                    "JSONCodec",
+                    "validateJsonSchema",
+                    "compileSchema",
+                    "CodecError",
+                    "SchemaError",
+                    "findNodeById",
+                    "insertChildIfMissing",
+                    "renameNode",
+                    "dedupeChildrenBy"
+                  ];
                   const missing = keys.filter(k => m[k] === undefined);
                   if (missing.length) { console.error("CJS: missing exports:", missing); process.exit(1); }
                   console.log("CJS requires OK —", keys.length, "exports verified");
                   EOF
 
                   cat > test-types.ts << 'EOF'
-                  import type { Codec, StorageLike, MnemonicProviderOptions, UseMnemonicKeyOptions, KeySchema, MigrationRule, SchemaRegistry, SchemaMode, JsonSchema, CompiledValidator } from "react-mnemonic";
-                  const _check: Codec<string> | StorageLike | MnemonicProviderOptions | UseMnemonicKeyOptions<string> | KeySchema | MigrationRule | SchemaRegistry | SchemaMode | JsonSchema | CompiledValidator | null = null;
+                  import type {
+                    Codec,
+                    StorageLike,
+                    MnemonicProviderOptions,
+                    UseMnemonicKeyOptions,
+                    UseMnemonicRecoveryOptions,
+                    ReconcileContext,
+                    CreateSchemaRegistryOptions,
+                    KeySchema,
+                    MigrationRule,
+                    SchemaRegistry,
+                    SchemaMode,
+                    JsonSchema,
+                    CompiledValidator,
+                    StructuralNode,
+                    StructuralTreeHelpers,
+                    Mnemonic,
+                    MnemonicDevToolsRegistry
+                  } from "react-mnemonic";
+                  const _check:
+                    | Codec<string>
+                    | StorageLike
+                    | MnemonicProviderOptions
+                    | UseMnemonicKeyOptions<string>
+                    | UseMnemonicRecoveryOptions
+                    | ReconcileContext
+                    | CreateSchemaRegistryOptions
+                    | KeySchema
+                    | MigrationRule
+                    | SchemaRegistry
+                    | SchemaMode
+                    | JsonSchema
+                    | CompiledValidator
+                    | StructuralNode<{ id: string }>
+                    | StructuralTreeHelpers<{ id: string }>
+                    | Mnemonic
+                    | MnemonicDevToolsRegistry
+                    | null = null;
                   console.log("Types OK");
                   EOF
 
