@@ -12,6 +12,7 @@ import "../css/demo.css";
 function DemoContent() {
     const { ResizablePanel } = require("../components/demo/ResizablePanel");
     const { PersistedForm } = require("../components/demo/PersistedForm");
+    const { ClearableNullableFieldDemo } = require("../components/demo/ClearableNullableFieldDemo");
     const { PersistentVsEphemeralDemo } = require("../components/demo/PersistentVsEphemeralDemo");
     const { ShoppingCart } = require("../components/demo/ShoppingCart");
     const { SchemaPlayground } = require("../components/demo/SchemaPlayground");
@@ -41,6 +42,15 @@ function DemoContent() {
                     in storage.
                 </p>
                 <PersistentVsEphemeralDemo />
+            </section>
+
+            <section className="demo-section">
+                <h2>Clearable Nullable Field</h2>
+                <p>
+                    Compare explicit nullable clear intent with <code>remove()</code> and <code>reset()</code>. Try
+                    clearing the field, then reload the page.
+                </p>
+                <ClearableNullableFieldDemo />
             </section>
 
             <section className="demo-section">
