@@ -482,8 +482,8 @@ export interface CreateSchemaRegistryOptions {
      *
      * Write-time normalizers (`fromVersion === toVersion`) are indexed
      * separately from read-time migration edges. Ambiguous outgoing edges,
-     * backward migrations, duplicate write normalizers, and cycles are
-     * rejected up front with `SchemaError("MIGRATION_GRAPH_INVALID")`.
+     * backward migrations, and duplicate write normalizers are rejected up
+     * front with `SchemaError("MIGRATION_GRAPH_INVALID")`.
      */
     migrations?: readonly MigrationRule[];
 }

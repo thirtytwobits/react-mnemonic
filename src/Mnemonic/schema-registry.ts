@@ -18,35 +18,6 @@ function validateVersion(value: number, label: string): void {
     }
 }
 
-function detectCycles(migrationsByKeyAndFromVersion: Map<string, MigrationRule>): void {
-    const seenRoots = new Set<string>();
-
-    for (const rule of migrationsByKeyAndFromVersion.values()) {
-        const rootKey = migrationVersionKey(rule.key, rule.fromVersion);
-        if (seenRoots.has(rootKey)) continue;
-
-        const visited = new Set<number>();
-        let currentVersion = rule.fromVersion;
-
-        while (true) {
-            if (visited.has(currentVersion)) {
-                throw new SchemaError(
-                    "MIGRATION_GRAPH_INVALID",
-                    `Migration graph for key "${rule.key}" contains a cycle at version ${currentVersion}`,
-                );
-            }
-
-            visited.add(currentVersion);
-            seenRoots.add(migrationVersionKey(rule.key, currentVersion));
-
-            const next = migrationsByKeyAndFromVersion.get(migrationVersionKey(rule.key, currentVersion));
-            if (!next) break;
-
-            currentVersion = next.toVersion;
-        }
-    }
-}
-
 /**
  * Create an immutable schema registry for common default/strict-mode setups.
  *
@@ -123,9 +94,6 @@ export function createSchemaRegistry(options: CreateSchemaRegistryOptions = {}):
 
         migrationsByKeyAndFromVersion.set(edgeKey, migration);
     }
-
-    detectCycles(migrationsByKeyAndFromVersion);
-
     return {
         getSchema(key, version) {
             return schemasByKeyAndVersion.get(schemaVersionKey(key, version));
@@ -139,14 +107,8 @@ export function createSchemaRegistry(options: CreateSchemaRegistryOptions = {}):
 
             const path: MigrationRule[] = [];
             let currentVersion = fromVersion;
-            const visited = new Set<number>();
 
             while (currentVersion < toVersion) {
-                if (visited.has(currentVersion)) {
-                    return null;
-                }
-                visited.add(currentVersion);
-
                 const next = migrationsByKeyAndFromVersion.get(migrationVersionKey(key, currentVersion));
                 if (!next) return null;
 

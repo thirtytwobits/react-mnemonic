@@ -101,8 +101,8 @@ interface SchemaRegistry {
     getSchema(key: string, version: number): KeySchema | undefined;
     getLatestSchema(key: string): KeySchema | undefined;
     getMigrationPath(key: string, from: number, to: number): MigrationRule[] | null;
-    getWriteMigration(key: string, version: number): MigrationRule | undefined;
-    registerSchema(schema: KeySchema): void;
+    getWriteMigration?(key: string, version: number): MigrationRule | undefined;
+    registerSchema?(schema: KeySchema): void;
 }
 ```
 

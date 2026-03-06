@@ -179,7 +179,7 @@ describe("createSchemaRegistry", () => {
         );
     });
 
-    it("throws MIGRATION_GRAPH_INVALID for cycles", () => {
+    it("throws MIGRATION_GRAPH_INVALID for backward migrations", () => {
         expect(() =>
             createSchemaRegistry({
                 schemas: [profileV1, profileV2, profileV4],

@@ -28,9 +28,6 @@ import {
     type MigrationRule,
     type StructuralTreeHelpers,
 } from "react-mnemonic";
-
-const schemas: KeySchema[] = [];
-const migrations: MigrationRule[] = [];
 ```
 
 ## Registering schemas
@@ -106,7 +103,7 @@ type LayoutNode = {
     children?: LayoutNode[];
 };
 
-migrations.push({
+const layoutMigration: MigrationRule = {
     key: "layout",
     fromVersion: 2,
     toVersion: 3,
@@ -124,7 +121,7 @@ migrations.push({
             (node) => node.id,
         );
     },
-});
+};
 ```
 
 The helper composition above is idempotent:
@@ -132,6 +129,9 @@ The helper composition above is idempotent:
 - `insertChildIfMissing` appends the child only once
 - `renameNode` renames only when the source id exists and the target id is unused
 - `dedupeChildrenBy` removes duplicate sibling ids while keeping the first match
+
+If you want that layout rule included in the immutable registry, add it before
+calling `createSchemaRegistry({ schemas, migrations: [...] })`.
 
 If your tree shape uses fields other than `id` and `children`, provide a custom
 adapter:
