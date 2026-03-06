@@ -245,6 +245,34 @@ describe("MnemonicProvider – storage edge cases", () => {
         expect(store!.getRawSnapshot("k")).toBeNull();
     });
 
+    it("treats throwing enumeration capability getters as non-enumerable during initialization", () => {
+        const badStorage = {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+            get length() {
+                throw new DOMException("blocked", "SecurityError");
+            },
+            key: () => null,
+        } as unknown as StorageLike;
+
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+
+        expect(() =>
+            render(
+                <MnemonicProvider namespace="ns" storage={badStorage}>
+                    <StoreConsumer onStore={onStore} />
+                </MnemonicProvider>,
+            ),
+        ).not.toThrow();
+
+        expect(store!.canEnumerateKeys).toBe(false);
+        expect(store!.keys()).toEqual([]);
+    });
+
     it("handles storage.setItem throwing (quota exceeded)", () => {
         const storage = createMockStorage();
         storage.setItem = () => {
@@ -523,6 +551,42 @@ describe("MnemonicProvider – DOMException/SecurityError logging", () => {
         // Squelched
         store!.keys();
         expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
+    });
+
+    it("logs DOMException when enumeration getters fail after initialization", () => {
+        const storage = createMockStorage();
+        storage.store.set("ns.a", "1");
+
+        let keyAccessCount = 0;
+        Object.defineProperty(storage, "key", {
+            configurable: true,
+            get() {
+                keyAccessCount += 1;
+                if (keyAccessCount === 1) {
+                    return (index: number) => Array.from(storage.store.keys())[index] ?? null;
+                }
+                throw new DOMException("blocked", "SecurityError");
+            },
+        });
+
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        expect(store!.canEnumerateKeys).toBe(true);
+        expect(store!.keys()).toEqual([]);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]![0]).toContain("Storage access error (SecurityError)");
 
         spy.mockRestore();
     });

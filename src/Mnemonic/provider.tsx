@@ -263,7 +263,6 @@ export function MnemonicProvider({
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
-        const canEnumerateKeys = Boolean(st && typeof st.length === "number" && typeof st.key === "function");
 
         /**
          * In-memory cache of raw string values.
@@ -284,6 +283,17 @@ export function MnemonicProvider({
 
         /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
         let accessErrorLogged = false;
+
+        const detectEnumerableStorage = () => {
+            if (!st) return false;
+            try {
+                return typeof st.length === "number" && typeof st.key === "function";
+            } catch {
+                return false;
+            }
+        };
+
+        const canEnumerateKeys = detectEnumerableStorage();
 
         const isProductionRuntime = () => {
             const env = (globalThis as any)?.process?.env?.NODE_ENV;
@@ -573,11 +583,11 @@ export function MnemonicProvider({
          */
         const keys = () => {
             if (!canEnumerateKeys || !st) return [];
-            const storageLength = st.length;
-            const getStorageKey = st.key;
-            if (typeof storageLength !== "number" || typeof getStorageKey !== "function") return [];
             const out: string[] = [];
             try {
+                const storageLength = st.length;
+                const getStorageKey = st.key;
+                if (typeof storageLength !== "number" || typeof getStorageKey !== "function") return [];
                 for (let i = 0; i < storageLength; i++) {
                     const k = getStorageKey.call(st, i);
                     if (!k) continue;
