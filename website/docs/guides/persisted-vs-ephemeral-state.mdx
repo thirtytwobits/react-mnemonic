@@ -10,7 +10,7 @@ import { PersistentVsEphemeralDemo } from "@site/src/components/demo/PersistentV
 
 `useMnemonicKey` will persist whatever you pass to `set`. That is powerful, but
 it also means complex UI modules can accidentally store runtime-only state that
-should have disappeared after a reload. Persist only the values you want to survive 
+should have disappeared after a reload. Persist only the values you want to survive
 reload and restore intentionally. If rehydrating a field would feel surprising, it
 should probably stay ephemeral.
 
