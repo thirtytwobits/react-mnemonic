@@ -7,12 +7,6 @@ Persistent, type-safe state management for React.
 [![license](https://img.shields.io/npm/l/react-mnemonic.svg)](./LICENSE.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
-> **⚠️ Alpha Software** — This library is in active development. APIs may
-> change between releases without prior notice. Use in production at your own
-> risk.
-
----
-
 **react-mnemonic** gives your React components persistent memory. Values survive
 page refreshes, synchronize across tabs, and stay type-safe end-to-end -- all
 through a single hook that works like `useState`.
@@ -50,7 +44,8 @@ pnpm add react-mnemonic
 
 ### Peer dependencies
 
-React 18 or later is required.
+React 18 or later is required. CI verifies packaged-consumer installs against
+React 18 and React 19.
 
 ```json
 {
@@ -538,12 +533,14 @@ Enable the console inspector in development:
 Then in the browser console:
 
 ```js
-__REACT_MNEMONIC_DEVTOOLS__.app.dump(); // table of all keys
-__REACT_MNEMONIC_DEVTOOLS__.app.get("theme"); // read a decoded value
-__REACT_MNEMONIC_DEVTOOLS__.app.set("theme", "dark"); // write
-__REACT_MNEMONIC_DEVTOOLS__.app.remove("theme"); // delete
-__REACT_MNEMONIC_DEVTOOLS__.app.keys(); // list all keys
-__REACT_MNEMONIC_DEVTOOLS__.app.clear(); // remove all keys
+const app = __REACT_MNEMONIC_DEVTOOLS__.resolve("app");
+
+app?.dump(); // table of all keys
+app?.get("theme"); // read a decoded value
+app?.set("theme", "dark"); // write
+app?.remove("theme"); // delete
+app?.keys(); // list all keys
+app?.clear(); // remove all keys
 ```
 
 ## TypeScript

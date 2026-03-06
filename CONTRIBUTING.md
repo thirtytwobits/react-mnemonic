@@ -229,7 +229,8 @@ Triggered by tagged releases matching `vX.Y.Z`:
 
 - Type-checks and format-checks the code
 - Builds and tests the library
-- Publishes to npm with `--tag alpha` (during prerelease phase)
+- Generates the API docs and builds the docs site
+- Publishes the package to the npm `latest` tag
 - Includes npm provenance attestation
 
 ## License

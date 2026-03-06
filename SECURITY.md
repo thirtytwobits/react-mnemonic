@@ -19,10 +19,9 @@ discovery.
 ### What to expect
 
 We will acknowledge receipt of your report and provide an initial assessment as
-soon as practical. Because react-mnemonic is currently in **alpha**, the project
-does not guarantee any SLA for response times or fixes. We will make a
-best-effort attempt to address confirmed vulnerabilities promptly, but timelines
-may vary.
+soon as practical. The project does not currently guarantee a formal SLA for
+response times or fixes, but we will make a best-effort attempt to address
+confirmed vulnerabilities promptly.
 
 ## Scope
 
@@ -36,10 +35,10 @@ untrusted server input. Security concerns most likely to apply include:
 
 ## Supported Versions
 
-During the alpha phase, only the latest published version receives security
-fixes. There is no backporting to older alpha releases.
+Security fixes are provided for the current stable `1.x` line. Pre-1.0 alpha
+releases are not supported.
 
-| Version      | Supported |
-| ------------ | --------- |
-| Latest alpha | Yes       |
-| Older alphas | No        |
+| Version | Supported |
+| ------- | --------- |
+| 1.x     | Yes       |
+| < 1.0   | No        |

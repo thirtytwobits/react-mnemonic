@@ -28,4 +28,7 @@ jobs:
             - run: npm run format:check
             - run: npm run build
             - run: npm run test
-            - run: npm publish --access public --tag alpha --provenance
+            - run: npm --prefix website ci
+            - run: npm run docs
+            - run: npm run docs:site
+            - run: npm publish --access public --provenance

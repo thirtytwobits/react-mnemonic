@@ -16,7 +16,8 @@ npm install react-mnemonic
 
 ## Peer dependencies
 
-React 18 or later is required.
+React 18 or later is required. CI verifies packaged-consumer installs against
+React 18 and React 19.
 
 ```json
 {
