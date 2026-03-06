@@ -7,7 +7,8 @@ description: Type-safe usage and available type exports.
 # TypeScript
 
 react-mnemonic is written in strict TypeScript and ships its own declarations.
-All public types are re-exported from the package root.
+All public types are re-exported from the package root. Common helper functions
+such as `createSchemaRegistry(...)` are also exported from the root package.
 
 ## Type imports
 
@@ -104,6 +105,9 @@ interface SchemaRegistry {
     registerSchema(schema: KeySchema): void;
 }
 ```
+
+For immutable registries, prefer `createSchemaRegistry({ schemas, migrations })`
+instead of manually implementing this interface.
 
 ### `StructuralTreeHelpers<T>`
 

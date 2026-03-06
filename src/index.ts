@@ -4,6 +4,7 @@
 export { MnemonicProvider, MnemonicProviderProps } from "./Mnemonic/provider";
 export { useMnemonicKey } from "./Mnemonic/use";
 export { useMnemonicRecovery } from "./Mnemonic/recovery";
+export { createSchemaRegistry } from "./Mnemonic/schema-registry";
 export { JSONCodec, createCodec, CodecError } from "./Mnemonic/codecs";
 export { SchemaError } from "./Mnemonic/schema";
 export { validateJsonSchema, compileSchema } from "./Mnemonic/json-schema";
@@ -23,6 +24,7 @@ export type {
     ReconcileContext,
     StorageLike,
     SchemaMode,
+    CreateSchemaRegistryOptions,
     KeySchema,
     MigrationRule,
     MigrationPath,

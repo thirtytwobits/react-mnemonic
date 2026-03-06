@@ -6,6 +6,7 @@ import {
     MnemonicProvider,
     useMnemonicKey,
     useMnemonicRecovery,
+    createSchemaRegistry,
     JSONCodec,
     createCodec,
     CodecError,
@@ -15,6 +16,7 @@ import {
 } from "./index";
 import type {
     Codec,
+    CreateSchemaRegistryOptions,
     MnemonicProviderOptions,
     UseMnemonicKeyOptions,
     UseMnemonicRecoveryOptions,
@@ -37,6 +39,11 @@ describe("Public API exports", () => {
     it("exports useMnemonicRecovery", () => {
         expect(useMnemonicRecovery).toBeDefined();
         expect(typeof useMnemonicRecovery).toBe("function");
+    });
+
+    it("exports createSchemaRegistry", () => {
+        expect(createSchemaRegistry).toBeDefined();
+        expect(typeof createSchemaRegistry).toBe("function");
     });
 
     it("exports JSONCodec", () => {
@@ -117,6 +124,15 @@ describe("Public API exports", () => {
             namespace: "test",
             clearedKeys: ["theme"],
         });
+    });
+
+    it("type exports are usable (CreateSchemaRegistryOptions)", () => {
+        const options: CreateSchemaRegistryOptions = {
+            schemas: [],
+            migrations: [],
+        };
+        expect(options.schemas).toEqual([]);
+        expect(options.migrations).toEqual([]);
     });
 
     it("type exports are usable (JsonSchema)", () => {

@@ -462,6 +462,33 @@ export type MigrationRule = {
 export type MigrationPath = MigrationRule[];
 
 /**
+ * Input options for {@link createSchemaRegistry}.
+ *
+ * Use this helper when your registry contents are known up front and do not
+ * need runtime mutation. The returned registry is immutable and optimized for
+ * the common `"default"` / `"strict"` setup.
+ */
+export interface CreateSchemaRegistryOptions {
+    /**
+     * Versioned schemas to index by key and version.
+     *
+     * Duplicate `key + version` pairs are rejected up front with
+     * `SchemaError("SCHEMA_REGISTRATION_CONFLICT")`.
+     */
+    schemas?: readonly KeySchema[];
+
+    /**
+     * Migration rules to index by key and version edge.
+     *
+     * Write-time normalizers (`fromVersion === toVersion`) are indexed
+     * separately from read-time migration edges. Ambiguous outgoing edges,
+     * backward migrations, duplicate write normalizers, and cycles are
+     * rejected up front with `SchemaError("MIGRATION_GRAPH_INVALID")`.
+     */
+    migrations?: readonly MigrationRule[];
+}
+
+/**
  * Lookup and registration API for key schemas and migration paths.
  *
  * Implementations of this interface are passed to `MnemonicProvider` via the
