@@ -31,4 +31,12 @@ jobs:
             - run: npm --prefix website ci
             - run: npm run docs
             - run: npm run docs:site
-            - run: npm publish --access public --provenance
+            - name: Select npm dist-tag
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  TAG=latest
+                  case "$VERSION" in
+                    *-beta.*) TAG=beta ;;
+                  esac
+                  echo "NPM_DIST_TAG=$TAG" >> "$GITHUB_ENV"
+            - run: npm publish --tag "$NPM_DIST_TAG" --access public --provenance

@@ -225,12 +225,13 @@ Runs on push to `main`:
 
 ### Releases (`release.yml`)
 
-Triggered by tagged releases matching `vX.Y.Z`:
+Triggered by tagged releases matching `v*` (for example `v1.0.0-beta.0` or
+`v1.0.0`):
 
 - Type-checks and format-checks the code
 - Builds and tests the library
 - Generates the API docs and builds the docs site
-- Publishes the package to the npm `latest` tag
+- Publishes beta prereleases to the npm `beta` tag and stable releases to `latest`
 - Includes npm provenance attestation
 
 ## License

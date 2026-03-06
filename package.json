@@ -1,6 +1,6 @@
 {
     "name": "react-mnemonic",
-    "version": "1.0.0",
+    "version": "1.0.0-beta.0",
     "description": "Persistent, type-safe state management for React",
     "type": "module",
     "main": "./dist/index.cjs",

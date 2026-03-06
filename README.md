@@ -11,6 +11,9 @@ Persistent, type-safe state management for React.
 page refreshes, synchronize across tabs, and stay type-safe end-to-end -- all
 through a single hook that works like `useState`.
 
+`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag while
+the release candidate hardening work finishes.
+
 ## Features
 
 - **`useState`-like API** -- `useMnemonicKey` returns `{ value, set, reset, remove }`
@@ -31,15 +34,15 @@ through a single hook that works like `useState`.
 ## Installation
 
 ```bash
-npm install react-mnemonic
+npm install react-mnemonic@beta
 ```
 
 ```bash
-yarn add react-mnemonic
+yarn add react-mnemonic@beta
 ```
 
 ```bash
-pnpm add react-mnemonic
+pnpm add react-mnemonic@beta
 ```
 
 ### Peer dependencies
