@@ -91,13 +91,13 @@ function renderHook<T>(
     storage: ReturnType<typeof createMockStorage>,
     namespace: string,
     hook: () => T,
-): { result: { current: T }; rerender: () => void } {
+): { result: { current: T }; rerender: () => void; unmount: () => void } {
     const resultRef: { current: T } = { current: undefined as T };
     function TestComponent() {
         resultRef.current = hook();
         return null;
     }
-    const { rerender: rrFn } = render(
+    const { rerender: rrFn, unmount } = render(
         <MnemonicProvider namespace={namespace} storage={storage}>
             <TestComponent />
         </MnemonicProvider>,
@@ -110,6 +110,7 @@ function renderHook<T>(
                     <TestComponent />
                 </MnemonicProvider>,
             ),
+        unmount,
     };
 }
 
@@ -176,6 +177,73 @@ describe("useMnemonicKey – basic read/write", () => {
         });
         expect(result.current.value).toBe(0);
         expect(storage.store.has("ns.count")).toBe(false);
+    });
+
+    it("persists explicit null clear intent across remounts", () => {
+        const firstMount = renderHook(storage, "ns", () =>
+            useMnemonicKey<string | null>("displayName", { defaultValue: "Anonymous" }),
+        );
+
+        act(() => {
+            firstMount.result.current.set("Scott");
+        });
+        expect(firstMount.result.current.value).toBe("Scott");
+
+        act(() => {
+            firstMount.result.current.set(null);
+        });
+        expect(firstMount.result.current.value).toBeNull();
+        expect(storage.store.get("ns.displayName")).toBe(env(JSON.stringify(null)));
+
+        firstMount.unmount();
+
+        const secondMount = renderHook(storage, "ns", () =>
+            useMnemonicKey<string | null>("displayName", { defaultValue: "Anonymous" }),
+        );
+
+        expect(secondMount.result.current.value).toBeNull();
+    });
+
+    it("remove() and reset() restore the default instead of persisting a cleared intent", () => {
+        const removed = renderHook(storage, "ns", () =>
+            useMnemonicKey<string | null>("displayName", { defaultValue: "Anonymous" }),
+        );
+
+        act(() => {
+            removed.result.current.set("Scott");
+        });
+        act(() => {
+            removed.result.current.remove();
+        });
+
+        expect(removed.result.current.value).toBe("Anonymous");
+        expect(storage.store.has("ns.displayName")).toBe(false);
+
+        removed.unmount();
+
+        const removedReload = renderHook(storage, "ns", () =>
+            useMnemonicKey<string | null>("displayName", { defaultValue: "Anonymous" }),
+        );
+
+        expect(removedReload.result.current.value).toBe("Anonymous");
+
+        act(() => {
+            removedReload.result.current.set("Robin");
+        });
+        act(() => {
+            removedReload.result.current.reset();
+        });
+
+        expect(removedReload.result.current.value).toBe("Anonymous");
+        expect(storage.store.get("ns.displayName")).toBe(env(JSON.stringify("Anonymous")));
+
+        removedReload.unmount();
+
+        const resetReload = renderHook(storage, "ns", () =>
+            useMnemonicKey<string | null>("displayName", { defaultValue: "Anonymous" }),
+        );
+
+        expect(resetReload.result.current.value).toBe("Anonymous");
     });
 });
 

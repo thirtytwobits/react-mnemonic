@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
                 "guides/json-schema-validation",
                 "guides/schema-migration",
                 "guides/reset-and-recovery",
+                "guides/clearable-persisted-values",
                 "guides/persisted-vs-ephemeral-state",
                 "guides/custom-codecs",
                 "guides/custom-storage",

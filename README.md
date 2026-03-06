@@ -106,6 +106,12 @@ or fully wipe a namespace without opening DevTools. See the
 [Reset and Recovery guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/reset-and-recovery)
 for soft-reset and hard-reset recipes.
 
+If a field must stay cleared across reloads, model it as nullable and persist
+`null` explicitly. `remove()` deletes the key and falls back to `defaultValue`,
+while `reset()` writes the default again. See the
+[Clearable Persisted Values guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values)
+for the canonical nullable pattern.
+
 ## API
 
 ### `<MnemonicProvider>`
@@ -140,6 +146,12 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 | `set`    | `(next: T \| (cur: T) => T) => void` | Update the value (direct or updater function) |
 | `reset`  | `() => void`                         | Reset to `defaultValue` and persist it        |
 | `remove` | `() => void`                         | Delete the key from storage entirely          |
+
+For clearable fields, remember the semantic split:
+
+- `set(null)` persists a cleared value and stays cleared after reload
+- `remove()` deletes the key, so the next read falls back to `defaultValue`
+- `reset()` persists `defaultValue`
 
 #### Options
 

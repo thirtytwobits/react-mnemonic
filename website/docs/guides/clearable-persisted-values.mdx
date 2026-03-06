@@ -1,0 +1,151 @@
+---
+sidebar_position: 5
+title: Clearable Persisted Values
+description: Model clear intent with nullable persisted state instead of deleting the key.
+---
+
+import { ClearableNullableFieldDemo } from "@site/src/components/demo/ClearableNullableFieldDemo";
+
+# Clearable Persisted Values
+
+Some fields need three distinct meanings:
+
+- a real value is present
+- the user explicitly cleared the value
+- no value has ever been stored, so the app should use a default
+
+That is where `null` matters.
+
+## The key semantic rule
+
+`react-mnemonic` gives you three different behaviors:
+
+| Action      | What it does                       | What happens after reload    |
+| ----------- | ---------------------------------- | ---------------------------- |
+| `set(null)` | Persists an explicit cleared value | Stays cleared                |
+| `remove()`  | Deletes the key entirely           | Falls back to `defaultValue` |
+| `reset()`   | Persists `defaultValue`            | Rehydrates the default       |
+
+If your UI has a real "clear" action and that cleared state should survive
+reload, model the persisted value as nullable and write `null`.
+
+## Interactive example
+
+<ClearableNullableFieldDemo />
+
+Clear the field, reload the page, and notice the difference:
+
+- `set(null)` keeps the field cleared
+- `remove()` brings the default back
+- `reset()` also brings the default back
+
+## Canonical pattern
+
+```tsx
+import { useMnemonicKey } from "react-mnemonic";
+
+function DisplayNameField() {
+    const {
+        value: displayName,
+        set,
+        remove,
+        reset,
+    } = useMnemonicKey<string | null>("displayName", {
+        defaultValue: "Anonymous",
+    });
+
+    return (
+        <>
+            <input
+                value={displayName ?? ""}
+                onChange={(e) => {
+                    const nextValue = e.target.value.trim();
+                    set(nextValue === "" ? null : e.target.value);
+                }}
+            />
+
+            <button onClick={() => set(null)}>Clear and keep cleared</button>
+            <button onClick={() => remove()}>Remove key</button>
+            <button onClick={() => reset()}>Reset default</button>
+        </>
+    );
+}
+```
+
+The important part is the normalization step:
+
+```ts
+const nextValue = e.target.value.trim();
+set(nextValue === "" ? null : e.target.value);
+```
+
+That turns "empty user input" into "persisted clear intent".
+
+## `undefined` vs `null`
+
+When a field is clearable and persisted, prefer:
+
+- `null` for "the user explicitly cleared this"
+- `undefined` for temporary in-memory absence before normalization
+
+Before writing, normalize `undefined` to `null`.
+
+```tsx
+const normalizeBeforePersist = <T,>(value: T | null | undefined) => value ?? null;
+```
+
+This avoids ambiguous behavior where a caller thinks they cleared a value but
+actually removed the key or let a default come back later.
+
+## Wrapper example
+
+If your app has many fields like this, wrap the pattern locally:
+
+```tsx
+import { useMnemonicKey } from "react-mnemonic";
+import type { UseMnemonicKeyOptions } from "react-mnemonic";
+
+function useClearableMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T | null>) {
+    const field = useMnemonicKey<T | null>(key, options);
+
+    return {
+        ...field,
+        set: (next: T | null | undefined | ((current: T | null) => T | null | undefined)) =>
+            field.set((current) => {
+                const resolved = typeof next === "function" ? next(current) : next;
+                return resolved ?? null;
+            }),
+        clear: () => field.set(null),
+    };
+}
+```
+
+This is app-level convenience code, not a new library API. It is useful when:
+
+- your forms frequently map empty strings to persisted `null`
+- you want one standard `clear()` action everywhere
+- you want to prevent accidental `undefined` writes from creeping in
+
+## Nullable schema guidance
+
+If the key is schema-managed, the schema must also allow `null`:
+
+```ts
+{
+    type: ["string", "null"];
+}
+```
+
+Without that, a clear action that writes `null` will fail validation.
+
+## When to use `remove()`
+
+`remove()` is still correct when you want "forget this key and go back to first-load defaults".
+
+Examples:
+
+- dismissing a one-off tutorial so a future rollout can re-seed defaults
+- clearing a cached search result object that should be recomputed
+- removing stale rollout state during recovery flows
+
+Use `remove()` when you want absence. Use `null` when you want durable cleared intent.
