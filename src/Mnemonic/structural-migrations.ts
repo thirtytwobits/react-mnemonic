@@ -35,7 +35,7 @@ export interface StructuralTreeHelpers<T> {
 
 type DefaultStructuralNode<T> = {
     id: string;
-    children?: T[];
+    children?: readonly T[];
 };
 
 function resolveHelpers<T>(helpers?: StructuralTreeHelpers<T>): StructuralTreeHelpers<T> {
@@ -51,12 +51,22 @@ function resolveHelpers<T>(helpers?: StructuralTreeHelpers<T>): StructuralTreeHe
 /**
  * Finds the first node with the requested id using depth-first traversal.
  *
+ * @template T - Tree node type (must extend `{ id: string; children?: readonly T[] }` when `helpers` is omitted)
+ * @param root - Root node to search
+ * @param id - Target node id
+ * @returns The matching node, or `undefined`
+ */
+export function findNodeById<T extends DefaultStructuralNode<T>>(root: T, id: string): T | undefined;
+/**
+ * Finds the first node with the requested id using depth-first traversal.
+ *
  * @template T - Tree node type
  * @param root - Root node to search
  * @param id - Target node id
- * @param helpers - Optional adapter for custom node shapes
+ * @param helpers - Adapter for custom node shapes
  * @returns The matching node, or `undefined`
  */
+export function findNodeById<T>(root: T, id: string, helpers: StructuralTreeHelpers<T>): T | undefined;
 export function findNodeById<T>(root: T, id: string, helpers?: StructuralTreeHelpers<T>): T | undefined {
     const tree = resolveHelpers(helpers);
     if (tree.getId(root) === id) return root;
@@ -72,13 +82,26 @@ export function findNodeById<T>(root: T, id: string, helpers?: StructuralTreeHel
  * direct children share the same id. Returns the original tree when the parent
  * is missing or the child is already present as a direct child.
  *
+ * @template T - Tree node type (must extend `{ id: string; children?: readonly T[] }` when `helpers` is omitted)
+ * @param root - Root node to update
+ * @param parentId - Parent node that should receive the child
+ * @param child - Child node to append
+ * @returns Updated tree with the child inserted once
+ */
+export function insertChildIfMissing<T extends DefaultStructuralNode<T>>(root: T, parentId: string, child: T): T;
+/**
+ * Inserts a child under the target parent when no existing child shares the
+ * same id. Returns the original tree when the parent is missing or the child is
+ * already present.
+ *
  * @template T - Tree node type
  * @param root - Root node to update
  * @param parentId - Parent node that should receive the child
  * @param child - Child node to append
- * @param helpers - Optional adapter for custom node shapes
+ * @param helpers - Adapter for custom node shapes
  * @returns Updated tree with the child inserted once
  */
+export function insertChildIfMissing<T>(root: T, parentId: string, child: T, helpers: StructuralTreeHelpers<T>): T;
 export function insertChildIfMissing<T>(root: T, parentId: string, child: T, helpers?: StructuralTreeHelpers<T>): T {
     const tree = resolveHelpers(helpers);
     const childId = tree.getId(child);
@@ -117,13 +140,26 @@ export function insertChildIfMissing<T>(root: T, parentId: string, child: T, hel
  * Returns the original tree when the source id is missing or the target id
  * already exists elsewhere.
  *
+ * @template T - Tree node type (must extend `{ id: string; children?: readonly T[] }` when `helpers` is omitted)
+ * @param root - Root node to update
+ * @param currentId - Existing id to rename
+ * @param nextId - Replacement id
+ * @returns Updated tree with matching node ids renamed
+ */
+export function renameNode<T extends DefaultStructuralNode<T>>(root: T, currentId: string, nextId: string): T;
+/**
+ * Renames every node with the source id while preserving tree structure.
+ * Returns the original tree when the source id is missing or the target id
+ * already exists elsewhere.
+ *
  * @template T - Tree node type
  * @param root - Root node to update
  * @param currentId - Existing id to rename
  * @param nextId - Replacement id
- * @param helpers - Optional adapter for custom node shapes
+ * @param helpers - Adapter for custom node shapes
  * @returns Updated tree with matching node ids renamed
  */
+export function renameNode<T>(root: T, currentId: string, nextId: string, helpers: StructuralTreeHelpers<T>): T;
 export function renameNode<T>(root: T, currentId: string, nextId: string, helpers?: StructuralTreeHelpers<T>): T {
     const tree = resolveHelpers(helpers);
     if (currentId === nextId) return root;
@@ -154,20 +190,26 @@ export function renameNode<T>(root: T, currentId: string, nextId: string, helper
  * encountered for each key. The helper traverses the full tree and returns the
  * original root when no duplicates are removed.
  *
- * Keys are tracked using a `Set`, so `getKey` should return a stable value with
- * meaningful `Set` equality semantics (typically a primitive such as a
- * string, number, or symbol). When returning objects, duplicates are only
- * removed if the object references are identical.
+ * @template T - Tree node type (must extend `{ id: string; children?: readonly T[] }` when `helpers` is omitted)
+ * @template K - Deduplication key type
+ * @param root - Root node to normalize
+ * @param getKey - Function that computes a dedupe key for each child
+ * @returns Updated tree with duplicate siblings removed
+ */
+export function dedupeChildrenBy<T extends DefaultStructuralNode<T>, K>(root: T, getKey: (node: T) => K): T;
+/**
+ * Deduplicates each node's immediate children while preserving the first child
+ * encountered for each key. The helper traverses the full tree and returns the
+ * original root when no duplicates are removed.
  *
  * @template T - Tree node type
  * @template K - Deduplication key type
  * @param root - Root node to normalize
- * @param getKey - Function that computes a dedupe key for each child; should
- * return a stable primitive (string/number/symbol) or other value suitable for
- * use as a `Set` key
- * @param helpers - Optional adapter for custom node shapes
+ * @param getKey - Function that computes a dedupe key for each child
+ * @param helpers - Adapter for custom node shapes
  * @returns Updated tree with duplicate siblings removed
  */
+export function dedupeChildrenBy<T, K>(root: T, getKey: (node: T) => K, helpers: StructuralTreeHelpers<T>): T;
 export function dedupeChildrenBy<T, K>(root: T, getKey: (node: T) => K, helpers?: StructuralTreeHelpers<T>): T {
     const tree = resolveHelpers(helpers);
 
