@@ -263,6 +263,7 @@ export function MnemonicProvider({
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
+        const canEnumerateKeys = Boolean(st && typeof st.length === "number" && typeof st.key === "function");
 
         /**
          * In-memory cache of raw string values.
@@ -571,11 +572,14 @@ export function MnemonicProvider({
          * @returns Array of unprefixed key names
          */
         const keys = () => {
-            if (!st || typeof st.length !== "number" || typeof st.key !== "function") return [];
+            if (!canEnumerateKeys || !st) return [];
+            const storageLength = st.length;
+            const getStorageKey = st.key;
+            if (typeof storageLength !== "number" || typeof getStorageKey !== "function") return [];
             const out: string[] = [];
             try {
-                for (let i = 0; i < st.length; i++) {
-                    const k = st.key(i);
+                for (let i = 0; i < storageLength; i++) {
+                    const k = getStorageKey.call(st, i);
                     if (!k) continue;
                     if (k.startsWith(prefix)) out.push(k.slice(prefix.length));
                 }
@@ -691,6 +695,7 @@ export function MnemonicProvider({
          */
         const store = {
             prefix,
+            canEnumerateKeys,
             subscribeRaw,
             getRawSnapshot,
             setRaw: writeRaw,

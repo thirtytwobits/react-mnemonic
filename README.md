@@ -27,6 +27,7 @@ through a single hook that works like `useState`.
 - **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
 - **Structural migration helpers** -- optional tree utilities for idempotent insert/rename/dedupe migration steps
 - **Read-time reconciliation** -- selectively enforce new defaults on persisted values without clearing the whole key
+- **Recovery helpers** -- build user-facing soft reset and hard reset flows with namespace-scoped clear helpers
 - **Write-time normalization** -- migrations where `fromVersion === toVersion` run on every write
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
 - **DevTools** -- inspect and mutate state from the browser console
@@ -99,6 +100,12 @@ want them to rehydrate after reload. See the
 [Persisted vs Ephemeral State guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/persisted-vs-ephemeral-state)
 for patterns and an interactive example.
 
+For self-service recovery UX, pair your per-key hooks with
+`useMnemonicRecovery` so users can clear stale filters, reset broken settings,
+or fully wipe a namespace without opening DevTools. See the
+[Reset and Recovery guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/reset-and-recovery)
+for soft-reset and hard-reset recipes.
+
 ## API
 
 ### `<MnemonicProvider>`
@@ -146,6 +153,31 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 | `listenCrossTab` | `boolean`                                         | `false`     | Sync via the browser `storage` event                          |
 | `schema`         | `{ version?: number }`                            | --          | Pin writes to a specific schema version                       |
 
+### `useMnemonicRecovery(options)`
+
+Hook for namespace-scoped recovery actions such as "clear saved filters" or
+"reset all persisted app data".
+
+```ts
+const { namespace, canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching } = useMnemonicRecovery({
+    onRecover: (event) => console.log(event.action, event.clearedKeys),
+});
+```
+
+| Return             | Type                                                | Description                                           |
+| ------------------ | --------------------------------------------------- | ----------------------------------------------------- |
+| `namespace`        | `string`                                            | Current provider namespace                            |
+| `canEnumerateKeys` | `boolean`                                           | Whether the storage backend can list namespace keys   |
+| `listKeys`         | `() => string[]`                                    | List visible unprefixed keys in the current namespace |
+| `clearAll`         | `() => string[]`                                    | Clear every key in the namespace                      |
+| `clearKeys`        | `(keys: readonly string[]) => string[]`             | Clear an explicit set of unprefixed keys              |
+| `clearMatching`    | `(predicate: (key: string) => boolean) => string[]` | Clear keys whose names match a predicate              |
+
+`clearAll()` and `clearMatching()` require an enumerable storage backend such
+as `localStorage` or `sessionStorage`. If your custom storage does not support
+`length` and `key(index)`, use `clearKeys([...])` with the explicit durable-key
+list your app owns.
+
 ### Codecs
 
 The default codec is `JSONCodec`, which handles all JSON-serializable values.
@@ -182,6 +214,8 @@ interface StorageLike {
 `onExternalChange` enables cross-tab sync for non-localStorage backends (e.g.
 IndexedDB over `BroadcastChannel`). The library handles all error cases
 internally -- see the `StorageLike` JSDoc for the full error-handling contract.
+Namespace-wide recovery helpers can only enumerate keys when the backend also
+implements `length` and `key(index)`.
 
 ### `validateJsonSchema(schema, value)`
 

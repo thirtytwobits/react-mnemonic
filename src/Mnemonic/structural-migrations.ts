@@ -33,16 +33,31 @@ export interface StructuralTreeHelpers<T> {
     withId: (node: T, id: string) => T;
 }
 
-type DefaultStructuralNode<T> = {
+/**
+ * Default tree node shape supported by the structural migration helpers.
+ *
+ * If your nodes already use `id` and `children`, you can call the helpers
+ * directly without supplying `StructuralTreeHelpers`.
+ *
+ * @template T - Tree node type
+ */
+export interface StructuralNode<T> {
+    /**
+     * Stable node identifier used for lookup and rename operations.
+     */
     id: string;
+
+    /**
+     * Optional child nodes.
+     */
     children?: readonly T[];
-};
+}
 
 function resolveHelpers<T>(helpers?: StructuralTreeHelpers<T>): StructuralTreeHelpers<T> {
     if (helpers) return helpers;
     return {
-        getId: (node: T) => (node as DefaultStructuralNode<T>).id,
-        getChildren: (node: T) => (node as DefaultStructuralNode<T>).children,
+        getId: (node: T) => (node as StructuralNode<T>).id,
+        getChildren: (node: T) => (node as StructuralNode<T>).children,
         withChildren: (node: T, children: T[]) => ({ ...(node as object), children }) as T,
         withId: (node: T, id: string) => ({ ...(node as object), id }) as T,
     };
@@ -56,7 +71,7 @@ function resolveHelpers<T>(helpers?: StructuralTreeHelpers<T>): StructuralTreeHe
  * @param id - Target node id
  * @returns The matching node, or `undefined`
  */
-export function findNodeById<T extends DefaultStructuralNode<T>>(root: T, id: string): T | undefined;
+export function findNodeById<T extends StructuralNode<T>>(root: T, id: string): T | undefined;
 /**
  * Finds the first node with the requested id using depth-first traversal.
  *
@@ -88,7 +103,7 @@ export function findNodeById<T>(root: T, id: string, helpers?: StructuralTreeHel
  * @param child - Child node to append
  * @returns Updated tree with the child inserted once
  */
-export function insertChildIfMissing<T extends DefaultStructuralNode<T>>(root: T, parentId: string, child: T): T;
+export function insertChildIfMissing<T extends StructuralNode<T>>(root: T, parentId: string, child: T): T;
 /**
  * Inserts a child under the target parent when no existing child shares the
  * same id. Returns the original tree when the parent is missing or the child is
@@ -146,7 +161,7 @@ export function insertChildIfMissing<T>(root: T, parentId: string, child: T, hel
  * @param nextId - Replacement id
  * @returns Updated tree with matching node ids renamed
  */
-export function renameNode<T extends DefaultStructuralNode<T>>(root: T, currentId: string, nextId: string): T;
+export function renameNode<T extends StructuralNode<T>>(root: T, currentId: string, nextId: string): T;
 /**
  * Renames every node with the source id while preserving tree structure.
  * Returns the original tree when the source id is missing or the target id
@@ -196,7 +211,7 @@ export function renameNode<T>(root: T, currentId: string, nextId: string, helper
  * @param getKey - Function that computes a dedupe key for each child
  * @returns Updated tree with duplicate siblings removed
  */
-export function dedupeChildrenBy<T extends DefaultStructuralNode<T>, K>(root: T, getKey: (node: T) => K): T;
+export function dedupeChildrenBy<T extends StructuralNode<T>, K>(root: T, getKey: (node: T) => K): T;
 /**
  * Deduplicates each node's immediate children while preserving the first child
  * encountered for each key. The helper traverses the full tree and returns the

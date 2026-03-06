@@ -73,6 +73,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 - [Schema Modes](/docs/guides/schema-modes) — add validation and versioning
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
 - [Persisted vs Ephemeral State](/docs/guides/persisted-vs-ephemeral-state) — keep durable preferences and runtime-only UI state separate
+- [Reset and Recovery](/docs/guides/reset-and-recovery) — add soft reset and hard reset flows for persisted state
 - [Custom Codecs](/docs/guides/custom-codecs) — serialize `Date`, `Set`, `Map`, etc.
 - [Cross-Tab Sync](/docs/guides/cross-tab-sync) — keep tabs in sync
 - [API Reference](/docs/api) — full TypeDoc-generated API docs
