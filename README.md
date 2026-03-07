@@ -26,6 +26,7 @@ through a single hook that works like `useState`.
 - **Read-time reconciliation** -- selectively enforce new defaults on persisted values without clearing the whole key
 - **Recovery helpers** -- build user-facing soft reset and hard reset flows with namespace-scoped clear helpers
 - **Write-time normalization** -- migrations where `fromVersion === toVersion` run on every write
+- **First-class key descriptors** -- define canonical, reusable key contracts once with `defineMnemonicKey(...)`
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
 - **DevTools** -- inspect and mutate state from the browser console
 - **SSR-safe** -- returns defaults when `window` is unavailable
@@ -91,6 +92,10 @@ export default function App() {
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
 
+If the same key is used in multiple components, consider defining it once with
+`defineMnemonicKey(...)` and reusing that descriptor everywhere. This keeps the
+contract importable and explicit for both humans and AI-assisted tooling.
+
 Persist only the durable slice of your app state. `useMnemonicKey` stores
 whatever you pass to `set`, so keep transient UI state like loading flags,
 hover state, and draft search text in plain React state unless you explicitly
@@ -109,6 +114,44 @@ If a field must stay cleared across reloads, model it as nullable and persist
 while `reset()` writes the default again. See the
 [Clearable Persisted Values guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values)
 for the canonical nullable pattern.
+
+## Canonical key definitions
+
+When the same persisted key appears in more than one component, define it once
+and reuse it:
+
+```tsx
+import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+
+export const themeKey = defineMnemonicKey("theme", {
+    defaultValue: "light" as "light" | "dark",
+    listenCrossTab: true,
+});
+
+function ThemeToggle() {
+    const { value: theme, set } = useMnemonicKey(themeKey);
+    return <button onClick={() => set(theme === "light" ? "dark" : "light")}>{theme}</button>;
+}
+
+function ThemePreview() {
+    const { value: theme } = useMnemonicKey(themeKey);
+    return <p>Current theme: {theme}</p>;
+}
+```
+
+Descriptors help with:
+
+- keeping one canonical key contract per persisted value
+- reusing the same `defaultValue`, `schema`, `codec`, and `reconcile` logic
+- making AI-assisted code generation and refactors less ambiguous
+
+The original lightweight form still works:
+
+```ts
+const { value, set } = useMnemonicKey("theme", {
+    defaultValue: "light" as "light" | "dark",
+});
+```
 
 ## API
 
@@ -130,11 +173,25 @@ Context provider that scopes storage keys under a namespace.
 
 Multiple providers with different namespaces can coexist in the same app.
 
-### `useMnemonicKey<T>(key, options)`
+### `defineMnemonicKey(key, options)`
+
+Define a reusable descriptor for a single persisted key.
+
+```ts
+const themeKey = defineMnemonicKey("theme", {
+    defaultValue: "light" as "light" | "dark",
+    listenCrossTab: true,
+});
+```
+
+The returned descriptor can be imported and passed directly to `useMnemonicKey`.
+
+### `useMnemonicKey<T>(descriptor)` / `useMnemonicKey<T>(key, options)`
 
 Hook for reading and writing a single persistent value.
 
 ```ts
+const { value, set, reset, remove } = useMnemonicKey(themeKey);
 const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 ```
 
@@ -555,6 +612,7 @@ All public types are re-exported from the package root:
 import type {
     Codec,
     StorageLike,
+    MnemonicKeyDescriptor,
     MnemonicProviderOptions,
     MnemonicProviderProps,
     UseMnemonicKeyOptions,

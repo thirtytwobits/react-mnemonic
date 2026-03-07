@@ -8,7 +8,8 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
-import type { StorageLike } from "./types";
+import { defineMnemonicKey } from "./key";
+import type { StorageLike, KeySchema, MigrationRule, SchemaRegistry } from "./types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,8 +36,60 @@ function createMockStorage(): StorageLike & { store: Map<string, string> } {
 }
 
 /** Helper to render MnemonicProvider with children via createElement. */
-function ssrRender(props: { namespace: string; storage?: StorageLike }, child: React.ReactElement): string {
+function ssrRender(
+    props: {
+        namespace: string;
+        storage?: StorageLike;
+        schemaMode?: "default" | "strict" | "autoschema";
+        schemaRegistry?: SchemaRegistry;
+        enableDevTools?: boolean;
+    },
+    child: React.ReactElement,
+): string {
     return renderToString(React.createElement(MnemonicProvider, { ...props, children: child }));
+}
+
+function env(payload: string, version = 0): string {
+    return JSON.stringify({ version, payload });
+}
+
+function schemaEnv(payload: unknown, version: number): string {
+    return JSON.stringify({ version, payload });
+}
+
+function createRegistry(schemas: KeySchema[] = [], rules: MigrationRule[] = []): SchemaRegistry {
+    const schemaMap = new Map<string, KeySchema>();
+    for (const schema of schemas) {
+        schemaMap.set(`${schema.key}:${schema.version}`, schema);
+    }
+    const ruleMap = new Map<string, MigrationRule[]>();
+    for (const rule of rules) {
+        const existing = ruleMap.get(rule.key) ?? [];
+        existing.push(rule);
+        ruleMap.set(rule.key, existing);
+    }
+    return {
+        getSchema(key, version) {
+            return schemaMap.get(`${key}:${version}`);
+        },
+        getLatestSchema(key) {
+            const candidates = Array.from(schemaMap.values()).filter((schema) => schema.key === key);
+            if (candidates.length === 0) return undefined;
+            return candidates.sort((a, b) => b.version - a.version)[0];
+        },
+        getMigrationPath(key, fromVersion, toVersion) {
+            const byKey = ruleMap.get(key) ?? [];
+            const path: MigrationRule[] = [];
+            let current = fromVersion;
+            while (current < toVersion) {
+                const next = byKey.find((rule) => rule.fromVersion === current && rule.toVersion > current);
+                if (!next) return null;
+                path.push(next);
+                current = next.toVersion;
+            }
+            return path;
+        },
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -143,5 +196,121 @@ describe("SSR integration (node environment)", () => {
         expect(factoryCalled).toBe(true);
         // renderToString HTML-encodes quotes: {"ts":0} → {&quot;ts&quot;:0}
         expect(html).toContain("{&quot;ts&quot;:0}");
+    });
+
+    it("renderToString supports descriptor-based keys", () => {
+        const themeKey = defineMnemonicKey("theme", {
+            defaultValue: "light" as "light" | "dark",
+        });
+
+        function Theme() {
+            const { value } = useMnemonicKey(themeKey);
+            return React.createElement("span", null, value);
+        }
+
+        const html = ssrRender({ namespace: "ssr" }, React.createElement(Theme));
+        expect(html).toContain("light");
+    });
+
+    it("renderToString ignores schema-managed stored values and renders defaults on the server", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            {
+                key: "profile",
+                version: 1,
+                schema: {
+                    type: "object",
+                    properties: {
+                        name: { type: "string" },
+                    },
+                    required: ["name"],
+                    additionalProperties: false,
+                },
+            },
+        ]);
+
+        storage.store.set("ssr.profile", schemaEnv({ name: "Ada" }, 1));
+
+        function Profile() {
+            const { value } = useMnemonicKey("profile", {
+                defaultValue: { name: "Guest" },
+            });
+            return React.createElement("span", null, value.name);
+        }
+
+        const html = ssrRender(
+            {
+                namespace: "ssr",
+                storage,
+                schemaMode: "default",
+                schemaRegistry: registry,
+            },
+            React.createElement(Profile),
+        );
+
+        expect(html).toContain("Guest");
+        expect(html).not.toContain("Ada");
+    });
+
+    it("renderToString does not run reconcile on the server", () => {
+        const storage = createMockStorage();
+        storage.store.set("ssr.preferences", env(JSON.stringify({ theme: "dark" })));
+
+        let reconcileCalled = false;
+
+        function Preferences() {
+            const { value } = useMnemonicKey("preferences", {
+                defaultValue: { theme: "light" },
+                reconcile: () => {
+                    reconcileCalled = true;
+                    return { theme: "dark" };
+                },
+            });
+            return React.createElement("span", null, value.theme);
+        }
+
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Preferences));
+
+        expect(html).toContain("light");
+        expect(reconcileCalled).toBe(false);
+    });
+
+    it("renderToString ignores invalid stored envelopes and calls defaultValue factory without an error", () => {
+        const storage = createMockStorage();
+        storage.store.set("ssr.counter", "{ definitely-not-json");
+
+        let receivedError: unknown = Symbol("unassigned");
+
+        function Counter() {
+            const { value } = useMnemonicKey("counter", {
+                defaultValue: (error) => {
+                    receivedError = error;
+                    return 0;
+                },
+            });
+            return React.createElement("span", null, String(value));
+        }
+
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Counter));
+
+        expect(html).toContain("0");
+        expect(receivedError).toBeUndefined();
+    });
+
+    it("renderToString does not touch window when enableDevTools is true", () => {
+        function Display() {
+            const { value } = useMnemonicKey("key", { defaultValue: "fallback" });
+            return React.createElement("div", null, value);
+        }
+
+        expect(() =>
+            ssrRender(
+                {
+                    namespace: "ssr-devtools",
+                    enableDevTools: true,
+                },
+                React.createElement(Display),
+            ),
+        ).not.toThrow();
     });
 });

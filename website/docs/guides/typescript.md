@@ -16,6 +16,7 @@ such as `createSchemaRegistry(...)` are also exported from the root package.
 import type {
     Codec,
     StorageLike,
+    MnemonicKeyDescriptor,
     MnemonicProviderOptions,
     MnemonicProviderProps,
     UseMnemonicKeyOptions,
@@ -53,6 +54,25 @@ const { value, set } = useMnemonicKey<"light" | "dark">("theme", {
     defaultValue: "light",
 });
 ```
+
+## Descriptor inference
+
+`defineMnemonicKey(...)` preserves the inferred value type and packages the key
+contract into a reusable object:
+
+```ts
+import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+
+const themeKey = defineMnemonicKey("theme", {
+    defaultValue: "light" as "light" | "dark",
+});
+
+const { value, set } = useMnemonicKey(themeKey);
+// `value` is inferred as "light" | "dark"
+```
+
+This is useful when the same durable key is shared across multiple components
+or generated code paths.
 
 ## Key types
 

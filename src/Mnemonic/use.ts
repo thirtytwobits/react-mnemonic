@@ -15,7 +15,30 @@ import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { validateJsonSchema, inferJsonSchema } from "./json-schema";
 import type { JsonSchema } from "./json-schema";
-import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext, MnemonicKeyState } from "./types";
+import type {
+    UseMnemonicKeyOptions,
+    KeySchema,
+    MigrationPath,
+    ReconcileContext,
+    MnemonicKeyState,
+    MnemonicKeyDescriptor,
+} from "./types";
+
+function resolveMnemonicKeyArgs<T>(
+    keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
+    options?: UseMnemonicKeyOptions<T>,
+): MnemonicKeyDescriptor<T, string> {
+    if (typeof keyOrDescriptor !== "string") {
+        return keyOrDescriptor;
+    }
+    if (!options) {
+        throw new Error("useMnemonicKey requires options when called with a string key");
+    }
+    return {
+        key: keyOrDescriptor,
+        options,
+    };
+}
 
 /**
  * React hook for persistent, type-safe state management.
@@ -46,19 +69,24 @@ import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext,
  *
  * @template T - The TypeScript type of the stored value
  *
- * @param key - The storage key (unprefixed, namespace is applied automatically)
- * @param options - Configuration options controlling persistence, encoding, and behavior
- *
  * @returns Persistent state handle with the current value and mutation helpers
  *
  * @see {@link UseMnemonicKeyOptions} - Hook configuration and lifecycle details
  *
  * @throws {Error} If used outside of a MnemonicProvider
  */
-export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>): MnemonicKeyState<T> {
+export function useMnemonicKey<T, K extends string>(descriptor: MnemonicKeyDescriptor<T, K>): MnemonicKeyState<T>;
+export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>): MnemonicKeyState<T>;
+export function useMnemonicKey<T>(
+    keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
+    options?: UseMnemonicKeyOptions<T>,
+): MnemonicKeyState<T> {
+    const descriptor = resolveMnemonicKeyArgs(keyOrDescriptor, options);
+    const key = descriptor.key;
+    const resolvedOptions = descriptor.options;
     const api = useMnemonic();
 
-    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = options;
+    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = resolvedOptions;
     const codec = codecOpt ?? JSONCodec;
     const schemaMode = api.schemaMode;
     const schemaRegistry = api.schemaRegistry;

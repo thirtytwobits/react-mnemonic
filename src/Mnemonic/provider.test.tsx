@@ -365,6 +365,39 @@ describe("MnemonicProvider – storage edge cases", () => {
         store!.removeRaw("k");
         expect(store!.getRawSnapshot("k")).toBeNull();
     });
+
+    it("falls back to in-memory behavior when the default browser storage is unavailable", () => {
+        const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+        Object.defineProperty(window, "localStorage", {
+            configurable: true,
+            get() {
+                throw new DOMException("blocked", "SecurityError");
+            },
+        });
+
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+
+        try {
+            expect(() =>
+                render(
+                    <MnemonicProvider namespace="browser-defaults">
+                        <StoreConsumer onStore={onStore} />
+                    </MnemonicProvider>,
+                ),
+            ).not.toThrow();
+
+            expect(store!.getRawSnapshot("k")).toBeNull();
+            store!.setRaw("k", "memory-only");
+            expect(store!.getRawSnapshot("k")).toBe("memory-only");
+        } finally {
+            if (originalDescriptor) {
+                Object.defineProperty(window, "localStorage", originalDescriptor);
+            }
+        }
+    });
 });
 
 describe("MnemonicProvider – DOMException/SecurityError logging", () => {
@@ -621,8 +654,20 @@ describe("MnemonicProvider – DOMException/SecurityError logging", () => {
 
 describe("MnemonicProvider – DevTools", () => {
     const originalWeakRef = (globalThis as any).WeakRef;
-    const originalFinalizationRegistry = (globalThis as any).FinalizationRegistry;
     const originalProcess = (globalThis as any).process;
+    const originalWeakRefDescriptor = Object.getOwnPropertyDescriptor(globalThis, "WeakRef");
+    const originalFinalizationRegistryDescriptor = Object.getOwnPropertyDescriptor(globalThis, "FinalizationRegistry");
+
+    const restoreGlobalConstructor = (
+        name: "WeakRef" | "FinalizationRegistry",
+        descriptor: PropertyDescriptor | undefined,
+    ) => {
+        if (descriptor) {
+            Object.defineProperty(globalThis, name, descriptor);
+            return;
+        }
+        delete (globalThis as any)[name];
+    };
 
     const setNodeEnv = (value: string) => {
         const currentProcess = (globalThis as any).process ?? {};
@@ -638,14 +683,14 @@ describe("MnemonicProvider – DevTools", () => {
 
     beforeEach(() => {
         delete (window as any).__REACT_MNEMONIC_DEVTOOLS__;
-        (globalThis as any).WeakRef = originalWeakRef;
-        (globalThis as any).FinalizationRegistry = originalFinalizationRegistry;
+        restoreGlobalConstructor("WeakRef", originalWeakRefDescriptor);
+        restoreGlobalConstructor("FinalizationRegistry", originalFinalizationRegistryDescriptor);
         (globalThis as any).process = originalProcess;
     });
 
     afterEach(() => {
-        (globalThis as any).WeakRef = originalWeakRef;
-        (globalThis as any).FinalizationRegistry = originalFinalizationRegistry;
+        restoreGlobalConstructor("WeakRef", originalWeakRefDescriptor);
+        restoreGlobalConstructor("FinalizationRegistry", originalFinalizationRegistryDescriptor);
         (globalThis as any).process = originalProcess;
     });
 
@@ -748,6 +793,43 @@ describe("MnemonicProvider – DevTools", () => {
         expect(list[0]!.namespace).toBe("dt");
         expect(list[0]!.available).toBe(true);
         expect(typeof list[0]!.registeredAt).toBe("number");
+    });
+
+    it("list() marks malformed or stale entries unavailable and stamps staleSince once", () => {
+        const staleSinceBefore = null;
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
+            providers: {
+                malformed: {
+                    namespace: "malformed",
+                    weakRef: {},
+                    registeredAt: 1,
+                    lastSeenAt: 2,
+                    staleSince: staleSinceBefore,
+                },
+            },
+            capabilities: { weakRef: true, finalizationRegistry: true },
+            __meta: { version: 0, lastUpdated: 0, lastChange: "" },
+        };
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        const list = registry.list();
+        const malformed = list.find((entry: any) => entry.namespace === "malformed");
+
+        expect(malformed).toBeDefined();
+        expect(malformed.available).toBe(false);
+        expect(typeof malformed.staleSince).toBe("number");
+
+        const stamped = malformed.staleSince;
+        const listAgain = registry.list();
+        const malformedAgain = listAgain.find((entry: any) => entry.namespace === "malformed");
+
+        expect(malformedAgain.staleSince).toBe(stamped);
     });
 
     it("resolved devtools get returns decoded value", () => {
@@ -854,6 +936,28 @@ describe("MnemonicProvider – DevTools", () => {
         const result = devtools.dump();
         expect(result).toEqual({ x: "10", y: "20" });
         expect(spy).toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
+    it("resolved devtools dump falls back to the raw string when a value is not valid JSON", () => {
+        const storage = createMockStorage();
+        storage.store.set("dt.plain", "not json");
+
+        render(
+            <MnemonicProvider namespace="dt" storage={storage} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const devtools = getRegistry().resolve("dt");
+        const spy = vi.spyOn(console, "table").mockImplementation(() => {});
+
+        const result = devtools.dump();
+
+        expect(result).toEqual({ plain: "not json" });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0]?.[0]).toEqual([{ key: "plain", value: "not json", decoded: "not json" }]);
+
         spy.mockRestore();
     });
 
@@ -975,6 +1079,32 @@ describe("MnemonicProvider – DevTools", () => {
         expect(getRegistry().providers.stale).not.toBe(fakeStaleEntry);
     });
 
+    it("resolve(namespace) stamps staleSince when a previously registered weak ref no longer dereferences", () => {
+        const staleEntry = {
+            namespace: "stale",
+            weakRef: { deref: () => undefined },
+            registeredAt: 1,
+            lastSeenAt: 2,
+            staleSince: null,
+        };
+
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
+            providers: { stale: staleEntry },
+            capabilities: { weakRef: true, finalizationRegistry: true },
+            __meta: { version: 0, lastUpdated: 0, lastChange: "" },
+        };
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        expect(registry.resolve("stale")).toBeNull();
+        expect(typeof registry.providers.stale.staleSince).toBe("number");
+    });
+
     it("cleans legacy direct namespace fields from existing registry object", () => {
         const legacyProvider = { get: () => "legacy" };
         (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
@@ -1014,6 +1144,70 @@ describe("MnemonicProvider – DevTools", () => {
         expect(registry.providers.dt).toBeDefined();
     });
 
+    it("ignores delete failures for hostile legacy properties during devtools initialization", () => {
+        const target: Record<string, unknown> = {
+            demo: { get: () => "legacy" },
+        };
+
+        const hostileRoot = new Proxy(target, {
+            getOwnPropertyDescriptor(obj, prop) {
+                if (prop === "demo") {
+                    return {
+                        configurable: true,
+                        enumerable: true,
+                        value: obj.demo,
+                        writable: true,
+                    };
+                }
+                return Object.getOwnPropertyDescriptor(obj, prop);
+            },
+            deleteProperty(_obj, prop) {
+                if (prop === "demo") {
+                    throw new Error("delete blocked");
+                }
+                return true;
+            },
+        });
+
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = hostileRoot;
+
+        expect(() =>
+            render(
+                <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                    <div />
+                </MnemonicProvider>,
+            ),
+        ).not.toThrow();
+
+        const registry = getRegistry();
+        expect(registry.demo).toBeDefined();
+        expect(registry.providers.dt).toBeDefined();
+    });
+
+    it("normalizes malformed __meta fields on an existing registry root", () => {
+        (window as any).__REACT_MNEMONIC_DEVTOOLS__ = {
+            providers: {},
+            capabilities: {},
+            __meta: {
+                version: Number.NaN,
+                lastUpdated: Number.POSITIVE_INFINITY,
+                lastChange: 42,
+            },
+        };
+
+        render(
+            <MnemonicProvider namespace="dt" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        expect(Number.isFinite(registry.__meta.version)).toBe(true);
+        expect(registry.__meta.version).toBeGreaterThanOrEqual(1);
+        expect(Number.isFinite(registry.__meta.lastUpdated)).toBe(true);
+        expect(registry.__meta.lastChange).toBe("dt.registry:namespace-registered");
+    });
+
     it("marks capabilities and skips provider registration when WeakRef is unavailable", () => {
         (globalThis as any).WeakRef = undefined;
         const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
@@ -1029,6 +1223,35 @@ describe("MnemonicProvider – DevTools", () => {
         expect(registry.resolve("no-weak")).toBeNull();
         expect(registry.list()).toEqual([]);
         expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('registry provider "no-weak" was not registered'));
+        infoSpy.mockRestore();
+    });
+
+    it("skips provider registration if WeakRef becomes unavailable between root creation and registration", () => {
+        let weakRefReads = 0;
+        Object.defineProperty(globalThis, "WeakRef", {
+            configurable: true,
+            get() {
+                weakRefReads += 1;
+                return weakRefReads === 1 ? originalWeakRef : undefined;
+            },
+        });
+
+        const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="weak-race" storage={createMockStorage()} enableDevTools={true}>
+                <div />
+            </MnemonicProvider>,
+        );
+
+        const registry = getRegistry();
+        expect(registry.capabilities.weakRef).toBe(true);
+        expect(registry.resolve("weak-race")).toBeNull();
+        expect(registry.providers["weak-race"]).toBeUndefined();
+        expect(infoSpy).toHaveBeenCalledWith(
+            expect.stringContaining('WeakRef became unavailable while registering "weak-race"'),
+        );
+
         infoSpy.mockRestore();
     });
 
@@ -1363,6 +1586,37 @@ describe("reloadFromStorage via onExternalChange", () => {
         expect(store!.getRawSnapshot("a")).toBe("1");
     });
 
+    it("granular reload treats storage read errors as a null snapshot and notifies listeners of the change", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        expect(store!.getRawSnapshot("a")).toBe("1");
+
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        storage.getItem = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+
+        storage.triggerExternalChange(["ns.a"]);
+
+        expect(listenerA).toHaveBeenCalledTimes(1);
+        expect(store!.getRawSnapshot("a")).toBeNull();
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("Storage access error (SecurityError)"));
+
+        spy.mockRestore();
+    });
+
     it("blanket reload via explicit undefined", () => {
         const storage = createMockStorageWithExternalChange();
         storage.store.set("ns.a", "1");
@@ -1385,5 +1639,36 @@ describe("reloadFromStorage via onExternalChange", () => {
 
         expect(listenerA).toHaveBeenCalled();
         expect(store!.getRawSnapshot("a")).toBe("updated");
+    });
+
+    it("blanket reload treats storage access errors as a null snapshot and notifies listeners of the change", () => {
+        const storage = createMockStorageWithExternalChange();
+        storage.store.set("ns.a", "1");
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const listenerA = vi.fn();
+        store!.subscribeRaw("a", listenerA);
+        expect(store!.getRawSnapshot("a")).toBe("1");
+
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        storage.getItem = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+
+        storage.triggerExternalChange(undefined);
+
+        expect(listenerA).toHaveBeenCalledTimes(1);
+        expect(store!.getRawSnapshot("a")).toBeNull();
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("Storage access error (SecurityError)"));
+
+        spy.mockRestore();
     });
 });

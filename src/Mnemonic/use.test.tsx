@@ -5,9 +5,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
+import { defineMnemonicKey } from "./key";
 import { createCodec, CodecError } from "./codecs";
 import { SchemaError } from "./schema";
-import type { StorageLike, Codec, ReconcileContext } from "./types";
+import type { StorageLike, Codec, ReconcileContext, MnemonicKeyState } from "./types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -244,6 +245,67 @@ describe("useMnemonicKey – basic read/write", () => {
         );
 
         expect(resetReload.result.current.value).toBe("Anonymous");
+    });
+
+    it("supports descriptor-based keys across multiple components", () => {
+        const themeKey = defineMnemonicKey("theme", {
+            defaultValue: "light" as "light" | "dark",
+        });
+        const firstRef: { current: MnemonicKeyState<"light" | "dark"> } = {
+            current: undefined as unknown as MnemonicKeyState<"light" | "dark">,
+        };
+        const secondRef: { current: MnemonicKeyState<"light" | "dark"> } = {
+            current: undefined as unknown as MnemonicKeyState<"light" | "dark">,
+        };
+
+        function FirstConsumer() {
+            firstRef.current = useMnemonicKey(themeKey);
+            return null;
+        }
+
+        function SecondConsumer() {
+            secondRef.current = useMnemonicKey(themeKey);
+            return null;
+        }
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <FirstConsumer />
+                <SecondConsumer />
+            </MnemonicProvider>,
+        );
+
+        expect(firstRef.current.value).toBe("light");
+        expect(secondRef.current.value).toBe("light");
+
+        act(() => {
+            firstRef.current.set("dark");
+        });
+
+        expect(firstRef.current.value).toBe("dark");
+        expect(secondRef.current.value).toBe("dark");
+        expect(storage.store.get("ns.theme")).toBe(env(JSON.stringify("dark")));
+    });
+
+    it("preserves nullable clear intent when using a descriptor", () => {
+        const displayNameKey = defineMnemonicKey("displayName", {
+            defaultValue: "Anonymous" as string | null,
+        });
+
+        const firstMount = renderHook(storage, "ns", () => useMnemonicKey(displayNameKey));
+
+        act(() => {
+            firstMount.result.current.set(null);
+        });
+
+        expect(firstMount.result.current.value).toBeNull();
+        expect(storage.store.get("ns.displayName")).toBe(env(JSON.stringify(null)));
+
+        firstMount.unmount();
+
+        const secondMount = renderHook(storage, "ns", () => useMnemonicKey(displayNameKey));
+
+        expect(secondMount.result.current.value).toBeNull();
     });
 });
 
