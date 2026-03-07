@@ -32,7 +32,12 @@ jobs:
               run: npm run test:coverage
 
             - name: SonarQube Cloud scan
-              uses: SonarSource/sonarqube-scan-action@v7
+              uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
+              with:
+                  args: >
+                      -Dsonar.sources=src
+                      -Dsonar.exclusions=src/**/*.test.ts,src/**/*.test.tsx,dist/**,coverage/**,docs/**,website/**,devtools-extension/**,node_modules/**
+                      -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
