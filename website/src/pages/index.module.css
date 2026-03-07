@@ -37,22 +37,31 @@
     margin-top: 2rem;
 }
 
-.heroOutlineButton {
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.92);
-    background: rgba(9, 22, 38, 0.22);
+.heroOutlineButton,
+.heroOutlineButton:link,
+.heroOutlineButton:visited {
+    --ifm-button-color: #fff;
+    --ifm-button-border-color: rgba(255, 255, 255, 0.92);
+    --ifm-button-background-color: rgba(9, 22, 38, 0.22);
+    color: var(--ifm-button-color);
     backdrop-filter: blur(4px);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .heroOutlineButton:hover,
 .heroOutlineButton:focus-visible {
-    color: #fff;
-    border-color: #fff;
-    background: rgba(9, 22, 38, 0.36);
+    --ifm-button-color: #fff;
+    --ifm-button-border-color: #fff;
+    --ifm-button-background-color: rgba(9, 22, 38, 0.36);
+    color: var(--ifm-button-color);
 }
 
 [data-theme="dark"] .heroOutlineButton {
-    background: rgba(9, 22, 38, 0.3);
+    --ifm-button-background-color: rgba(9, 22, 38, 0.3);
+}
+
+:global([data-theme="light"]) .heroOutlineButton {
+    color: var(--ifm-button-color);
 }
 
 .installSnippet {

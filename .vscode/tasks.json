@@ -1,0 +1,51 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Library: Build",
+            "type": "npm",
+            "script": "build",
+            "path": "",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Repo: Format",
+            "type": "npm",
+            "script": "format",
+            "path": "",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Docs: Start Server",
+            "type": "npm",
+            "script": "docs:site:start",
+            "path": "",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "custom",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": ".*(Serving site from:|Server is running|Local:).*"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Docs: Build And Start Server",
+            "dependsOrder": "sequence",
+            "dependsOn": ["Library: Build", "Docs: Start Server"],
+            "problemMatcher": []
+        }
+    ]
+}

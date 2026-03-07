@@ -79,10 +79,7 @@ function HomepageHeader() {
                         Get Started
                     </Link>
                     <Link
-                        className={clsx(
-                            "button button--outline button--secondary button--lg",
-                            styles.heroOutlineButton,
-                        )}
+                        className={clsx("button button--outline button--lg", styles.heroOutlineButton)}
                         to="/docs/api"
                         style={{ marginLeft: "1rem" }}
                     >
@@ -113,8 +110,8 @@ function HomepageFeatures() {
         <section className={styles.features}>
             <div className="container">
                 <div className="row">
-                    {features.map((props, idx) => (
-                        <Feature key={idx} {...props} />
+                    {features.map((props) => (
+                        <Feature key={props.title} {...props} />
                     ))}
                 </div>
             </div>

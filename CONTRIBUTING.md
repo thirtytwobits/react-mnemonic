@@ -66,15 +66,16 @@ cd ..
 
 ### Library development
 
-| Command                | Description                                   |
-| ---------------------- | --------------------------------------------- |
-| `npm run build`        | One-shot production build into `dist/`        |
-| `npm run dev`          | Watch mode — rebuilds `dist/` on file changes |
-| `npm run test`         | Run the full Vitest test suite once           |
-| `npm run test:watch`   | Run Vitest in watch mode                      |
-| `npm run lint`         | Type-check with `tsc --noEmit`                |
-| `npm run format`       | Format all files with Prettier                |
-| `npm run format:check` | Check formatting without writing              |
+| Command                 | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `npm run build`         | One-shot production build into `dist/`        |
+| `npm run dev`           | Watch mode — rebuilds `dist/` on file changes |
+| `npm run test`          | Run the full Vitest test suite once           |
+| `npm run test:coverage` | Run Vitest with LCOV + HTML coverage output   |
+| `npm run test:watch`    | Run Vitest in watch mode                      |
+| `npm run lint`          | Type-check with `tsc --noEmit`                |
+| `npm run format`        | Format all files with Prettier                |
+| `npm run format:check`  | Check formatting without writing              |
 
 All commands are run from the **repository root**.
 
@@ -132,7 +133,7 @@ npm run test:watch
 ### Coverage
 
 ```bash
-npx vitest run --coverage
+npm run test:coverage
 ```
 
 Coverage reports (HTML + LCOV) are written to `coverage/`.
@@ -212,6 +213,42 @@ Runs on every push and pull request:
   tarball and installs it with **npm**, **yarn**, and **pnpm** in parallel, then
   verifies ESM imports, CJS requires, and TypeScript type resolution
   (`moduleResolution: "nodenext"`).
+
+### SonarQube Cloud (`sonarcloud.yml`)
+
+Runs on pushes to `main` and on pull requests:
+
+- On pushes to `main`, runs inside the `production-ci` GitHub environment
+- Installs dependencies
+- Generates `coverage/lcov.info` via `npm run test:coverage`
+- Uploads source analysis and coverage to SonarQube Cloud using
+  `SonarSource/sonarqube-scan-action@v7`
+- On pull requests, skips Sonar analysis and writes a short notice explaining
+  that the token is only available through the `production-ci` environment
+
+Maintainer setup:
+
+1. Import `thirtytwobits/react-mnemonic` into SonarQube Cloud.
+2. Confirm the organization key and project key in
+   `sonar-project.properties`
+   match the imported project.
+3. Add `SONAR_TOKEN` to the `production-ci` GitHub environment secrets.
+
+Because the token is environment-scoped, pull requests do not run SonarQube
+analysis in this configuration.
+
+### Code Scanning (`codeql.yml`)
+
+Runs on pushes to `main`, pull requests targeting `main`, and a weekly schedule:
+
+- Analyzes the repository with GitHub CodeQL for `javascript-typescript`
+- Uses `build-mode: none`, which is the supported mode for this interpreted codebase
+- Scans the shipped library, docs-site source, docs tooling scripts, and the
+  browser devtools extension
+
+If GitHub's CodeQL default setup is already enabled in the repository settings,
+disable it before relying on this workflow so the repository does not run two
+separate CodeQL configurations.
 
 ### Documentation deployment (`deploy-docs.yml`)
 
