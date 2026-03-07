@@ -4,6 +4,7 @@
 export { MnemonicProvider, MnemonicProviderProps } from "./Mnemonic/provider";
 export { useMnemonicKey } from "./Mnemonic/use";
 export { useMnemonicRecovery } from "./Mnemonic/recovery";
+export { defineMnemonicKey } from "./Mnemonic/key";
 export { createSchemaRegistry } from "./Mnemonic/schema-registry";
 export { JSONCodec, createCodec, CodecError } from "./Mnemonic/codecs";
 export { SchemaError } from "./Mnemonic/schema";
@@ -13,6 +14,7 @@ export type { JsonSchema, JsonSchemaType, JsonSchemaValidationError, CompiledVal
 export type { StructuralNode, StructuralTreeHelpers } from "./Mnemonic/structural-migrations";
 export type {
     Codec,
+    MnemonicKeyDescriptor,
     Listener,
     Mnemonic,
     MnemonicKeyState,

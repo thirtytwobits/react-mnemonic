@@ -3,8 +3,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { MnemonicProvider, useMnemonic } from "./provider";
 import { useMnemonicKey } from "./use";
+import { defineMnemonicKey } from "./key";
 import type { StorageLike } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -288,6 +291,55 @@ describe("useSyncExternalStore – tearing prevention", () => {
 
         expect(v1).toBe(99);
         expect(v2).toBe(99);
+    });
+});
+
+// ============================================================================
+// SSR Hydration Contract
+// ============================================================================
+
+describe("SSR hydration contract", () => {
+    let storage: ReturnType<typeof createMockStorage>;
+
+    beforeEach(() => {
+        storage = createMockStorage();
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = "";
+    });
+
+    it("server-renders the default and hydrates to the persisted value on the client", async () => {
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
+
+        const themeKey = defineMnemonicKey("theme", {
+            defaultValue: "light" as "light" | "dark",
+        });
+
+        function Theme() {
+            const { value } = useMnemonicKey(themeKey);
+            return <span>{value}</span>;
+        }
+
+        const app = (
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <Theme />
+            </MnemonicProvider>
+        );
+
+        const html = renderToString(app);
+        expect(html).toContain("light");
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await act(async () => {
+            hydrateRoot(container, app);
+            await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain("dark");
     });
 });
 

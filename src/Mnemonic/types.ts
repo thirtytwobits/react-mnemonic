@@ -987,6 +987,42 @@ export interface MnemonicKeyState<T> {
 }
 
 /**
+ * Reusable, importable contract for a single persisted key.
+ *
+ * Descriptors package the key name and its `useMnemonicKey(...)` options into
+ * a stable object that can be defined once at module scope and reused across
+ * components. This helps keep persistence behavior explicit and consistent,
+ * especially when the same key appears in multiple parts of an application.
+ *
+ * @template T - The decoded value type for the key
+ * @template K - The literal key name
+ *
+ * @example
+ * ```typescript
+ * const themeKey = defineMnemonicKey("theme", {
+ *   defaultValue: "light" as "light" | "dark",
+ *   listenCrossTab: true,
+ * });
+ *
+ * const { value, set } = useMnemonicKey(themeKey);
+ * ```
+ *
+ * @see {@link defineMnemonicKey} - Helper for creating descriptors
+ * @see {@link useMnemonicKey} - Hook that consumes descriptors
+ */
+export interface MnemonicKeyDescriptor<T, K extends string = string> {
+    /**
+     * Unprefixed storage key name.
+     */
+    readonly key: K;
+
+    /**
+     * Canonical options for this key.
+     */
+    readonly options: UseMnemonicKeyOptions<T>;
+}
+
+/**
  * Configuration options for the useMnemonicKey hook.
  *
  * These options control how a value is persisted, decoded, and

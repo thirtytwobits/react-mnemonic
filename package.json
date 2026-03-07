@@ -24,6 +24,7 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
         "lint": "tsc -p tsconfig.json --noEmit",
         "format": "prettier --write .",

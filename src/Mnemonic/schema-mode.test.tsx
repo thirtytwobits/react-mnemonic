@@ -6,6 +6,7 @@ import { render, act, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MnemonicProvider, useMnemonic } from "./provider";
 import { useMnemonicKey } from "./use";
+import { defineMnemonicKey } from "./key";
 import { SchemaError } from "./schema";
 import { CodecError } from "./codecs";
 import type { StorageLike, KeySchema, MigrationRule, SchemaRegistry } from "./types";
@@ -129,6 +130,24 @@ describe("schema mode behavior", () => {
                 </MnemonicProvider>,
             ),
         ).toThrow("strict mode requires schemaRegistry");
+        spy.mockRestore();
+    });
+
+    it("autoschema mode requires schemaRegistry.registerSchema", () => {
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const incompleteRegistry: SchemaRegistry = {
+            getSchema: () => undefined,
+            getLatestSchema: () => undefined,
+            getMigrationPath: () => null,
+        };
+
+        expect(() =>
+            render(
+                <MnemonicProvider namespace="ns" schemaMode="autoschema" schemaRegistry={incompleteRegistry}>
+                    <div />
+                </MnemonicProvider>,
+            ),
+        ).toThrow("MnemonicProvider autoschema mode requires schemaRegistry.registerSchema");
         spy.mockRestore();
     });
 
@@ -312,6 +331,83 @@ describe("schema mode behavior", () => {
 
         await waitFor(() => {
             expect(storage.store.get("ns.settings")).toBe(schemaEnv({ theme: "dark" }, 2));
+        });
+    });
+
+    it("supports descriptor-based keys for schema migration flows", async () => {
+        const storage = createMockStorage();
+        const registry = createRegistry(
+            [
+                {
+                    key: "profile",
+                    version: 1,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string" },
+                        },
+                        required: ["name"],
+                        additionalProperties: false,
+                    },
+                },
+                {
+                    key: "profile",
+                    version: 2,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string" },
+                            migratedAt: { type: "string" },
+                        },
+                        required: ["name", "migratedAt"],
+                        additionalProperties: false,
+                    },
+                },
+            ],
+            [
+                {
+                    key: "profile",
+                    fromVersion: 1,
+                    toVersion: 2,
+                    migrate: (value) => ({
+                        ...(value as { name: string }),
+                        migratedAt: "2026-03-07T00:00:00.000Z",
+                    }),
+                },
+            ],
+        );
+
+        storage.store.set("ns.profile", schemaEnv({ name: "Ada" }, 1));
+
+        const profileKey = defineMnemonicKey("profile", {
+            defaultValue: {
+                name: "",
+                migratedAt: "",
+            },
+        });
+
+        const result = renderHook(() => useMnemonicKey(profileKey), {
+            namespace: "ns",
+            storage,
+            schemaMode: "default",
+            schemaRegistry: registry,
+        });
+
+        expect(result.current.value).toEqual({
+            name: "Ada",
+            migratedAt: "2026-03-07T00:00:00.000Z",
+        });
+
+        await waitFor(() => {
+            expect(storage.store.get("ns.profile")).toBe(
+                schemaEnv(
+                    {
+                        name: "Ada",
+                        migratedAt: "2026-03-07T00:00:00.000Z",
+                    },
+                    2,
+                ),
+            );
         });
     });
 

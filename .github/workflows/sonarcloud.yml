@@ -1,0 +1,58 @@
+name: SonarQube Cloud
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    sonarcloud-main:
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        environment: production-ci
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Generate coverage report
+              run: npm run test:coverage
+
+            - name: SonarQube Cloud scan
+              uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
+              with:
+                  args: >
+                      -Dsonar.sources=src
+                      -Dsonar.exclusions=src/**/*.test.ts,src/**/*.test.tsx,dist/**,coverage/**,docs/**,website/**,devtools-extension/**,node_modules/**
+                      -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    sonarcloud-pr:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Explain skipped SonarQube Cloud scan
+              run: |
+                  echo "::notice title=SonarQube Cloud skipped::Pull request SonarQube scans are intentionally skipped because SONAR_TOKEN is only available in the production-ci environment used on main."
+                  {
+                      echo "## SonarQube Cloud"
+                      echo
+                      echo "Pull request SonarQube scans are intentionally skipped."
+                      echo
+                      echo "The real SonarQube analysis runs only on pushes to \`main\`, where the workflow is bound to the \`production-ci\` GitHub environment that holds \`SONAR_TOKEN\`."
+                  } >> "$GITHUB_STEP_SUMMARY"

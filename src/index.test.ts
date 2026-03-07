@@ -6,6 +6,7 @@ import {
     MnemonicProvider,
     useMnemonicKey,
     useMnemonicRecovery,
+    defineMnemonicKey,
     createSchemaRegistry,
     JSONCodec,
     createCodec,
@@ -17,6 +18,7 @@ import {
 import type {
     Codec,
     CreateSchemaRegistryOptions,
+    MnemonicKeyDescriptor,
     MnemonicProviderOptions,
     UseMnemonicKeyOptions,
     UseMnemonicRecoveryOptions,
@@ -39,6 +41,11 @@ describe("Public API exports", () => {
     it("exports useMnemonicRecovery", () => {
         expect(useMnemonicRecovery).toBeDefined();
         expect(typeof useMnemonicRecovery).toBe("function");
+    });
+
+    it("exports defineMnemonicKey", () => {
+        expect(defineMnemonicKey).toBeDefined();
+        expect(typeof defineMnemonicKey).toBe("function");
     });
 
     it("exports createSchemaRegistry", () => {
@@ -110,6 +117,29 @@ describe("Public API exports", () => {
             defaultValue: "hello",
         };
         expect(opts.defaultValue).toBe("hello");
+    });
+
+    it("type exports are usable (MnemonicKeyDescriptor)", () => {
+        const descriptor: MnemonicKeyDescriptor<number, "count"> = defineMnemonicKey("count", {
+            defaultValue: 0,
+        });
+        expect(descriptor.key).toBe("count");
+        expect(descriptor.options.defaultValue).toBe(0);
+    });
+
+    it("descriptor usage preserves value inference for useMnemonicKey", () => {
+        const themeKey = defineMnemonicKey("theme", {
+            defaultValue: "light" as "light" | "dark",
+        });
+
+        function TypecheckComponent() {
+            const state = useMnemonicKey(themeKey);
+            const theme: "light" | "dark" = state.value;
+            expect(theme).toBe("light");
+            return null;
+        }
+
+        expect(TypecheckComponent).toBeDefined();
     });
 
     it("type exports are usable (UseMnemonicRecoveryOptions)", () => {
