@@ -63,33 +63,39 @@ const startHereSidebarCategory = `    // START_HERE_START
     // START_HERE_END
 `;
 
+function normalizeNewlines(text) {
+    return text.replace(/\r\n/g, "\n");
+}
+
 function replaceMarkedBlock(text, startMarker, endMarker, replacement) {
     const pattern = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}\\n?`, "m");
     return pattern.test(text) ? text.replace(pattern, `${replacement}\n`) : text;
 }
 
 function postprocessApiIndex() {
-    const original = readFileSync(apiIndexPath, "utf8");
+    const original = normalizeNewlines(readFileSync(apiIndexPath, "utf8"));
     let next = replaceMarkedBlock(original, "<!-- START_HERE_START -->", "<!-- START_HERE_END -->", "");
+    const headerPattern = /^# react-mnemonic[^\n]*(?:\n){2}/m;
+    const headerMatch = next.match(headerPattern);
 
-    if (!next.startsWith("# react-mnemonic")) {
-        throw new Error(`Unexpected API index format in ${apiIndexPath}`);
+    if (!headerMatch) {
+        throw new Error(`Could not locate react-mnemonic header in ${apiIndexPath}`);
     }
 
-    next = next.replace("# react-mnemonic\n\n", `# react-mnemonic\n\n${startHereSection}\n\n`);
+    next = next.replace(headerPattern, `${headerMatch[0]}${startHereSection}\n\n`);
     writeFileSync(apiIndexPath, next, "utf8");
 }
 
 function postprocessTypedocSidebar() {
-    const original = readFileSync(typedocSidebarPath, "utf8");
+    const original = normalizeNewlines(readFileSync(typedocSidebarPath, "utf8"));
     let next = replaceMarkedBlock(original, "// START_HERE_START", "// START_HERE_END", "");
-
-    const anchor = "const typedocSidebar = {\n  items: [\n";
-    if (!next.includes(anchor)) {
+    const anchorPattern = /const typedocSidebar = \{\n  items: \[\n/;
+    const anchorMatch = next.match(anchorPattern);
+    if (!anchorMatch) {
         throw new Error(`Unexpected sidebar format in ${typedocSidebarPath}`);
     }
 
-    next = next.replace(anchor, `${anchor}${startHereSidebarCategory}`);
+    next = next.replace(anchorPattern, `${anchorMatch[0]}${startHereSidebarCategory}`);
     writeFileSync(typedocSidebarPath, next, "utf8");
 }
 
