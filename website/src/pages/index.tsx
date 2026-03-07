@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import Link from "@docusaurus/Link";
+import useBaseUrl from "@docusaurus/useBaseUrl";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
 import CodeBlock from "@theme/CodeBlock";
@@ -40,37 +41,37 @@ const features: FeatureItem[] = [
             "useMnemonicKey returns { value, set, reset, remove } — the same mental model as useState, with persistence built in.",
     },
     {
-        title: "JSON Schema Validation",
+        title: "AI-Friendly",
         description:
-            "Optional schema-based validation using a built-in JSON Schema subset. Versioned schemas with automatic migration paths.",
-    },
-    {
-        title: "Cross-Tab Sync",
-        description:
-            "Opt-in listenCrossTab uses the browser storage event. Custom backends can use BroadcastChannel via onExternalChange.",
-    },
-    {
-        title: "Pluggable Storage",
-        description:
-            "Bring your own backend via the StorageLike interface — IndexedDB, sessionStorage, or anything with get/set/remove.",
-    },
-    {
-        title: "Schema Migration",
-        description:
-            "Upgrade stored data with versioned schemas and migration rules. Write-time normalizers keep data clean on every write.",
+            "Designed with rigorous typing and predictable behavior. No magic — easy for AI to understand and work with.",
     },
     {
         title: "Zero Dependencies",
         description:
-            "Tree-shakeable, ships ESM + CJS with full TypeScript declarations. SSR-safe — returns defaults when window is unavailable.",
+            "Tree-shakeable for ESM bundlers, ships ESM + CJS with bundled TypeScript declarations, and is SSR-safe.",
     },
 ];
 
 function HomepageHeader() {
     const { siteConfig } = useDocusaurusContext();
+    const backgroundVideoUrl = useBaseUrl("/img/ink.mp4");
+
     return (
         <header className={clsx("hero hero--primary", styles.heroBanner)}>
-            <div className="container">
+            <video
+                aria-hidden="true"
+                className={styles.heroVideo}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                tabIndex={-1}
+            >
+                <source src={backgroundVideoUrl} type="video/mp4" />
+            </video>
+            <div className={styles.heroOverlay} />
+            <div className={clsx("container", styles.heroContent)}>
                 <h1 className="hero__title">{siteConfig.title}</h1>
                 <p className="hero__subtitle">{siteConfig.tagline}</p>
                 <div className={styles.buttons}>
@@ -78,7 +79,7 @@ function HomepageHeader() {
                         Get Started
                     </Link>
                     <Link
-                        className="button button--outline button--secondary button--lg"
+                        className={clsx("button button--outline button--secondary button--lg", styles.heroOutlineButton)}
                         to="/docs/api"
                         style={{ marginLeft: "1rem" }}
                     >
@@ -93,7 +94,7 @@ function HomepageHeader() {
     );
 }
 
-function Feature({ title, description }: FeatureItem) {
+function Feature({ title, description }: Readonly<FeatureItem>) {
     return (
         <div className={clsx("col col--4")}>
             <div className="feature-card" style={{ height: "100%", marginBottom: "1rem" }}>
@@ -139,6 +140,21 @@ function HomepageExample() {
     );
 }
 
+function HomepageAttribution() {
+    return (
+        <section className={styles.attribution}>
+            <div className="container">
+                <p>
+                    background video by{" "}
+                    <a href="https://www.pexels.com/video/clouds-of-black-and-orange-paint-underwater-7565824/">
+                        MART PRODUCTION
+                    </a>
+                </p>
+            </div>
+        </section>
+    );
+}
+
 export default function Home(): React.JSX.Element {
     const { siteConfig } = useDocusaurusContext();
     return (
@@ -147,6 +163,7 @@ export default function Home(): React.JSX.Element {
             <main>
                 <HomepageFeatures />
                 <HomepageExample />
+                <HomepageAttribution />
             </main>
         </Layout>
     );
