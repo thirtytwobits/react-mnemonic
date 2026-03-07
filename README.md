@@ -3,7 +3,8 @@
 Persistent, type-safe state management for React.
 
 [![npm version](https://img.shields.io/npm/v/react-mnemonic.svg)](https://www.npmjs.com/package/react-mnemonic)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/react-mnemonic)](https://bundlephobia.com/package/react-mnemonic)
+[![docs](https://img.shields.io/badge/docs-online-0A7EA4.svg)](https://thirtytwobits.github.io/react-mnemonic/)
+[![dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](https://www.npmjs.com/package/react-mnemonic)
 [![license](https://img.shields.io/npm/l/react-mnemonic.svg)](./LICENSE.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
@@ -11,8 +12,7 @@ Persistent, type-safe state management for React.
 page refreshes, synchronize across tabs, and stay type-safe end-to-end -- all
 through a single hook that works like `useState`.
 
-`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag while
-the release candidate hardening work finishes.
+`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag. We are working on large changes as part of the beta1 milestone and expect beta 1 to then receive only fixes and polish ahead of the first production release.
 
 ## Features
 

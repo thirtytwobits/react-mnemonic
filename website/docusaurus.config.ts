@@ -39,6 +39,8 @@ const config: Config = {
                 excludePrivate: true,
                 excludeProtected: true,
                 excludeInternal: true,
+                sort: ["kind", "alphabetical"],
+                kindSortOrder: ["Function", "Interface", "TypeAlias", "Class", "Variable", "Enum"],
                 parametersFormat: "table",
                 enumMembersFormat: "table",
                 typeDeclarationFormat: "table",

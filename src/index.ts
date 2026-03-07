@@ -15,6 +15,7 @@ export type {
     Codec,
     Listener,
     Mnemonic,
+    MnemonicKeyState,
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,
     MnemonicRecoveryHook,

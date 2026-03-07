@@ -3,6 +3,31 @@
     text-align: center;
     position: relative;
     overflow: hidden;
+    min-height: 28rem;
+    display: flex;
+    align-items: center;
+}
+
+.heroVideo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.heroOverlay {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(8, 20, 34, 0.4), rgba(8, 20, 34, 0.72)),
+        linear-gradient(135deg, rgba(10, 71, 128, 0.28), rgba(21, 101, 192, 0.12));
+}
+
+.heroContent {
+    position: relative;
+    z-index: 1;
 }
 
 .buttons {
@@ -10,6 +35,24 @@
     align-items: center;
     justify-content: center;
     margin-top: 2rem;
+}
+
+.heroOutlineButton {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.92);
+    background: rgba(9, 22, 38, 0.22);
+    backdrop-filter: blur(4px);
+}
+
+.heroOutlineButton:hover,
+.heroOutlineButton:focus-visible {
+    color: #fff;
+    border-color: #fff;
+    background: rgba(9, 22, 38, 0.36);
+}
+
+[data-theme="dark"] .heroOutlineButton {
+    background: rgba(9, 22, 38, 0.3);
 }
 
 .installSnippet {
@@ -37,4 +80,34 @@
 .example {
     padding: 3rem 0;
     background: var(--ifm-background-surface-color);
+}
+
+.attribution {
+    padding: 0 0 0.75rem;
+}
+
+.attribution p {
+    margin: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: var(--ifm-color-emphasis-600);
+}
+
+.attribution a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.14em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .heroVideo {
+        display: none;
+    }
+
+    .heroBanner {
+        background:
+            linear-gradient(180deg, rgba(8, 20, 34, 0.4), rgba(8, 20, 34, 0.72)),
+            linear-gradient(135deg, #1565c0, #0d47a1);
+    }
 }

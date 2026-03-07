@@ -15,7 +15,7 @@ import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { validateJsonSchema, inferJsonSchema } from "./json-schema";
 import type { JsonSchema } from "./json-schema";
-import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext } from "./types";
+import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext, MnemonicKeyState } from "./types";
 
 /**
  * React hook for persistent, type-safe state management.
@@ -27,16 +27,35 @@ import type { UseMnemonicKeyOptions, KeySchema, MigrationPath, ReconcileContext 
  * Must be used within a `MnemonicProvider`. Uses React's `useSyncExternalStore`
  * internally for efficient, tearing-free state synchronization.
  *
+ * Read lifecycle, in order:
+ * 1. Load the raw stored envelope for `key`
+ * 2. Decode the payload (codec or schema-managed JSON)
+ * 3. Validate and migrate when schemas are registered
+ * 4. Run `reconcile(...)` if provided
+ * 5. Fall back to `defaultValue` when the key is absent or invalid
+ *
+ * Write semantics:
+ * - `set(...)` persists a new value
+ * - `reset()` persists `defaultValue`
+ * - `remove()` deletes the key entirely so future reads fall back to `defaultValue`
+ *
+ * For guide-level background, see the
+ * [Schema Migration guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)
+ * and the
+ * [Clearable Persisted Values guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values).
+ *
  * @template T - The TypeScript type of the stored value
  *
  * @param key - The storage key (unprefixed, namespace is applied automatically)
  * @param options - Configuration options controlling persistence, encoding, and behavior
  *
- * @returns Object with the current value and methods to update it
+ * @returns Persistent state handle with the current value and mutation helpers
+ *
+ * @see {@link UseMnemonicKeyOptions} - Hook configuration and lifecycle details
  *
  * @throws {Error} If used outside of a MnemonicProvider
  */
-export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>) {
+export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>): MnemonicKeyState<T> {
     const api = useMnemonic();
 
     const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = options;
@@ -633,7 +652,7 @@ export function useMnemonicKey<T>(key: string, options: UseMnemonicKeyOptions<T>
         return () => api.removeRaw(key);
     }, [api, key]);
 
-    return useMemo(
+    return useMemo<MnemonicKeyState<T>>(
         () =>
             /** @see {@link UseMnemonicKeyOptions} for configuration details */
             ({
