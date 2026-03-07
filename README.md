@@ -12,8 +12,7 @@ Persistent, type-safe state management for React.
 page refreshes, synchronize across tabs, and stay type-safe end-to-end -- all
 through a single hook that works like `useState`.
 
-`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag while
-the release candidate hardening work finishes.
+`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag. We are working on large changes as part of the beta1 milestone and expect beta 1 to then receive only fixes and polish ahead of the first production release.
 
 ## Features
 

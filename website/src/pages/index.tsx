@@ -79,7 +79,10 @@ function HomepageHeader() {
                         Get Started
                     </Link>
                     <Link
-                        className={clsx("button button--outline button--secondary button--lg", styles.heroOutlineButton)}
+                        className={clsx(
+                            "button button--outline button--secondary button--lg",
+                            styles.heroOutlineButton,
+                        )}
                         to="/docs/api"
                         style={{ marginLeft: "1rem" }}
                     >
