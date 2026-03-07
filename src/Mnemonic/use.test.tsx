@@ -6,8 +6,11 @@ import { render, act, waitFor } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
 import { defineMnemonicKey } from "./key";
+import { createSchemaRegistry } from "./schema-registry";
 import { createCodec, CodecError } from "./codecs";
 import { SchemaError } from "./schema";
+import { defineKeySchema } from "./schema-helpers";
+import { mnemonicSchema } from "./typed-schema";
 import type { StorageLike, Codec, ReconcileContext, MnemonicKeyState } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -306,6 +309,47 @@ describe("useMnemonicKey – basic read/write", () => {
         const secondMount = renderHook(storage, "ns", () => useMnemonicKey(displayNameKey));
 
         expect(secondMount.result.current.value).toBeNull();
+    });
+
+    it("supports schema-bound descriptors with schema-derived inference", () => {
+        const themeSchema = defineKeySchema("theme", 1, mnemonicSchema.enum(["light", "dark"] as const));
+        const registry = createSchemaRegistry({ schemas: [themeSchema] });
+        const themeKey = defineMnemonicKey(themeSchema, {
+            defaultValue: "light",
+            reconcile: (value, _context) => (value === "dark" ? value : "light"),
+        });
+
+        const firstRef: { current: MnemonicKeyState<"light" | "dark"> } = {
+            current: undefined as unknown as MnemonicKeyState<"light" | "dark">,
+        };
+        const secondRef: { current: MnemonicKeyState<"light" | "dark"> } = {
+            current: undefined as unknown as MnemonicKeyState<"light" | "dark">,
+        };
+
+        function FirstConsumer() {
+            firstRef.current = useMnemonicKey(themeKey);
+            return null;
+        }
+
+        function SecondConsumer() {
+            secondRef.current = useMnemonicKey(themeKey);
+            return null;
+        }
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage} schemaMode="default" schemaRegistry={registry}>
+                <FirstConsumer />
+                <SecondConsumer />
+            </MnemonicProvider>,
+        );
+
+        act(() => {
+            firstRef.current.set("dark");
+        });
+
+        expect(firstRef.current.value).toBe("dark");
+        expect(secondRef.current.value).toBe("dark");
+        expect(storage.store.get("ns.theme")).toBe(JSON.stringify({ version: 1, payload: "dark" }));
     });
 });
 

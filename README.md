@@ -4,6 +4,7 @@ Persistent, type-safe state management for React.
 
 [![npm version](https://img.shields.io/npm/v/react-mnemonic.svg)](https://www.npmjs.com/package/react-mnemonic)
 [![docs](https://img.shields.io/badge/docs-online-0A7EA4.svg)](https://thirtytwobits.github.io/react-mnemonic/)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=thirtytwobits_react-mnemonic&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=thirtytwobits_react-mnemonic)
 [![dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](https://www.npmjs.com/package/react-mnemonic)
 [![license](https://img.shields.io/npm/l/react-mnemonic.svg)](./LICENSE.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
@@ -22,6 +23,7 @@ through a single hook that works like `useState`.
 - **Cross-tab sync** -- opt-in `listenCrossTab` uses the browser `storage` event
 - **Pluggable storage** -- bring your own backend via the `StorageLike` interface (IndexedDB, sessionStorage, etc.)
 - **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
+- **Typed schema cohesion helpers** -- define one schema object and reuse it across runtime validation, key descriptors, and migrations
 - **Structural migration helpers** -- optional tree utilities for idempotent insert/rename/dedupe migration steps
 - **Read-time reconciliation** -- selectively enforce new defaults on persisted values without clearing the whole key
 - **Recovery helpers** -- build user-facing soft reset and hard reset flows with namespace-scoped clear helpers
@@ -153,6 +155,83 @@ const { value, set } = useMnemonicKey("theme", {
 });
 ```
 
+## Single source of truth schemas
+
+If you want the same schema object to drive both runtime validation and
+TypeScript inference, use the typed schema helpers:
+
+```tsx
+import {
+    MnemonicProvider,
+    createSchemaRegistry,
+    defineKeySchema,
+    defineMnemonicKey,
+    defineMigration,
+    mnemonicSchema,
+    useMnemonicKey,
+} from "react-mnemonic";
+
+const profileV1 = defineKeySchema(
+    "profile",
+    1,
+    mnemonicSchema.object({
+        name: mnemonicSchema.string(),
+    }),
+);
+
+const profileV2 = defineKeySchema(
+    "profile",
+    2,
+    mnemonicSchema.object({
+        name: mnemonicSchema.string(),
+        email: mnemonicSchema.string(),
+    }),
+);
+
+const profileKey = defineMnemonicKey(profileV2, {
+    defaultValue: { name: "", email: "" },
+    reconcile: (value) => ({
+        ...value,
+        email: value.email.trim().toLowerCase(),
+    }),
+});
+
+const registry = createSchemaRegistry({
+    schemas: [profileV1, profileV2],
+    migrations: [
+        defineMigration(profileV1, profileV2, (value) => ({
+            ...value,
+            email: "",
+        })),
+    ],
+});
+
+function ProfileForm() {
+    const { value: profile, set } = useMnemonicKey(profileKey);
+    return <button onClick={() => set({ ...profile, email: "hello@example.com" })}>Save</button>;
+}
+
+export default function App() {
+    return (
+        <MnemonicProvider namespace="my-app" schemaMode="default" schemaRegistry={registry}>
+            <ProfileForm />
+        </MnemonicProvider>
+    );
+}
+```
+
+This path gives you:
+
+- one schema object reused in the registry, key descriptor, and migrations
+- inferred types for `defaultValue`, `value`, `set`, and `reconcile`
+- typed migration callbacks via `defineMigration(...)`
+
+Tradeoffs versus the lightweight JSON-only path:
+
+- more setup up front
+- best fit when a key is schema-managed and long-lived
+- not necessary for simple keys where `defaultValue` inference is already enough
+
 ## API
 
 ### `<MnemonicProvider>`
@@ -185,6 +264,23 @@ const themeKey = defineMnemonicKey("theme", {
 ```
 
 The returned descriptor can be imported and passed directly to `useMnemonicKey`.
+
+### `mnemonicSchema`, `defineKeySchema`, and `defineMigration`
+
+Use these helpers when you want a schema-managed key to have one source of
+truth for runtime validation and TypeScript inference.
+
+```ts
+const themeSchema = defineKeySchema("theme", 1, mnemonicSchema.enum(["light", "dark"] as const));
+
+const themeKey = defineMnemonicKey(themeSchema, {
+    defaultValue: "light",
+});
+```
+
+`defineMigration(fromSchema, toSchema, migrate)` infers the migration callback
+from the source and target schemas, while `defineWriteMigration(schema, migrate)`
+creates a typed same-version normalizer.
 
 ### `useMnemonicKey<T>(descriptor)` / `useMnemonicKey<T>(key, options)`
 

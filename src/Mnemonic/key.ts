@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
-import type { MnemonicKeyDescriptor, UseMnemonicKeyOptions } from "./types";
+import type { JsonSchema } from "./json-schema";
+import type { KeySchema, MnemonicKeyDescriptor, SchemaBoundKeyOptions, UseMnemonicKeyOptions } from "./types";
 
 /**
  * Define a reusable, importable contract for a persisted key.
@@ -30,9 +31,27 @@ import type { MnemonicKeyDescriptor, UseMnemonicKeyOptions } from "./types";
 export function defineMnemonicKey<const K extends string, T>(
     key: K,
     options: UseMnemonicKeyOptions<T>,
-): MnemonicKeyDescriptor<T, K> {
+): MnemonicKeyDescriptor<T, K>;
+export function defineMnemonicKey<const K extends string, TSchema extends KeySchema<unknown, K, JsonSchema>>(
+    keySchema: TSchema,
+    options: SchemaBoundKeyOptions<TSchema extends KeySchema<infer TValue, string, JsonSchema> ? TValue : never>,
+): MnemonicKeyDescriptor<TSchema extends KeySchema<infer TValue, string, JsonSchema> ? TValue : never, TSchema["key"]>;
+export function defineMnemonicKey(
+    keyOrSchema: string | KeySchema<unknown, string, JsonSchema>,
+    options: UseMnemonicKeyOptions<unknown> | SchemaBoundKeyOptions<unknown>,
+): MnemonicKeyDescriptor<unknown, string> {
+    if (typeof keyOrSchema !== "string") {
+        return Object.freeze({
+            key: keyOrSchema.key,
+            options: {
+                ...options,
+                schema: { version: keyOrSchema.version },
+            },
+        });
+    }
+
     return Object.freeze({
-        key,
+        key: keyOrSchema,
         options,
     });
 }
