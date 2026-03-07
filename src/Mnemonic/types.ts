@@ -130,7 +130,7 @@ export interface MnemonicProviderOptions {
      * enableDevTools: process.env.NODE_ENV === 'development'
      *
      * // Then in browser console:
-     * const provider = window.__REACT_MNEMONIC_DEVTOOLS__.resolve('myApp')
+     * const provider = window.__REACT_MNEMONIC_DEVTOOLS__?.resolve('myApp')
      * provider?.dump()
      * provider?.get('user')
      * provider?.set('user', { name: 'Test' })
@@ -468,6 +468,10 @@ export type MigrationPath = MigrationRule[];
  * Use this helper when your registry contents are known up front and do not
  * need runtime mutation. The returned registry is immutable and optimized for
  * the common `"default"` / `"strict"` setup.
+ *
+ * For most apps, this should be your default entry point for schema-managed
+ * persistence. Implement {@link SchemaRegistry} manually only when you need
+ * custom lookup behavior or runtime schema registration beyond autoschema mode.
  */
 export interface CreateSchemaRegistryOptions {
     /**
@@ -502,15 +506,19 @@ export interface CreateSchemaRegistryOptions {
  * read/write hot paths fast. `"autoschema"` remains mutable to support
  * inferred schema registration.
  *
+ * Most applications should prefer {@link createSchemaRegistry} instead of
+ * implementing this interface manually. Manual implementations are mainly for
+ * advanced cases such as custom backing stores, dynamic schema discovery, or
+ * adapter layers around an existing registry system.
+ *
  * @example
  * ```typescript
- * const registry: SchemaRegistry = {
- *   getSchema: (key, version) => schemas.get(`${key}@${version}`),
- *   getLatestSchema: (key) => latestByKey.get(key),
- *   getMigrationPath: (key, from, to) => buildPath(key, from, to),
- *   getWriteMigration: (key, version) => normalizers.get(`${key}@${version}`),
- *   registerSchema: (schema) => { schemas.set(`${schema.key}@${schema.version}`, schema); },
- * };
+ * const registry = createSchemaRegistry({
+ *   schemas: [
+ *     { key: "settings", version: 1, schema: { type: "object", required: ["theme"] } },
+ *   ],
+ *   migrations: [],
+ * });
  *
  * <MnemonicProvider namespace="app" schemaRegistry={registry} schemaMode="strict">
  *   <App />
@@ -933,6 +941,52 @@ export interface MnemonicRecoveryHook {
 }
 
 /**
+ * Return shape from {@link useMnemonicKey}.
+ *
+ * This mirrors the familiar `useState` mental model while making the storage
+ * semantics explicit:
+ *
+ * - `set(...)` writes a new persisted value
+ * - `reset()` writes `defaultValue` back into storage
+ * - `remove()` deletes the key entirely so reads fall back to `defaultValue`
+ *
+ * See the
+ * [Clearable Persisted Values guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values)
+ * for the semantic differences between clearing, resetting, and removing a key.
+ *
+ * @template T - The decoded value type for the key
+ *
+ * @see {@link UseMnemonicKeyOptions} - Hook configuration and lifecycle details
+ */
+export interface MnemonicKeyState<T> {
+    /**
+     * Current decoded value, or the default when the key is absent or invalid.
+     */
+    value: T;
+
+    /**
+     * Persist a new value.
+     *
+     * Accepts either a direct replacement value or an updater function that
+     * receives the current decoded value.
+     */
+    set: (next: T | ((current: T) => T)) => void;
+
+    /**
+     * Reset the key back to `defaultValue` and persist that default.
+     */
+    reset: () => void;
+
+    /**
+     * Delete the key from storage entirely.
+     *
+     * Future reads will fall back to `defaultValue` until the key is written
+     * again.
+     */
+    remove: () => void;
+}
+
+/**
  * Configuration options for the useMnemonicKey hook.
  *
  * These options control how a value is persisted, decoded, and
@@ -1047,6 +1101,9 @@ export type UseMnemonicKeyOptions<T> = {
      * between explicit versions. Use `reconcile` for conditional, field-level
      * adjustments that depend on application policy rather than a strict schema
      * upgrade step.
+     *
+     * See the Schema Migration guide for migration-vs-reconciliation guidance:
+     * https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration
      *
      * If `reconcile` throws a `SchemaError`, that error is preserved and passed
      * to `defaultValue`. Any other thrown error is wrapped as

@@ -25,6 +25,13 @@ function validateVersion(value: number, label: string): void {
  * ambiguous definitions, and returns a {@link SchemaRegistry} ready to pass to
  * `MnemonicProvider`.
  *
+ * Most applications should prefer this helper over manually implementing
+ * {@link SchemaRegistry}.
+ *
+ * See the
+ * [Schema Migration guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)
+ * for end-to-end registry and migration patterns.
+ *
  * @param options - Initial schema and migration definitions
  * @returns An indexed immutable schema registry
  *

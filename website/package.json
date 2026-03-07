@@ -12,7 +12,7 @@
         "serve": "docusaurus serve",
         "write-translations": "docusaurus write-translations",
         "write-heading-ids": "docusaurus write-heading-ids",
-        "typedoc": "docusaurus generate-typedoc"
+        "typedoc": "docusaurus generate-typedoc && node ./scripts/postprocess-typedoc.mjs"
     },
     "dependencies": {
         "@docusaurus/core": "^3.9.2",

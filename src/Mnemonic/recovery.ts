@@ -20,6 +20,10 @@ function uniqueKeys(keys: readonly string[]): string[] {
  * Applications can use this to offer self-service recovery UX for corrupt or
  * legacy persisted state. The hook operates on the current provider namespace.
  *
+ * See the
+ * [Reset and Recovery guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/reset-and-recovery)
+ * for soft-reset and hard-reset patterns.
+ *
  * @param options - Optional recovery callback for telemetry/auditing
  * @returns Namespace recovery helpers
  *
