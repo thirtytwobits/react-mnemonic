@@ -34,6 +34,12 @@ If you want the shortest reliable contract for implementation work, stay here.
 
 ## Structured summary
 
+The JSON block below is a simplified excerpt for quick reading. The complete,
+authoritative machine-readable contract lives in
+[`/ai-contract.json`](/ai-contract.json), which also includes top-level fields
+such as `version`, `title`, `writeLifecycle`, `recipes`, and
+`storageContract.requiredProvider`.
+
 ```json
 {
     "storageContract": {
