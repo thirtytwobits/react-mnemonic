@@ -263,7 +263,10 @@ function buildEnumValidationStep(schema: JsonSchema): ValidationStep | null {
 
     return (value, path, errors) => {
         const primitiveMatch = isJsonPrimitive(value) && enumPrimitiveSet.has(value);
-        const complexMatch = enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
+        const complexMatch =
+            !primitiveMatch &&
+            enumComplexMembers.length > 0 &&
+            enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
         if (primitiveMatch || complexMatch) {
             return;
         }
