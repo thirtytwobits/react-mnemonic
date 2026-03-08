@@ -38,6 +38,7 @@ type StringSchemaOptions = Pick<JsonSchema, "minLength" | "maxLength">;
 type NumberSchemaOptions = Pick<JsonSchema, "minimum" | "maximum" | "exclusiveMinimum" | "exclusiveMaximum">;
 type ArraySchemaOptions = Pick<JsonSchema, "minItems" | "maxItems">;
 type ObjectSchemaOptions = Pick<JsonSchema, "additionalProperties">;
+type JsonSchemaTypeInput = JsonSchemaType | JsonSchemaType[] | undefined;
 
 function cloneSchema<T>(schema: TypedJsonSchema<T>): TypedJsonSchema<T> {
     const clone = { ...schema } as TypedJsonSchema<T>;
@@ -81,14 +82,12 @@ function withType<T>(
     } as TypedJsonSchema<T>;
 }
 
-function toTypeArray(type: JsonSchemaType | JsonSchemaType[] | undefined): JsonSchemaType[] | null {
+function toTypeArray(type: JsonSchemaTypeInput): JsonSchemaType[] | null {
     if (type === undefined) return null;
     return Array.isArray(type) ? [...type] : [type];
 }
 
-function appendNullType(
-    type: JsonSchemaType | JsonSchemaType[] | undefined,
-): JsonSchemaType | JsonSchemaType[] | undefined {
+function appendNullType(type: JsonSchemaTypeInput): JsonSchemaType | JsonSchemaType[] | undefined {
     const types = toTypeArray(type);
     if (types === null) {
         return undefined;
