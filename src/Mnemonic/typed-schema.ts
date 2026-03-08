@@ -95,8 +95,14 @@ function nullableSchema<T>(schema: TypedJsonSchema<T>): TypedJsonSchema<T | null
     }
 
     if ("const" in schema) {
+        const { const: constValue, ...rest } = schema as TypedJsonSchema<T> & { const?: JsonConstValue | null };
+        if (constValue === null || constValue === undefined) {
+            return schema as TypedJsonSchema<T | null>;
+        }
+
         return {
-            enum: [schema.const ?? null, null],
+            ...rest,
+            enum: [constValue, null],
         } as TypedJsonSchema<T | null>;
     }
 

@@ -43,6 +43,17 @@ describe("mnemonicSchema", () => {
         expect(validateJsonSchema("sepia", themeSchema)).not.toEqual([]);
     });
 
+    it("preserves nullable const schemas without duplicating null", () => {
+        const nullOnlySchema = mnemonicSchema.nullable(mnemonicSchema.literal(null));
+
+        expect(nullOnlySchema).toEqual({
+            const: null,
+        });
+
+        expect(validateJsonSchema(null, nullOnlySchema)).toEqual([]);
+        expect(validateJsonSchema("nope", nullOnlySchema)).not.toEqual([]);
+    });
+
     it("builds record schemas using additionalProperties", () => {
         const counterMapSchema = mnemonicSchema.record(mnemonicSchema.integer({ minimum: 0 }));
 

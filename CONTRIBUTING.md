@@ -224,7 +224,7 @@ Maintainer setup:
 1. Import `thirtytwobits/react-mnemonic` into SonarQube Cloud.
 2. In SonarQube Cloud project settings, enable automatic analysis for the
    repository.
-3. Keep [.sonarcloud.properties](/Users/thirtytwobits/workspace/github/thirtytwobits/react-mnemonic/.sonarcloud.properties)
+3. Keep [`.sonarcloud.properties`](./.sonarcloud.properties)
    in sync with the intended automatic-analysis scope. This repository pins
    automatic analysis to `sonar.sources=src` and excludes `src/**/*.test.ts`
    and `src/**/*.test.tsx`, so website, docs, build output, and devtools files

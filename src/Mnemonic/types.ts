@@ -455,7 +455,7 @@ export type MigrationRule<TFrom = unknown, TTo = unknown, K extends string = str
      * @param value - The decoded value at `fromVersion`
      * @returns The transformed value for `toVersion`
      */
-    migrate: (value: TFrom) => TTo;
+    migrate(value: TFrom): TTo;
 };
 
 /**

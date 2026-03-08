@@ -229,6 +229,13 @@ describe("Public API exports", () => {
             name: "Scott",
             email: "hi@example.com",
         });
+
+        const options: CreateSchemaRegistryOptions = {
+            schemas: [profileV1, profileV2],
+            migrations: [migration, writeMigration],
+        };
+
+        expect(options.migrations).toHaveLength(2);
     });
 
     it("type exports are usable (UseMnemonicRecoveryOptions)", () => {

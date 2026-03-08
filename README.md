@@ -228,7 +228,7 @@ This path gives you:
 
 Tradeoffs versus the lightweight JSON-only path:
 
-- more setup up front
+- more setup upfront
 - best fit when a key is schema-managed and long-lived
 - not necessary for simple keys where `defaultValue` inference is already enough
 
