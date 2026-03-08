@@ -319,12 +319,12 @@ export function MnemonicProvider({
         };
 
         const canEnumerateKeys = detectEnumerableStorage();
-        const crossTabSyncMode: Mnemonic["crossTabSyncMode"] =
-            browserLocalStorage !== undefined && st === browserLocalStorage
-                ? "browser-storage-event"
-                : typeof st?.onExternalChange === "function"
-                  ? "custom-external-change"
-                  : "none";
+        let crossTabSyncMode: NonNullable<Mnemonic["crossTabSyncMode"]> = "none";
+        if (browserLocalStorage !== undefined && st === browserLocalStorage) {
+            crossTabSyncMode = "browser-storage-event";
+        } else if (typeof st?.onExternalChange === "function") {
+            crossTabSyncMode = "custom-external-change";
+        }
 
         const isProductionRuntime = () => {
             const env = (globalThis as any)?.process?.env?.NODE_ENV;

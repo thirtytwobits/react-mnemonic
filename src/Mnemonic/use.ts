@@ -62,7 +62,7 @@ function stableDiagnosticValue(value: unknown): string {
     } catch {
         const tag = Object.prototype.toString.call(value);
         if (value !== null && (typeof value === "object" || typeof value === "function")) {
-            return `${tag}#${getDiagnosticObjectId(value as object)}`;
+            return `${tag}#${getDiagnosticObjectId(value)}`;
         }
         return tag;
     }
@@ -680,7 +680,7 @@ export function useMnemonicKey<T>(
     useEffect(() => {
         if (!isDevelopmentRuntime()) return;
 
-        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && typeof window !== "undefined") {
+        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && typeof globalThis.window !== "undefined") {
             warnOnce(
                 api,
                 `listenCrossTab:${key}`,
