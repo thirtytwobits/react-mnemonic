@@ -26,7 +26,7 @@ function createMockStorage(): StorageLike & { store: Map<string, string> } {
     };
 }
 
-function renderHook<T>(storage: StorageLike, namespace: string, hook: () => T): { current: T } {
+function renderHook<T>(storage: StorageLike, namespace: string, hook: () => T): { current: T; unmount: () => void } {
     const resultRef = { current: undefined as T };
 
     function TestComponent() {
@@ -34,13 +34,13 @@ function renderHook<T>(storage: StorageLike, namespace: string, hook: () => T): 
         return null;
     }
 
-    render(
+    const { unmount } = render(
         <MnemonicProvider namespace={namespace} storage={storage}>
             <TestComponent />
         </MnemonicProvider>,
     );
 
-    return resultRef;
+    return { ...resultRef, unmount };
 }
 
 function createSeededRandom(seed: number) {
@@ -98,7 +98,7 @@ const malformedEnvelopeCorpus = [
     JSON.stringify({ version: Number.POSITIVE_INFINITY, payload: "x" }),
     JSON.stringify({ version: {}, payload: "x" }),
     JSON.stringify({ version: 0, payload: undefined }),
-    JSON.stringify({ version: 0, payload: Symbol("x") }),
+    '{"version":"symbol","payload":{"__type__":"Symbol","description":"x"}}',
 ];
 
 function expectInvalidEnvelopeFallback(raw: string, namespace: string): void {
@@ -117,9 +117,13 @@ function expectInvalidEnvelopeFallback(raw: string, namespace: string): void {
         }),
     );
 
-    expect(result.current.value).toBe("fallback");
-    expect(receivedError).toBeInstanceOf(SchemaError);
-    expect(receivedError?.code).toBe("INVALID_ENVELOPE");
+    try {
+        expect(result.current.value).toBe("fallback");
+        expect(receivedError).toBeInstanceOf(SchemaError);
+        expect(receivedError?.code).toBe("INVALID_ENVELOPE");
+    } finally {
+        result.unmount();
+    }
 }
 
 describe("malformed envelope handling", () => {

@@ -58,7 +58,7 @@ async function main() {
             console.log(`\n[consumer-fixture] ${fixture.name}: ${fixture.description}`);
 
             await cp(templateDir, workingDir, { recursive: true });
-            await run(npmCmd, ["install"], workingDir);
+            await run(npmCmd, ["ci"], workingDir);
             await run(npmCmd, ["install", "--no-save", tarballPath], workingDir);
             await run(npmCmd, ["run", "check"], workingDir);
         }
