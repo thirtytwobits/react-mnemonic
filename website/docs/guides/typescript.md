@@ -17,6 +17,8 @@ import type {
     Codec,
     StorageLike,
     MnemonicKeyDescriptor,
+    TypedJsonSchema,
+    InferJsonSchemaValue,
     MnemonicProviderOptions,
     MnemonicProviderProps,
     UseMnemonicKeyOptions,
@@ -73,6 +75,42 @@ const { value, set } = useMnemonicKey(themeKey);
 
 This is useful when the same durable key is shared across multiple components
 or generated code paths.
+
+## Schema/type cohesion
+
+When you want a schema-managed key to derive its TypeScript type from the
+runtime schema object, use the typed schema helpers:
+
+```ts
+import { defineKeySchema, defineMnemonicKey, mnemonicSchema } from "react-mnemonic";
+
+const themeSchema = defineKeySchema("theme", 1, mnemonicSchema.enum(["light", "dark"] as const));
+
+const themeKey = defineMnemonicKey(themeSchema, {
+    defaultValue: "light",
+    reconcile: (value) => value,
+});
+```
+
+In that flow:
+
+- `defaultValue` is inferred from the schema
+- `reconcile(value)` receives the schema-derived value type
+- `useMnemonicKey(themeKey)` returns the same inferred type
+
+You can also work directly with the helper types:
+
+```ts
+const profileSchema: TypedJsonSchema<{
+    name: string;
+    email?: string;
+}> = mnemonicSchema.object({
+    name: mnemonicSchema.string(),
+    email: mnemonicSchema.optional(mnemonicSchema.string()),
+});
+
+type Profile = InferJsonSchemaValue<typeof profileSchema>;
+```
 
 ## Key types
 

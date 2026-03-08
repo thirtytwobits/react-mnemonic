@@ -8,6 +8,10 @@ import {
     useMnemonicRecovery,
     defineMnemonicKey,
     createSchemaRegistry,
+    defineKeySchema,
+    defineMigration,
+    defineWriteMigration,
+    mnemonicSchema,
     JSONCodec,
     createCodec,
     CodecError,
@@ -25,6 +29,9 @@ import type {
     MnemonicRecoveryEvent,
     JsonSchema,
     CompiledValidator,
+    TypedJsonSchema,
+    InferJsonSchemaValue,
+    MigrationRule,
 } from "./index";
 
 describe("Public API exports", () => {
@@ -51,6 +58,17 @@ describe("Public API exports", () => {
     it("exports createSchemaRegistry", () => {
         expect(createSchemaRegistry).toBeDefined();
         expect(typeof createSchemaRegistry).toBe("function");
+    });
+
+    it("exports typed schema helpers", () => {
+        expect(defineKeySchema).toBeDefined();
+        expect(typeof defineKeySchema).toBe("function");
+        expect(defineMigration).toBeDefined();
+        expect(typeof defineMigration).toBe("function");
+        expect(defineWriteMigration).toBeDefined();
+        expect(typeof defineWriteMigration).toBe("function");
+        expect(mnemonicSchema).toBeDefined();
+        expect(typeof mnemonicSchema.object).toBe("function");
     });
 
     it("exports JSONCodec", () => {
@@ -142,6 +160,84 @@ describe("Public API exports", () => {
         expect(TypecheckComponent).toBeDefined();
     });
 
+    it("schema-bound descriptors preserve inference for defaults and reconcile hooks", () => {
+        const themeKeySchema = defineKeySchema("theme", 1, mnemonicSchema.enum(["light", "dark"] as const));
+        const themeKey = defineMnemonicKey(themeKeySchema, {
+            defaultValue: "light",
+            reconcile: (value, context) => {
+                const themed: "light" | "dark" = value;
+                const version: number | undefined = context.latestVersion;
+                expect(version).toBeUndefined();
+                return themed;
+            },
+        });
+
+        const descriptor: MnemonicKeyDescriptor<"light" | "dark", "theme"> = themeKey;
+        expect(descriptor.options.schema).toEqual({ version: 1 });
+    });
+
+    it("typed schema exports are usable", () => {
+        const profileSchema: TypedJsonSchema<{
+            name: string;
+            email?: string;
+        }> = mnemonicSchema.object({
+            name: mnemonicSchema.string(),
+            email: mnemonicSchema.optional(mnemonicSchema.string()),
+        });
+        const schemaValue: InferJsonSchemaValue<typeof profileSchema> = {
+            name: "Scott",
+            email: "scott@example.com",
+        };
+
+        expect(profileSchema.type).toBe("object");
+        expect(schemaValue.name).toBe("Scott");
+    });
+
+    it("typed migration helpers are usable", () => {
+        const profileV1 = defineKeySchema(
+            "profile",
+            1,
+            mnemonicSchema.object({
+                name: mnemonicSchema.string(),
+            }),
+        );
+        const profileV2 = defineKeySchema(
+            "profile",
+            2,
+            mnemonicSchema.object({
+                name: mnemonicSchema.string(),
+                email: mnemonicSchema.string(),
+            }),
+        );
+
+        const migration: MigrationRule<{ name: string }, { name: string; email: string }, "profile"> = defineMigration(
+            profileV1,
+            profileV2,
+            (value) => ({
+                ...value,
+                email: "",
+            }),
+        );
+
+        const writeMigration = defineWriteMigration(profileV2, (value) => ({
+            ...value,
+            email: value.email.trim(),
+        }));
+
+        expect(migration.migrate({ name: "Scott" })).toEqual({ name: "Scott", email: "" });
+        expect(writeMigration.migrate({ name: "Scott", email: "  hi@example.com  " })).toEqual({
+            name: "Scott",
+            email: "hi@example.com",
+        });
+
+        const options: CreateSchemaRegistryOptions = {
+            schemas: [profileV1, profileV2],
+            migrations: [migration, writeMigration],
+        };
+
+        expect(options.migrations).toHaveLength(2);
+    });
+
     it("type exports are usable (UseMnemonicRecoveryOptions)", () => {
         const options: UseMnemonicRecoveryOptions = {
             onRecover: (event: MnemonicRecoveryEvent) => {
@@ -172,5 +268,24 @@ describe("Public API exports", () => {
             required: ["name"],
         };
         expect(schema.type).toBe("object");
+    });
+
+    it("flags schema/default mismatches at compile time", () => {
+        const counterSchema = defineKeySchema("count", 1, mnemonicSchema.integer());
+
+        defineMnemonicKey(counterSchema, {
+            defaultValue: 0,
+            reconcile: (value) => value + 1,
+        });
+
+        // @ts-expect-error schema-bound keys infer number, not string
+        defineMnemonicKey(counterSchema, {
+            defaultValue: "0",
+        });
+
+        // @ts-expect-error typed migrations must return the target schema shape
+        defineMigration(counterSchema, counterSchema, (_value) => "nope");
+
+        expect(counterSchema.version).toBe(1);
     });
 });

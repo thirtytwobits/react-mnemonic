@@ -42,6 +42,9 @@ If that same key needs to appear in multiple components, define it once with
 [Canonical Key Definitions](/docs/guides/canonical-key-definitions) for the
 pattern.
 
+If you want runtime schemas and TypeScript types to come from the same source,
+see [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas).
+
 Persist only values you want to restore intentionally. Runtime-only UI state
 like loading flags, open panels, and draft search text should usually stay in
 plain React state instead of the persisted key.
@@ -78,6 +81,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 - [Schema Modes](/docs/guides/schema-modes) — add validation and versioning
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
 - [Canonical Key Definitions](/docs/guides/canonical-key-definitions) — define reusable key contracts once
+- [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas) — keep runtime schemas and TS types aligned
 - [Clearable Persisted Values](/docs/guides/clearable-persisted-values) — model durable clear intent with nullable keys
 - [Persisted vs Ephemeral State](/docs/guides/persisted-vs-ephemeral-state) — keep durable preferences and runtime-only UI state separate
 - [Reset and Recovery](/docs/guides/reset-and-recovery) — add soft reset and hard reset flows for persisted state

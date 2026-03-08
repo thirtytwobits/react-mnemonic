@@ -214,28 +214,30 @@ Runs on every push and pull request:
   verifies ESM imports, CJS requires, and TypeScript type resolution
   (`moduleResolution: "nodenext"`).
 
-### SonarQube Cloud (`sonarcloud.yml`)
+### SonarQube Cloud
 
-Runs on pushes to `main` and on pull requests:
-
-- On pushes to `main`, runs inside the `production-ci` GitHub environment
-- Installs dependencies
-- Generates `coverage/lcov.info` via `npm run test:coverage`
-- Uploads source analysis and coverage to SonarQube Cloud using
-  `SonarSource/sonarqube-scan-action@v7`
-- On pull requests, skips Sonar analysis and writes a short notice explaining
-  that the token is only available through the `production-ci` environment
+This repository now relies on SonarQube Cloud automatic analysis instead of a
+GitHub Actions scanner workflow.
 
 Maintainer setup:
 
 1. Import `thirtytwobits/react-mnemonic` into SonarQube Cloud.
-2. Confirm the organization key and project key in
-   `sonar-project.properties`
-   match the imported project.
-3. Add `SONAR_TOKEN` to the `production-ci` GitHub environment secrets.
+2. In SonarQube Cloud project settings, enable automatic analysis for the
+   repository.
+3. Keep [`.sonarcloud.properties`](./.sonarcloud.properties)
+   in sync with the intended automatic-analysis scope. This repository pins
+   automatic analysis to `sonar.sources=src` and excludes `src/**/*.test.ts`
+   and `src/**/*.test.tsx`, so website, docs, build output, and devtools files
+   are excluded by scope rather than by broad path patterns.
 
-Because the token is environment-scoped, pull requests do not run SonarQube
-analysis in this configuration.
+Important tradeoff:
+
+- Automatic analysis does not consume this repository's LCOV coverage output, so
+  SonarQube coverage metrics will no longer be populated from `npm run test:coverage`.
+- Automatic analysis uses `.sonarcloud.properties`, not `sonar-project.properties`.
+- Some automatic-analysis settings can also be changed in the SonarQube Cloud UI,
+  but the repository should treat `.sonarcloud.properties` as the source of truth
+  for version-controlled scope settings.
 
 ### Code Scanning (`codeql.yml`)
 

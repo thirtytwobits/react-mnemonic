@@ -11,6 +11,9 @@
 import type { CodecError } from "./codecs";
 import type { SchemaError } from "./schema";
 import type { JsonSchema } from "./json-schema";
+import type { InferJsonSchemaValue } from "./typed-schema";
+
+declare const keySchemaValueBrand: unique symbol;
 
 /**
  * Codec for encoding and decoding values to and from storage.
@@ -351,11 +354,11 @@ export interface MnemonicDevToolsRegistry {
  * @see {@link MigrationRule} - How values migrate between schema versions
  * @see {@link JsonSchema} - The JSON Schema subset used for validation
  */
-export type KeySchema = {
+export type KeySchema<TValue = unknown, K extends string = string, TSchema extends JsonSchema = JsonSchema> = {
     /**
      * The unprefixed storage key this schema applies to.
      */
-    key: string;
+    key: K;
 
     /**
      * The version number for this schema.
@@ -370,7 +373,16 @@ export type KeySchema = {
      * Only the subset of JSON Schema keywords defined in {@link JsonSchema}
      * are supported. An empty schema `{}` accepts any value.
      */
-    schema: JsonSchema;
+    schema: TSchema;
+
+    /**
+     * Phantom type linking this runtime schema to its decoded TypeScript value.
+     *
+     * This field is never set at runtime. It exists only so helpers such as
+     * `defineKeySchema(...)`, `defineMnemonicKey(...)`, and `defineMigration(...)`
+     * can preserve a single source of truth between schema shape and value type.
+     */
+    readonly [keySchemaValueBrand]?: TValue;
 };
 
 /**
@@ -414,11 +426,11 @@ export type KeySchema = {
  * @see {@link SchemaRegistry.getMigrationPath} - How the path is resolved
  * @see {@link SchemaRegistry.getWriteMigration} - How write-time normalizers are resolved
  */
-export type MigrationRule = {
+export type MigrationRule<TFrom = unknown, TTo = unknown, K extends string = string> = {
     /**
      * The unprefixed storage key this rule applies to.
      */
-    key: string;
+    key: K;
 
     /**
      * The version the stored data is migrating **from**.
@@ -445,7 +457,7 @@ export type MigrationRule = {
      * @param value - The decoded value at `fromVersion`
      * @returns The transformed value for `toVersion`
      */
-    migrate: (value: unknown) => unknown;
+    migrate(value: TFrom): TTo;
 };
 
 /**
@@ -460,7 +472,7 @@ export type MigrationRule = {
  * @see {@link MigrationRule} - Individual migration step
  * @see {@link SchemaRegistry.getMigrationPath} - Resolves a path between versions
  */
-export type MigrationPath = MigrationRule[];
+export type MigrationPath<K extends string = string> = MigrationRule<unknown, unknown, K>[];
 
 /**
  * Input options for {@link createSchemaRegistry}.
@@ -1021,6 +1033,26 @@ export interface MnemonicKeyDescriptor<T, K extends string = string> {
      */
     readonly options: UseMnemonicKeyOptions<T>;
 }
+
+/**
+ * Key descriptor options inferred from a typed key schema.
+ *
+ * This mirrors `UseMnemonicKeyOptions<T>` but intentionally omits the `schema`
+ * override so the descriptor stays pinned to the supplied key schema version.
+ */
+export type SchemaBoundKeyOptions<T> = Omit<UseMnemonicKeyOptions<T>, "schema">;
+
+/**
+ * Typed key schema shape inferred from a schema helper or branded JSON Schema.
+ *
+ * Useful when you want a versioned schema object to carry its decoded
+ * TypeScript value through registries, descriptors, and migration helpers.
+ */
+export type TypedKeySchema<TSchema extends JsonSchema, K extends string = string> = KeySchema<
+    InferJsonSchemaValue<TSchema>,
+    K,
+    TSchema
+>;
 
 /**
  * Configuration options for the useMnemonicKey hook.
