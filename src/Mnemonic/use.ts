@@ -14,6 +14,7 @@ import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { validateJsonSchema, inferJsonSchema } from "./json-schema";
+import { getRuntimeNodeEnv } from "./runtime";
 import type { JsonSchema } from "./json-schema";
 import type {
     UseMnemonicKeyOptions,
@@ -25,6 +26,103 @@ import type {
 } from "./types";
 
 const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
+const diagnosticContractRegistry = new WeakMap<object, Map<string, string>>();
+const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
+const diagnosticObjectIds = new WeakMap<object, number>();
+let nextDiagnosticObjectId = 1;
+
+function isDevelopmentRuntime(): boolean {
+    return getRuntimeNodeEnv() === "development";
+}
+
+function getDiagnosticWarnings(api: object): Set<string> {
+    let warnings = diagnosticWarningRegistry.get(api);
+    if (!warnings) {
+        warnings = new Set<string>();
+        diagnosticWarningRegistry.set(api, warnings);
+    }
+    return warnings;
+}
+
+function warnOnce(api: object, id: string, message: string): void {
+    const warnings = getDiagnosticWarnings(api);
+    if (warnings.has(id)) return;
+    warnings.add(id);
+    console.warn(message);
+}
+
+function stableDiagnosticValue(value: unknown): string {
+    if (typeof value === "function") {
+        const source = Function.prototype.toString.call(value).split(/\s+/).join(" ").trim();
+        const name = value.name || "anonymous";
+        return `[factory:${name}/${value.length}:${source}]`;
+    }
+    if (typeof value === "bigint") return `${value.toString()}n`;
+    if (typeof value === "symbol") return value.toString();
+    if (value === undefined) return "undefined";
+    try {
+        return JSON.stringify(value);
+    } catch {
+        const tag = Object.prototype.toString.call(value);
+        if (value !== null && (typeof value === "object" || typeof value === "function")) {
+            return `${tag}#${getDiagnosticObjectId(value)}`;
+        }
+        return tag;
+    }
+}
+
+function isObjectLike(value: unknown): value is object {
+    return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
+function getDiagnosticObjectId(value: object): number {
+    const existing = diagnosticObjectIds.get(value);
+    if (existing !== undefined) return existing;
+    const id = nextDiagnosticObjectId++;
+    diagnosticObjectIds.set(value, id);
+    return id;
+}
+
+function buildContractFingerprint<T>({
+    api,
+    key,
+    defaultValue,
+    codecOpt,
+    schema,
+    reconcile,
+    listenCrossTab,
+    ssrOptions,
+}: {
+    api: object;
+    key: string;
+    defaultValue: UseMnemonicKeyOptions<T>["defaultValue"];
+    codecOpt: UseMnemonicKeyOptions<T>["codec"];
+    schema: UseMnemonicKeyOptions<T>["schema"];
+    reconcile: UseMnemonicKeyOptions<T>["reconcile"];
+    listenCrossTab: UseMnemonicKeyOptions<T>["listenCrossTab"];
+    ssrOptions: UseMnemonicKeyOptions<T>["ssr"];
+}): string {
+    const codecSignature =
+        codecOpt == null || !isObjectLike(codecOpt)
+            ? "default-json-codec"
+            : `codec:${stableDiagnosticValue((codecOpt as { encode?: unknown }).encode)}:${stableDiagnosticValue((codecOpt as { decode?: unknown }).decode)}`;
+    const reconcileSignature =
+        reconcile == null || !isObjectLike(reconcile)
+            ? "no-reconcile"
+            : `reconcile:${stableDiagnosticValue(reconcile)}`;
+
+    return JSON.stringify({
+        key,
+        defaultValue: stableDiagnosticValue(defaultValue),
+        codec: codecSignature,
+        schemaVersion: schema?.version ?? null,
+        listenCrossTab: Boolean(listenCrossTab),
+        reconcile: reconcileSignature,
+        ssrHydration: ssrOptions?.hydration ?? null,
+        hasServerValue: ssrOptions?.serverValue !== undefined,
+        providerHydration: (api as { ssrHydration?: string }).ssrHydration ?? null,
+    });
+}
 
 function resolveMnemonicKeyArgs<T>(
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
@@ -103,6 +201,34 @@ export function useMnemonicKey<T>(
     const schemaRegistry = api.schemaRegistry;
     const hydrationMode = ssrOptions?.hydration ?? api.ssrHydration;
     const [hasMounted, setHasMounted] = useState(hydrationMode !== "client-only");
+    const developmentRuntime = isDevelopmentRuntime();
+    const contractFingerprint = useMemo(
+        () =>
+            developmentRuntime
+                ? buildContractFingerprint({
+                      api,
+                      key,
+                      defaultValue,
+                      codecOpt,
+                      schema,
+                      reconcile,
+                      listenCrossTab,
+                      ssrOptions,
+                  })
+                : null,
+        [
+            developmentRuntime,
+            api,
+            key,
+            defaultValue,
+            codecOpt,
+            schema?.version,
+            reconcile,
+            listenCrossTab,
+            ssrOptions?.hydration,
+            ssrOptions?.serverValue,
+        ],
+    );
 
     /**
      * Helper to get the fallback/default value.
@@ -576,6 +702,60 @@ export function useMnemonicKey<T>(
         return decodeForRead(raw);
     }, [decodeForRead, getServerValue, raw]);
     const value = decoded.value;
+
+    useEffect(() => {
+        if (!developmentRuntime) return;
+
+        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && globalThis.window !== undefined) {
+            warnOnce(
+                api,
+                `listenCrossTab:${key}`,
+                `[Mnemonic] useMnemonicKey("${key}") enabled listenCrossTab, but the active storage backend may not be able to notify external changes. If you're using a custom Storage-like wrapper around localStorage, ensure it forwards browser "storage" events or implements storage.onExternalChange(...); otherwise, use localStorage or implement storage.onExternalChange(...) on your custom backend.`,
+            );
+        }
+
+        if (codecOpt && schema?.version !== undefined && api.schemaRegistry) {
+            warnOnce(
+                api,
+                `codec+schema:${key}`,
+                `[Mnemonic] useMnemonicKey("${key}") received both a custom codec and schema.version. Schema-managed reads/writes do not use the codec path. Remove the codec for schema-managed storage, or remove schema.version if you intended codec-only persistence.`,
+            );
+        }
+
+        let keyContracts = diagnosticContractRegistry.get(api);
+        if (!keyContracts) {
+            keyContracts = new Map<string, string>();
+            diagnosticContractRegistry.set(api, keyContracts);
+        }
+
+        if (contractFingerprint === null) {
+            return;
+        }
+        const previousContract = keyContracts.get(key);
+        if (previousContract === undefined) {
+            keyContracts.set(key, contractFingerprint);
+            return;
+        }
+        if (previousContract === contractFingerprint) {
+            return;
+        }
+
+        warnOnce(
+            api,
+            `contract-conflict:${key}`,
+            `[Mnemonic] Conflicting useMnemonicKey contracts detected for key "${key}" in namespace "${api.prefix.slice(0, -1)}". Reuse a shared descriptor with defineMnemonicKey(...) or align defaultValue/codec/schema/reconcile options so every consumer describes the same persisted contract.`,
+        );
+    }, [
+        api,
+        key,
+        developmentRuntime,
+        contractFingerprint,
+        listenCrossTab,
+        codecOpt,
+        schema?.version,
+        api.schemaRegistry,
+        api.crossTabSyncMode,
+    ]);
 
     useEffect(() => {
         if (hasMounted) return;

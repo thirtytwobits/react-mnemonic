@@ -1,12 +1,48 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
 import { useMnemonicRecovery } from "./recovery";
 import type { StorageLike } from "./types";
+
+const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+const originalNodeEnv = originalProcess?.env?.NODE_ENV;
+
+function setNodeEnv(value: string) {
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (!globalWithProcess.process) {
+        globalWithProcess.process = { env: { NODE_ENV: value } };
+        return;
+    }
+    if (!globalWithProcess.process.env) {
+        globalWithProcess.process.env = {};
+    }
+    globalWithProcess.process.env.NODE_ENV = value;
+}
+
+function restoreProcess() {
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (originalProcess === undefined) {
+        delete (globalWithProcess as { process?: unknown }).process;
+        return;
+    }
+    if (!globalWithProcess.process?.env) {
+        globalWithProcess.process = originalProcess;
+        return;
+    }
+    if (originalNodeEnv === undefined) {
+        delete globalWithProcess.process.env.NODE_ENV;
+        return;
+    }
+    globalWithProcess.process.env.NODE_ENV = originalNodeEnv;
+}
+
+afterEach(() => {
+    restoreProcess();
+});
 
 function createEnumerableStorage(): StorageLike & { store: Map<string, string> } {
     const store = new Map<string, string>();
@@ -69,6 +105,36 @@ function renderHook<T>(
 }
 
 describe("useMnemonicRecovery", () => {
+    it("warns in development before throwing for non-enumerable clearAll", () => {
+        setNodeEnv("development");
+        const storage = createNonEnumerableStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const { result } = renderHook(storage, "app", () => useMnemonicRecovery());
+
+        expect(() => result.current.clearAll()).toThrow(/enumerable storage backend/);
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("clearAll() requires an enumerable storage backend"),
+        );
+
+        warnSpy.mockRestore();
+    });
+
+    it("warns in development before throwing for non-enumerable clearMatching", () => {
+        setNodeEnv("development");
+        const storage = createNonEnumerableStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const { result } = renderHook(storage, "app", () => useMnemonicRecovery());
+
+        expect(() => result.current.clearMatching(() => true)).toThrow(/enumerable storage backend/);
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("clearMatching() requires an enumerable storage backend"),
+        );
+
+        warnSpy.mockRestore();
+    });
+
     it("clears all keys in the current namespace and leaves other namespaces alone", () => {
         const storage = createEnumerableStorage();
         storage.store.set("app.theme", env("dark"));

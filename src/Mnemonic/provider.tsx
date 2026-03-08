@@ -12,6 +12,7 @@
  */
 
 import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
+import { getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
 import type {
     Mnemonic,
     MnemonicProviderOptions,
@@ -318,10 +319,18 @@ export function MnemonicProvider({
         };
 
         const canEnumerateKeys = detectEnumerableStorage();
+        let crossTabSyncMode: NonNullable<Mnemonic["crossTabSyncMode"]> = "none";
+        const isExplicitNativeBrowserStorage =
+            st !== undefined && storage !== undefined && getNativeBrowserStorages().includes(st);
+        if ((storage === undefined && st !== undefined) || isExplicitNativeBrowserStorage) {
+            crossTabSyncMode = "browser-storage-event";
+        } else if (typeof st?.onExternalChange === "function") {
+            crossTabSyncMode = "custom-external-change";
+        }
 
         const isProductionRuntime = () => {
-            const env = (globalThis as any)?.process?.env?.NODE_ENV;
-            if (typeof env !== "string") {
+            const env = getRuntimeNodeEnv();
+            if (env === undefined) {
                 return true;
             }
             return env === "production";
@@ -795,6 +804,7 @@ export function MnemonicProvider({
             reloadFromStorage,
             schemaMode: schemaMode as SchemaMode,
             ssrHydration,
+            crossTabSyncMode,
             ...(schemaRegistry ? { schemaRegistry: schemaRegistry as SchemaRegistry } : {}),
         };
 

@@ -96,3 +96,16 @@ const { set } = useMnemonicKey("profile", {
 // The stored value remains unchanged.
 set({ name: "", email: "not-an-email" });
 ```
+
+## Development diagnostics
+
+In development builds, Mnemonic also emits a small set of targeted warnings for
+likely configuration mistakes. These warnings are intentionally high-signal and
+include the recommended fix.
+
+| Warning shape                                                          | What it means                                                                                     | Recommended fix                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `listenCrossTab` on a backend without external notifications           | The current storage backend cannot actually deliver cross-tab updates                             | Use `localStorage` or implement `storage.onExternalChange(...)` on the custom backend                       |
+| Custom `codec` combined with `schema.version`                          | Schema-managed reads/writes do not use the codec serialization path                               | Remove the codec for schema-managed keys, or remove `schema.version` if you intended codec-only persistence |
+| Same key declared with conflicting contracts in one provider namespace | Different components disagree about the persisted shape/defaults/options for the same logical key | Reuse a shared descriptor with `defineMnemonicKey(...)` or align the options                                |
+| `clearAll()` / `clearMatching()` on a non-enumerable backend           | Namespace-wide recovery cannot list keys automatically                                            | Use `clearKeys([...])` with an explicit key list, or supply a backend with `length` and `key(index)`        |
