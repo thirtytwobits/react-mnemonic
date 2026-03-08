@@ -1,0 +1,50 @@
+{
+    "version": 1,
+    "title": "react-mnemonic AI Contract Guide",
+    "storageContract": {
+        "type": "synchronous",
+        "namespacePattern": "${namespace}.${key}",
+        "requiredProvider": true,
+        "actions": {
+            "set": "persist next value",
+            "reset": "persist defaultValue",
+            "remove": "delete key and fall back to defaultValue"
+        }
+    },
+    "readLifecycle": [
+        "load raw snapshot",
+        "decode payload",
+        "validate and migrate when schemas exist",
+        "run reconcile if provided",
+        "fall back to defaultValue when absent or invalid",
+        "persist read-time rewrite when migration/autoschema/reconcile changed storage shape"
+    ],
+    "writeLifecycle": [
+        "resolve updater against current decoded value",
+        "choose schema or codec write path",
+        "run write-time migration when configured",
+        "validate target schema when schema-managed",
+        "encode versioned envelope",
+        "write raw snapshot and notify subscribers"
+    ],
+    "decisionShortcuts": {
+        "durableClearIntent": "set(null)",
+        "forgetKey": "remove()",
+        "restoreDefault": "reset()",
+        "structuralUpgrade": "schema migration",
+        "conditionalPolicyRewrite": "reconcile"
+    },
+    "ssr": {
+        "defaultServerValue": "defaultValue",
+        "optionalServerValue": "ssr.serverValue",
+        "hydrationModes": ["immediate", "client-only"]
+    },
+    "recipes": [
+        "theme-preference",
+        "saved-filters",
+        "dismissible-ui",
+        "durable-draft",
+        "schema-upgrade",
+        "ssr-placeholder"
+    ]
+}

@@ -43,7 +43,7 @@ const features: FeatureItem[] = [
     {
         title: "AI-Friendly",
         description:
-            "Designed with rigorous typing and predictable behavior. No magic — easy for AI to understand and work with.",
+            "Designed with rigorous typing and predictable behavior, with a dedicated AI contract guide for deterministic implementation work.",
     },
     {
         title: "SSR-safe by default",
@@ -84,6 +84,13 @@ function HomepageHeader() {
                         style={{ marginLeft: "1rem" }}
                     >
                         API Reference
+                    </Link>
+                    <Link
+                        className={clsx("button button--outline button--lg", styles.heroOutlineButton)}
+                        to="/docs/guides/ai-contract-guide"
+                        style={{ marginLeft: "1rem" }}
+                    >
+                        AI Contract Guide
                     </Link>
                 </div>
                 <div className={styles.installSnippet}>
@@ -132,6 +139,10 @@ function HomepageExample() {
                         <p style={{ textAlign: "center", marginTop: "1rem", opacity: 0.8 }}>
                             The counter value persists in <code>localStorage</code> under <code>my-app.count</code> and
                             survives full page reloads.
+                        </p>
+                        <p style={{ textAlign: "center", marginTop: "0.75rem" }}>
+                            Need the deterministic implementation contract?{" "}
+                            <Link to="/docs/guides/ai-contract-guide">Read the AI Contract Guide</Link>.
                         </p>
                     </div>
                 </div>
