@@ -565,12 +565,10 @@ export function useMnemonicKey<T>(
      * Subscribe to raw storage changes using React's useSyncExternalStore.
      * This ensures efficient, tearing-free updates when storage changes.
      */
-    const getServerRawSnapshot = useCallback((): string | null => {
-        if (ssrOptions?.serverValue === undefined) {
-            return null;
-        }
-        return `${SSR_SNAPSHOT_PREFIX}${encodeForWrite(getServerValue())}`;
-    }, [encodeForWrite, getServerValue, ssrOptions?.serverValue]);
+    const getServerRawSnapshot = useCallback(
+        (): string | null => (ssrOptions?.serverValue === undefined ? null : SSR_SNAPSHOT_PREFIX),
+        [ssrOptions?.serverValue],
+    );
 
     const deferStorageRead = hydrationMode === "client-only" && !hasMounted;
     const subscribe = useCallback(
@@ -591,15 +589,14 @@ export function useMnemonicKey<T>(
 
     const decoded = useMemo(() => {
         if (raw?.startsWith(SSR_SNAPSHOT_PREFIX)) {
-            const serverDecoded = decodeForRead(raw.slice(SSR_SNAPSHOT_PREFIX.length));
             return {
-                value: serverDecoded.value,
+                value: getServerValue(),
                 rewriteRaw: undefined,
                 pendingSchema: undefined,
             };
         }
         return decodeForRead(raw);
-    }, [decodeForRead, raw]);
+    }, [decodeForRead, getServerValue, raw]);
     const value = decoded.value;
 
     useEffect(() => {

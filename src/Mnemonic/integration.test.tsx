@@ -399,10 +399,9 @@ describe("SSR hydration contract", () => {
         container.innerHTML = html;
         document.body.appendChild(container);
 
-        hydrateRoot(container, app);
-        expect(container.textContent).toContain("light");
-
         await act(async () => {
+            hydrateRoot(container, app);
+            expect(container.textContent).toContain("light");
             await Promise.resolve();
         });
 
