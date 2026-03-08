@@ -92,15 +92,18 @@ function buildInvalidEnvelopeFuzzCases(count: number): string[] {
 }
 
 const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+const originalNodeEnv = originalProcess?.env?.NODE_ENV;
 
 function setNodeEnv(value: string) {
-    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process = {
-        ...(originalProcess ?? { env: {} }),
-        env: {
-            ...(originalProcess?.env ?? {}),
-            NODE_ENV: value,
-        },
-    };
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (!globalWithProcess.process) {
+        globalWithProcess.process = { env: { NODE_ENV: value } };
+        return;
+    }
+    if (!globalWithProcess.process.env) {
+        globalWithProcess.process.env = {};
+    }
+    globalWithProcess.process.env.NODE_ENV = value;
 }
 
 function restoreProcess() {
@@ -109,7 +112,15 @@ function restoreProcess() {
         delete (globalWithProcess as { process?: unknown }).process;
         return;
     }
-    globalWithProcess.process = originalProcess;
+    if (!globalWithProcess.process?.env) {
+        globalWithProcess.process = originalProcess;
+        return;
+    }
+    if (originalNodeEnv === undefined) {
+        delete globalWithProcess.process.env.NODE_ENV;
+        return;
+    }
+    globalWithProcess.process.env.NODE_ENV = originalNodeEnv;
 }
 
 /** Renders a hook within MnemonicProvider and returns accessor for the result. */
@@ -455,6 +466,20 @@ describe("useMnemonicKey – development diagnostics", () => {
             expect.stringContaining("received both a custom codec and schema.version"),
         );
         warnSpy.mockRestore();
+    });
+
+    it("does not crash diagnostics when codec is nullish at runtime", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+
+        expect(() =>
+            renderHook(storage, "ns", () =>
+                useMnemonicKey("theme", {
+                    defaultValue: "light",
+                    codec: null as never,
+                }),
+            ),
+        ).not.toThrow();
     });
 
     it("warns in development when the same key is declared with conflicting contracts", () => {

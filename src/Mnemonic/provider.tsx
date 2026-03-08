@@ -282,8 +282,7 @@ export function MnemonicProvider({
 
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
-        const browserLocalStorage = defaultBrowserStorage();
-        const st = storage ?? browserLocalStorage;
+        const st = storage ?? defaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
 
         /**
@@ -320,7 +319,7 @@ export function MnemonicProvider({
 
         const canEnumerateKeys = detectEnumerableStorage();
         let crossTabSyncMode: NonNullable<Mnemonic["crossTabSyncMode"]> = "none";
-        if (browserLocalStorage !== undefined && st === browserLocalStorage) {
+        if (storage === undefined && st !== undefined) {
             crossTabSyncMode = "browser-storage-event";
         } else if (typeof st?.onExternalChange === "function") {
             crossTabSyncMode = "custom-external-change";

@@ -24,6 +24,8 @@ import type {
     MnemonicKeyDescriptor,
 } from "./types";
 
+declare const process: { env?: { NODE_ENV?: string } } | undefined;
+
 const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
 const diagnosticContractRegistry = new WeakMap<object, Map<string, string>>();
 const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
@@ -31,6 +33,9 @@ const diagnosticObjectIds = new WeakMap<object, number>();
 let nextDiagnosticObjectId = 1;
 
 function isDevelopmentRuntime(): boolean {
+    if (typeof process !== "undefined" && process.env?.NODE_ENV != null) {
+        return process.env.NODE_ENV === "development";
+    }
     return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
 }
 
@@ -70,6 +75,10 @@ function stableDiagnosticValue(value: unknown): string {
     }
 }
 
+function isObjectLike(value: unknown): value is object {
+    return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
 function getDiagnosticObjectId(value: object): number {
     const existing = diagnosticObjectIds.get(value);
     if (existing !== undefined) return existing;
@@ -98,8 +107,13 @@ function buildContractFingerprint<T>({
     ssrOptions: UseMnemonicKeyOptions<T>["ssr"];
 }): string {
     const codecSignature =
-        codecOpt === undefined ? "default-json-codec" : `codec#${getDiagnosticObjectId(codecOpt as object)}`;
-    const reconcileSignature = reconcile ? `reconcile#${getDiagnosticObjectId(reconcile as object)}` : "no-reconcile";
+        codecOpt == null || !isObjectLike(codecOpt)
+            ? "default-json-codec"
+            : `codec:${stableDiagnosticValue((codecOpt as { encode?: unknown }).encode)}:${stableDiagnosticValue((codecOpt as { decode?: unknown }).decode)}`;
+    const reconcileSignature =
+        reconcile == null || !isObjectLike(reconcile)
+            ? "no-reconcile"
+            : `reconcile:${stableDiagnosticValue(reconcile)}`;
 
     return JSON.stringify({
         key,
@@ -191,19 +205,22 @@ export function useMnemonicKey<T>(
     const schemaRegistry = api.schemaRegistry;
     const hydrationMode = ssrOptions?.hydration ?? api.ssrHydration;
     const [hasMounted, setHasMounted] = useState(hydrationMode !== "client-only");
+    const developmentRuntime = isDevelopmentRuntime();
     const contractFingerprint = useMemo(
         () =>
-            buildContractFingerprint({
-                api,
-                key,
-                defaultValue,
-                codecOpt,
-                schema,
-                reconcile,
-                listenCrossTab,
-                ssrOptions,
-            }),
-        [api, key, defaultValue, codecOpt, schema, reconcile, listenCrossTab, ssrOptions],
+            !developmentRuntime
+                ? null
+                : buildContractFingerprint({
+                      api,
+                      key,
+                      defaultValue,
+                      codecOpt,
+                      schema,
+                      reconcile,
+                      listenCrossTab,
+                      ssrOptions,
+                  }),
+        [developmentRuntime, api, key, defaultValue, codecOpt, schema, reconcile, listenCrossTab, ssrOptions],
     );
 
     /**
@@ -680,13 +697,13 @@ export function useMnemonicKey<T>(
     const value = decoded.value;
 
     useEffect(() => {
-        if (!isDevelopmentRuntime()) return;
+        if (!developmentRuntime) return;
 
         if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && globalThis.window !== undefined) {
             warnOnce(
                 api,
                 `listenCrossTab:${key}`,
-                `[Mnemonic] useMnemonicKey("${key}") enabled listenCrossTab, but the active storage backend cannot notify external changes. Use localStorage or implement storage.onExternalChange(...) on your custom backend.`,
+                `[Mnemonic] useMnemonicKey("${key}") enabled listenCrossTab, but the active storage backend may not be able to notify external changes. If you're using a custom Storage-like wrapper around localStorage, ensure it forwards browser "storage" events or implements storage.onExternalChange(...); otherwise, use localStorage or implement storage.onExternalChange(...) on your custom backend.`,
             );
         }
 
@@ -704,6 +721,9 @@ export function useMnemonicKey<T>(
             diagnosticContractRegistry.set(api, keyContracts);
         }
 
+        if (contractFingerprint === null) {
+            return;
+        }
         const previousContract = keyContracts.get(key);
         if (previousContract === undefined) {
             keyContracts.set(key, contractFingerprint);
@@ -721,6 +741,7 @@ export function useMnemonicKey<T>(
     }, [
         api,
         key,
+        developmentRuntime,
         contractFingerprint,
         listenCrossTab,
         codecOpt,

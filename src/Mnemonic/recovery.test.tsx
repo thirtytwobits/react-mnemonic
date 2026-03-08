@@ -9,15 +9,18 @@ import { useMnemonicRecovery } from "./recovery";
 import type { StorageLike } from "./types";
 
 const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+const originalNodeEnv = originalProcess?.env?.NODE_ENV;
 
 function setNodeEnv(value: string) {
-    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process = {
-        ...(originalProcess ?? { env: {} }),
-        env: {
-            ...(originalProcess?.env ?? {}),
-            NODE_ENV: value,
-        },
-    };
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (!globalWithProcess.process) {
+        globalWithProcess.process = { env: { NODE_ENV: value } };
+        return;
+    }
+    if (!globalWithProcess.process.env) {
+        globalWithProcess.process.env = {};
+    }
+    globalWithProcess.process.env.NODE_ENV = value;
 }
 
 function restoreProcess() {
@@ -26,7 +29,15 @@ function restoreProcess() {
         delete (globalWithProcess as { process?: unknown }).process;
         return;
     }
-    globalWithProcess.process = originalProcess;
+    if (!globalWithProcess.process?.env) {
+        globalWithProcess.process = originalProcess;
+        return;
+    }
+    if (originalNodeEnv === undefined) {
+        delete globalWithProcess.process.env.NODE_ENV;
+        return;
+    }
+    globalWithProcess.process.env.NODE_ENV = originalNodeEnv;
 }
 
 afterEach(() => {
