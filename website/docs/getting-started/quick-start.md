@@ -50,6 +50,10 @@ pattern.
 If you want runtime schemas and TypeScript types to come from the same source,
 see [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas).
 
+If you want a deterministic implementation guide with invariants, decision
+tables, and copy-pastable recipes, see
+[AI Contract Guide](/docs/guides/ai-contract-guide).
+
 Persist only values you want to restore intentionally. Runtime-only UI state
 like loading flags, open panels, and draft search text should usually stay in
 plain React state instead of the persisted key.
@@ -85,6 +89,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 - [Schema Modes](/docs/guides/schema-modes) — add validation and versioning
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
+- [AI Contract Guide](/docs/guides/ai-contract-guide) — invariants, lifecycle order, decision tables, and canonical recipes
 - [Canonical Key Definitions](/docs/guides/canonical-key-definitions) — define reusable key contracts once
 - [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas) — keep runtime schemas and TS types aligned
 - [Clearable Persisted Values](/docs/guides/clearable-persisted-values) — model durable clear intent with nullable keys

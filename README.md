@@ -106,6 +106,10 @@ If the same key is used in multiple components, consider defining it once with
 `defineMnemonicKey(...)` and reusing that descriptor everywhere. This keeps the
 contract importable and explicit for both humans and AI-assisted tooling.
 
+For a deterministic implementation reference aimed at AI agents and advanced
+users, see the
+[AI Contract Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/ai-contract-guide).
+
 Persist only the durable slice of your app state. `useMnemonicKey` stores
 whatever you pass to `set`, so keep transient UI state like loading flags,
 hover state, and draft search text in plain React state unless you explicitly
