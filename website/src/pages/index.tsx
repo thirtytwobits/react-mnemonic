@@ -46,9 +46,9 @@ const features: FeatureItem[] = [
             "Designed with rigorous typing and predictable behavior. No magic — easy for AI to understand and work with.",
     },
     {
-        title: "Zero Dependencies",
+        title: "SSR-safe by default",
         description:
-            "Tree-shakeable for ESM bundlers, ships ESM + CJS with bundled TypeScript declarations, and is SSR-safe.",
+            "Server renders use defaultValue by default, with opt-in serverValue and client-only hydration controls when you need them.",
     },
 ];
 

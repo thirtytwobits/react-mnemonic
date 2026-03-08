@@ -37,6 +37,11 @@ export default function App() {
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
 
+In server-rendered apps, the default contract is: render `defaultValue` on the
+server, then hydrate to persisted storage on the client. When you need a
+deterministic server placeholder or want to defer storage reads until after
+mount, see [Server Rendering](/docs/guides/server-rendering).
+
 If that same key needs to appear in multiple components, define it once with
 `defineMnemonicKey(...)` and reuse the descriptor. See
 [Canonical Key Definitions](/docs/guides/canonical-key-definitions) for the
@@ -85,6 +90,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 - [Clearable Persisted Values](/docs/guides/clearable-persisted-values) — model durable clear intent with nullable keys
 - [Persisted vs Ephemeral State](/docs/guides/persisted-vs-ephemeral-state) — keep durable preferences and runtime-only UI state separate
 - [Reset and Recovery](/docs/guides/reset-and-recovery) — add soft reset and hard reset flows for persisted state
+- [Server Rendering](/docs/guides/server-rendering) — control server placeholders and hydration timing in Next.js or Remix
 - [Custom Codecs](/docs/guides/custom-codecs) — serialize `Date`, `Set`, `Map`, etc.
 - [Cross-Tab Sync](/docs/guides/cross-tab-sync) — keep tabs in sync
 - [API Reference](/docs/api) — full TypeDoc-generated API docs

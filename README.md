@@ -31,7 +31,7 @@ through a single hook that works like `useState`.
 - **First-class key descriptors** -- define canonical, reusable key contracts once with `defineMnemonicKey(...)`
 - **Lifecycle callbacks** -- `onMount` and `onChange` hooks
 - **DevTools** -- inspect and mutate state from the browser console
-- **SSR-safe** -- returns defaults when `window` is unavailable
+- **SSR-safe with explicit controls** -- defaults to `defaultValue` on the server, with optional `ssr.serverValue` and `client-only` hydration
 - **Tree-shakeable, zero dependencies** -- ships ESM + CJS with full TypeScript declarations
 
 ## Installation
@@ -93,6 +93,14 @@ export default function App() {
 
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
+
+In server-rendered apps, `useMnemonicKey(...)` renders `defaultValue` on the
+server by default and then hydrates to persisted storage on the client. When
+you need a deterministic server placeholder or want to delay storage reads
+until after mount, use `ssr.serverValue` and `ssr.hydration: "client-only"`.
+See the
+[Server Rendering guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/server-rendering)
+for Next.js and Remix examples.
 
 If the same key is used in multiple components, consider defining it once with
 `defineMnemonicKey(...)` and reusing that descriptor everywhere. This keeps the

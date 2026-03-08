@@ -9,7 +9,7 @@
  * encoding/decoding, and JSON Schema validation.
  */
 
-import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback } from "react";
+import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback, useState } from "react";
 import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
@@ -23,6 +23,8 @@ import type {
     MnemonicKeyState,
     MnemonicKeyDescriptor,
 } from "./types";
+
+const SSR_SNAPSHOT_PREFIX = "\u0000mnemonic:ssr:";
 
 function resolveMnemonicKeyArgs<T>(
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
@@ -86,10 +88,21 @@ export function useMnemonicKey<T>(
     const resolvedOptions = descriptor.options;
     const api = useMnemonic();
 
-    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = resolvedOptions;
+    const {
+        defaultValue,
+        onMount,
+        onChange,
+        listenCrossTab,
+        codec: codecOpt,
+        schema,
+        reconcile,
+        ssr: ssrOptions,
+    } = resolvedOptions;
     const codec = codecOpt ?? JSONCodec;
     const schemaMode = api.schemaMode;
     const schemaRegistry = api.schemaRegistry;
+    const hydrationMode = ssrOptions?.hydration ?? api.ssrHydration;
+    const [hasMounted, setHasMounted] = useState(hydrationMode !== "client-only");
 
     /**
      * Helper to get the fallback/default value.
@@ -101,6 +114,19 @@ export function useMnemonicKey<T>(
                 ? (defaultValue as (error?: CodecError | SchemaError) => T)(error)
                 : defaultValue,
         [defaultValue],
+    );
+
+    const getServerValue = useCallback(
+        (error?: CodecError | SchemaError) => {
+            const serverValue = ssrOptions?.serverValue;
+            if (serverValue === undefined) {
+                return getFallback(error);
+            }
+            return typeof serverValue === "function"
+                ? (serverValue as (error?: CodecError | SchemaError) => T)(error)
+                : serverValue;
+        },
+        [getFallback, ssrOptions?.serverValue],
     );
 
     const parseEnvelope = useCallback(
@@ -539,14 +565,47 @@ export function useMnemonicKey<T>(
      * Subscribe to raw storage changes using React's useSyncExternalStore.
      * This ensures efficient, tearing-free updates when storage changes.
      */
-    const raw = useSyncExternalStore(
-        (listener) => api.subscribeRaw(key, listener),
-        () => api.getRawSnapshot(key),
-        () => null, // SSR snapshot - no storage in server environment
+    const getServerRawSnapshot = useCallback((): string | null => {
+        if (ssrOptions?.serverValue === undefined) {
+            return null;
+        }
+        return `${SSR_SNAPSHOT_PREFIX}${encodeForWrite(getServerValue())}`;
+    }, [encodeForWrite, getServerValue, ssrOptions?.serverValue]);
+
+    const deferStorageRead = hydrationMode === "client-only" && !hasMounted;
+    const subscribe = useCallback(
+        (listener: () => void) => {
+            if (deferStorageRead) {
+                return () => undefined;
+            }
+            return api.subscribeRaw(key, listener);
+        },
+        [api, deferStorageRead, key],
     );
 
-    const decoded = useMemo(() => decodeForRead(raw), [decodeForRead, raw]);
+    const raw = useSyncExternalStore(
+        subscribe,
+        () => (deferStorageRead ? getServerRawSnapshot() : api.getRawSnapshot(key)),
+        getServerRawSnapshot,
+    );
+
+    const decoded = useMemo(() => {
+        if (raw != null && raw.startsWith(SSR_SNAPSHOT_PREFIX)) {
+            const serverDecoded = decodeForRead(raw.slice(SSR_SNAPSHOT_PREFIX.length));
+            return {
+                value: serverDecoded.value,
+                rewriteRaw: undefined,
+                pendingSchema: undefined,
+            };
+        }
+        return decodeForRead(raw);
+    }, [decodeForRead, raw]);
     const value = decoded.value;
+
+    useEffect(() => {
+        if (hasMounted) return;
+        setHasMounted(true);
+    }, [hasMounted]);
 
     // Persist opportunistic read-time upgrades (migrations, autoschema rewrite).
     useEffect(() => {

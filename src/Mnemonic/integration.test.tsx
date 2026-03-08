@@ -341,6 +341,73 @@ describe("SSR hydration contract", () => {
 
         expect(container.textContent).toContain("dark");
     });
+
+    it("server-renders an explicit serverValue before hydrating to persisted storage", async () => {
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                ssr: {
+                    serverValue: "system",
+                },
+            });
+            return <span>{value}</span>;
+        }
+
+        const app = (
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <Theme />
+            </MnemonicProvider>
+        );
+
+        const html = renderToString(app);
+        expect(html).toContain("system");
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await act(async () => {
+            hydrateRoot(container, app);
+            await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain("dark");
+    });
+
+    it("client-only hydration keeps the server placeholder until mount, then reads persisted storage", async () => {
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark",
+            });
+            return <span>{value}</span>;
+        }
+
+        const app = (
+            <MnemonicProvider namespace="ns" storage={storage} ssr={{ hydration: "client-only" }}>
+                <Theme />
+            </MnemonicProvider>
+        );
+
+        const html = renderToString(app);
+        expect(html).toContain("light");
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        hydrateRoot(container, app);
+        expect(container.textContent).toContain("light");
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain("dark");
+    });
 });
 
 // ============================================================================

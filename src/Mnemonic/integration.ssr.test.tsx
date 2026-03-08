@@ -43,6 +43,9 @@ function ssrRender(
         schemaMode?: "default" | "strict" | "autoschema";
         schemaRegistry?: SchemaRegistry;
         enableDevTools?: boolean;
+        ssr?: {
+            hydration?: "immediate" | "client-only";
+        };
     },
     child: React.ReactElement,
 ): string {
@@ -124,11 +127,31 @@ describe("SSR integration (node environment)", () => {
 
         const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Theme));
 
-        // Server snapshot is always null, so the default is used
+        // Default SSR snapshot is null, so the default is used
         // even though storage has "dark". This is the SSR contract:
         // the server renders with the default, client hydrates and
         // may update once storage is read.
         expect(html).toContain("light");
+    });
+
+    it("renderToString can use an explicit serverValue", () => {
+        const storage = createMockStorage();
+        storage.store.set("ssr.theme", JSON.stringify({ version: 0, payload: JSON.stringify("dark") }));
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                ssr: {
+                    serverValue: "system",
+                },
+            });
+            return React.createElement("span", null, value);
+        }
+
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Theme));
+
+        expect(html).toContain("system");
+        expect(html).not.toContain("dark");
     });
 
     it("renderToString does not throw with listenCrossTab enabled", () => {

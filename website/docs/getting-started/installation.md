@@ -42,4 +42,5 @@ The package ships:
 | Types  | `dist/index.d.ts` | TypeScript declarations                     |
 
 The library is tree-shakeable, has zero runtime dependencies, and is SSR-safe
-(returns defaults when `window` is unavailable).
+by default. Without extra configuration, hooks render `defaultValue` on the
+server and then hydrate to persisted storage on the client.
