@@ -376,6 +376,62 @@ describe("SSR hydration contract", () => {
         expect(container.textContent).toContain("dark");
     });
 
+    it("hook-level client-only hydration defers storage reads until after mount", async () => {
+        const reads: string[] = [];
+        const trackedStorage: StorageLike & { store: Map<string, string> } = {
+            store: new Map([["ns.theme", env(JSON.stringify("dark"))]]),
+            getItem: (key: string) => {
+                reads.push(key);
+                return trackedStorage.store.get(key) ?? null;
+            },
+            setItem: (key: string, value: string) => {
+                trackedStorage.store.set(key, value);
+            },
+            removeItem: (key: string) => {
+                trackedStorage.store.delete(key);
+            },
+            get length() {
+                return trackedStorage.store.size;
+            },
+            key: (index: number) => {
+                return Array.from(trackedStorage.store.keys())[index] ?? null;
+            },
+        };
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark",
+                ssr: {
+                    hydration: "client-only",
+                },
+            });
+            return <span>{value}</span>;
+        }
+
+        const app = (
+            <MnemonicProvider namespace="ns" storage={trackedStorage} ssr={{ hydration: "immediate" }}>
+                <Theme />
+            </MnemonicProvider>
+        );
+
+        const html = renderToString(app);
+        expect(html).toContain("light");
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await act(async () => {
+            hydrateRoot(container, app);
+            expect(reads).toEqual([]);
+            expect(container.textContent).toContain("light");
+            await Promise.resolve();
+        });
+
+        expect(reads).toContain("ns.theme");
+        expect(container.textContent).toContain("dark");
+    });
+
     it("client-only hydration keeps the server placeholder until mount, then reads persisted storage", async () => {
         storage.store.set("ns.theme", env(JSON.stringify("dark")));
 
@@ -406,6 +462,41 @@ describe("SSR hydration contract", () => {
         });
 
         expect(container.textContent).toContain("dark");
+    });
+
+    it("serverValue factory falls back to defaultValue after hydration when storage is empty", async () => {
+        const serverValue = vi.fn(() => "system" as const);
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                ssr: {
+                    serverValue,
+                },
+            });
+            return <span>{value}</span>;
+        }
+
+        const app = (
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <Theme />
+            </MnemonicProvider>
+        );
+
+        const html = renderToString(app);
+        expect(html).toContain("system");
+
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        await act(async () => {
+            hydrateRoot(container, app);
+            await Promise.resolve();
+        });
+
+        expect(serverValue).toHaveBeenCalled();
+        expect(container.textContent).toContain("light");
     });
 });
 
