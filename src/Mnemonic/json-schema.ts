@@ -165,6 +165,9 @@ export function jsonDeepEqual(a: unknown, b: unknown): boolean {
  */
 export type CompiledValidator = (value: unknown, path?: string) => JsonSchemaValidationError[];
 
+type ValidationStep = (value: unknown, path: string, errors: JsonSchemaValidationError[]) => void;
+type TypeValidationStep = (value: unknown, path: string, errors: JsonSchemaValidationError[]) => boolean;
+
 /** Module-level cache: schema object identity → compiled validator. */
 const compiledCache = new WeakMap<JsonSchema, CompiledValidator>();
 
@@ -204,254 +207,270 @@ function isJsonPrimitive(value: unknown): boolean {
  * function contains only the checks that are relevant.
  */
 function buildValidator(schema: JsonSchema): CompiledValidator {
-    // --- Pre-compute: type ---
-    const resolvedTypes: readonly JsonSchemaType[] | null =
-        schema.type !== undefined ? (Array.isArray(schema.type) ? schema.type : [schema.type]) : null;
-    const typeLabel = resolvedTypes !== null ? JSON.stringify(schema.type) : "";
+    const typeStep = buildTypeValidationStep(schema);
+    const validationSteps = [
+        buildEnumValidationStep(schema),
+        buildConstValidationStep(schema),
+        buildNumberValidationStep(schema),
+        buildStringValidationStep(schema),
+        buildObjectValidationStep(schema),
+        buildArrayValidationStep(schema),
+    ].filter((step): step is ValidationStep => step !== null);
 
-    // --- Pre-compute: enum ---
-    const enumMembers = schema.enum;
-    let enumPrimitiveSet: Set<unknown> | null = null;
-    let enumComplexMembers: readonly unknown[] | null = null;
-    if (enumMembers !== undefined) {
-        const primitives: unknown[] = [];
-        const complex: unknown[] = [];
-        for (const member of enumMembers) {
-            if (isJsonPrimitive(member)) {
-                primitives.push(member);
-            } else {
-                complex.push(member);
-            }
-        }
-        if (primitives.length > 0) enumPrimitiveSet = new Set(primitives);
-        if (complex.length > 0) enumComplexMembers = complex;
-    }
-
-    // --- Pre-compute: const ---
-    const hasConst = "const" in schema;
-    const constValue = schema.const;
-
-    // --- Pre-compute: number constraints ---
-    const hasMinimum = schema.minimum !== undefined;
-    const minimum = schema.minimum!;
-    const hasMaximum = schema.maximum !== undefined;
-    const maximum = schema.maximum!;
-    const hasExMin = schema.exclusiveMinimum !== undefined;
-    const exMin = schema.exclusiveMinimum!;
-    const hasExMax = schema.exclusiveMaximum !== undefined;
-    const exMax = schema.exclusiveMaximum!;
-    const hasNumberConstraints = hasMinimum || hasMaximum || hasExMin || hasExMax;
-
-    // --- Pre-compute: string constraints ---
-    const hasMinLength = schema.minLength !== undefined;
-    const minLen = schema.minLength!;
-    const hasMaxLength = schema.maxLength !== undefined;
-    const maxLen = schema.maxLength!;
-    const hasStringConstraints = hasMinLength || hasMaxLength;
-
-    // --- Pre-compute: object constraints ---
-    const requiredKeys = schema.required;
-    const hasRequired = requiredKeys !== undefined && requiredKeys.length > 0;
-    const hasProperties = schema.properties !== undefined;
-    const propertyValidators: [string, CompiledValidator][] | null = hasProperties
-        ? Object.entries(schema.properties!).map(
-              ([name, propSchema]) => [name, compileSchema(propSchema)] as [string, CompiledValidator],
-          )
-        : null;
-    const checkAdditional = schema.additionalProperties !== undefined && schema.additionalProperties !== true;
-    const additionalIsFalse = schema.additionalProperties === false;
-    const additionalValidator: CompiledValidator | null =
-        checkAdditional && !additionalIsFalse ? compileSchema(schema.additionalProperties as JsonSchema) : null;
-    const definedPropKeys: Set<string> | null = checkAdditional
-        ? new Set(schema.properties ? Object.keys(schema.properties) : [])
-        : null;
-    const hasObjectConstraints = hasRequired || hasProperties || checkAdditional;
-
-    // --- Pre-compute: array constraints ---
-    const hasMinItems = schema.minItems !== undefined;
-    const minItems = schema.minItems!;
-    const hasMaxItems = schema.maxItems !== undefined;
-    const maxItems = schema.maxItems!;
-    const itemsValidator: CompiledValidator | null = schema.items !== undefined ? compileSchema(schema.items) : null;
-    const hasArrayConstraints = hasMinItems || hasMaxItems || itemsValidator !== null;
-
-    // --- Empty schema fast path ---
-    if (
-        resolvedTypes === null &&
-        enumMembers === undefined &&
-        !hasConst &&
-        !hasNumberConstraints &&
-        !hasStringConstraints &&
-        !hasObjectConstraints &&
-        !hasArrayConstraints
-    ) {
+    if (typeStep === null && validationSteps.length === 0) {
         return (_value: unknown, _path?: string) => [];
     }
 
-    // --- Compiled validator ---
     return (value: unknown, path: string = ""): JsonSchemaValidationError[] => {
         const errors: JsonSchemaValidationError[] = [];
-
-        // --- type ---
-        if (resolvedTypes !== null) {
-            const matched = resolvedTypes.some((t) => matchesType(value, t));
-            if (!matched) {
-                errors.push({
-                    path,
-                    message: `Expected type ${typeLabel}, got ${jsonTypeLabel(value)}`,
-                    keyword: "type",
-                });
-                return errors; // short-circuit
-            }
+        if (typeStep && !typeStep(value, path, errors)) {
+            return errors;
         }
-
-        // --- enum ---
-        if (enumMembers !== undefined) {
-            let matched = false;
-            if (enumPrimitiveSet !== null && isJsonPrimitive(value)) {
-                matched = enumPrimitiveSet.has(value);
-            }
-            if (!matched && enumComplexMembers !== null) {
-                matched = enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
-            }
-            if (!matched) {
-                errors.push({
-                    path,
-                    message: `Value does not match any enum member`,
-                    keyword: "enum",
-                });
-            }
+        for (const step of validationSteps) {
+            step(value, path, errors);
         }
-
-        // --- const ---
-        if (hasConst) {
-            if (!jsonDeepEqual(value, constValue)) {
-                errors.push({
-                    path,
-                    message: `Value does not match const`,
-                    keyword: "const",
-                });
-            }
-        }
-
-        // --- number constraints ---
-        if (hasNumberConstraints && typeof value === "number") {
-            if (hasMinimum && value < minimum) {
-                errors.push({
-                    path,
-                    message: `Value ${value} is less than minimum ${minimum}`,
-                    keyword: "minimum",
-                });
-            }
-            if (hasMaximum && value > maximum) {
-                errors.push({
-                    path,
-                    message: `Value ${value} is greater than maximum ${maximum}`,
-                    keyword: "maximum",
-                });
-            }
-            if (hasExMin && value <= exMin) {
-                errors.push({
-                    path,
-                    message: `Value ${value} is not greater than exclusiveMinimum ${exMin}`,
-                    keyword: "exclusiveMinimum",
-                });
-            }
-            if (hasExMax && value >= exMax) {
-                errors.push({
-                    path,
-                    message: `Value ${value} is not less than exclusiveMaximum ${exMax}`,
-                    keyword: "exclusiveMaximum",
-                });
-            }
-        }
-
-        // --- string constraints ---
-        if (hasStringConstraints && typeof value === "string") {
-            if (hasMinLength && value.length < minLen) {
-                errors.push({
-                    path,
-                    message: `String length ${value.length} is less than minLength ${minLen}`,
-                    keyword: "minLength",
-                });
-            }
-            if (hasMaxLength && value.length > maxLen) {
-                errors.push({
-                    path,
-                    message: `String length ${value.length} is greater than maxLength ${maxLen}`,
-                    keyword: "maxLength",
-                });
-            }
-        }
-
-        // --- object constraints ---
-        if (hasObjectConstraints && typeof value === "object" && value !== null && !Array.isArray(value)) {
-            const obj = value as Record<string, unknown>;
-
-            if (hasRequired) {
-                for (const reqKey of requiredKeys!) {
-                    if (!Object.prototype.hasOwnProperty.call(obj, reqKey)) {
-                        errors.push({
-                            path,
-                            message: `Missing required property "${reqKey}"`,
-                            keyword: "required",
-                        });
-                    }
-                }
-            }
-
-            if (propertyValidators !== null) {
-                for (const [propName, propValidator] of propertyValidators) {
-                    if (Object.prototype.hasOwnProperty.call(obj, propName)) {
-                        const propErrors = propValidator(obj[propName], `${path}/${propName}`);
-                        errors.push(...propErrors);
-                    }
-                }
-            }
-
-            if (checkAdditional) {
-                for (const objKey of Object.keys(obj)) {
-                    if (!definedPropKeys!.has(objKey)) {
-                        if (additionalIsFalse) {
-                            errors.push({
-                                path,
-                                message: `Additional property "${objKey}" is not allowed`,
-                                keyword: "additionalProperties",
-                            });
-                        } else {
-                            const propErrors = additionalValidator!(obj[objKey], `${path}/${objKey}`);
-                            errors.push(...propErrors);
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- array constraints ---
-        if (hasArrayConstraints && Array.isArray(value)) {
-            if (hasMinItems && value.length < minItems) {
-                errors.push({
-                    path,
-                    message: `Array length ${value.length} is less than minItems ${minItems}`,
-                    keyword: "minItems",
-                });
-            }
-            if (hasMaxItems && value.length > maxItems) {
-                errors.push({
-                    path,
-                    message: `Array length ${value.length} is greater than maxItems ${maxItems}`,
-                    keyword: "maxItems",
-                });
-            }
-            if (itemsValidator !== null) {
-                for (let i = 0; i < value.length; i++) {
-                    const itemErrors = itemsValidator(value[i], `${path}/${i}`);
-                    errors.push(...itemErrors);
-                }
-            }
-        }
-
         return errors;
+    };
+}
+
+function buildTypeValidationStep(schema: JsonSchema): TypeValidationStep | null {
+    if (schema.type === undefined) {
+        return null;
+    }
+
+    const resolvedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+    const typeLabel = JSON.stringify(schema.type);
+    return (value, path, errors) => {
+        if (resolvedTypes.some((type) => matchesType(value, type))) {
+            return true;
+        }
+        errors.push({
+            path,
+            message: `Expected type ${typeLabel}, got ${jsonTypeLabel(value)}`,
+            keyword: "type",
+        });
+        return false;
+    };
+}
+
+function buildEnumValidationStep(schema: JsonSchema): ValidationStep | null {
+    if (schema.enum === undefined) {
+        return null;
+    }
+
+    const enumPrimitiveSet = new Set(schema.enum.filter((member) => isJsonPrimitive(member)));
+    const enumComplexMembers = schema.enum.filter((member) => !isJsonPrimitive(member));
+
+    return (value, path, errors) => {
+        const primitiveMatch = isJsonPrimitive(value) && enumPrimitiveSet.has(value);
+        const complexMatch = enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
+        if (primitiveMatch || complexMatch) {
+            return;
+        }
+        errors.push({
+            path,
+            message: `Value does not match any enum member`,
+            keyword: "enum",
+        });
+    };
+}
+
+function buildConstValidationStep(schema: JsonSchema): ValidationStep | null {
+    if (!("const" in schema)) {
+        return null;
+    }
+
+    return (value, path, errors) => {
+        if (jsonDeepEqual(value, schema.const)) {
+            return;
+        }
+        errors.push({
+            path,
+            message: `Value does not match const`,
+            keyword: "const",
+        });
+    };
+}
+
+function buildNumberValidationStep(schema: JsonSchema): ValidationStep | null {
+    const hasMinimum = schema.minimum !== undefined;
+    const hasMaximum = schema.maximum !== undefined;
+    const hasExMin = schema.exclusiveMinimum !== undefined;
+    const hasExMax = schema.exclusiveMaximum !== undefined;
+    if (!hasMinimum && !hasMaximum && !hasExMin && !hasExMax) {
+        return null;
+    }
+
+    const minimum = schema.minimum;
+    const maximum = schema.maximum;
+    const exMin = schema.exclusiveMinimum;
+    const exMax = schema.exclusiveMaximum;
+
+    return (value, path, errors) => {
+        if (typeof value !== "number") {
+            return;
+        }
+        if (hasMinimum && value < minimum!) {
+            errors.push({
+                path,
+                message: `Value ${value} is less than minimum ${minimum!}`,
+                keyword: "minimum",
+            });
+        }
+        if (hasMaximum && value > maximum!) {
+            errors.push({
+                path,
+                message: `Value ${value} is greater than maximum ${maximum!}`,
+                keyword: "maximum",
+            });
+        }
+        if (hasExMin && value <= exMin!) {
+            errors.push({
+                path,
+                message: `Value ${value} is not greater than exclusiveMinimum ${exMin!}`,
+                keyword: "exclusiveMinimum",
+            });
+        }
+        if (hasExMax && value >= exMax!) {
+            errors.push({
+                path,
+                message: `Value ${value} is not less than exclusiveMaximum ${exMax!}`,
+                keyword: "exclusiveMaximum",
+            });
+        }
+    };
+}
+
+function buildStringValidationStep(schema: JsonSchema): ValidationStep | null {
+    const hasMinLength = schema.minLength !== undefined;
+    const hasMaxLength = schema.maxLength !== undefined;
+    if (!hasMinLength && !hasMaxLength) {
+        return null;
+    }
+
+    const minLength = schema.minLength;
+    const maxLength = schema.maxLength;
+    return (value, path, errors) => {
+        if (typeof value !== "string") {
+            return;
+        }
+        if (hasMinLength && value.length < minLength!) {
+            errors.push({
+                path,
+                message: `String length ${value.length} is less than minLength ${minLength!}`,
+                keyword: "minLength",
+            });
+        }
+        if (hasMaxLength && value.length > maxLength!) {
+            errors.push({
+                path,
+                message: `String length ${value.length} is greater than maxLength ${maxLength!}`,
+                keyword: "maxLength",
+            });
+        }
+    };
+}
+
+function buildObjectValidationStep(schema: JsonSchema): ValidationStep | null {
+    const requiredKeys = schema.required;
+    const hasRequired = requiredKeys !== undefined && requiredKeys.length > 0;
+    const propertyValidators = schema.properties
+        ? (Object.entries(schema.properties).map(([name, propertySchema]) => [
+              name,
+              compileSchema(propertySchema),
+          ]) satisfies [string, CompiledValidator][])
+        : null;
+    const checkAdditional = schema.additionalProperties !== undefined && schema.additionalProperties !== true;
+    const additionalIsFalse = schema.additionalProperties === false;
+    const additionalValidator =
+        checkAdditional && !additionalIsFalse ? compileSchema(schema.additionalProperties as JsonSchema) : null;
+    const definedPropKeys = checkAdditional ? new Set(Object.keys(schema.properties ?? {})) : null;
+
+    if (!hasRequired && propertyValidators === null && !checkAdditional) {
+        return null;
+    }
+
+    return (value, path, errors) => {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+            return;
+        }
+
+        const objectValue = value as Record<string, unknown>;
+        if (hasRequired) {
+            for (const requiredKey of requiredKeys!) {
+                if (!Object.prototype.hasOwnProperty.call(objectValue, requiredKey)) {
+                    errors.push({
+                        path,
+                        message: `Missing required property "${requiredKey}"`,
+                        keyword: "required",
+                    });
+                }
+            }
+        }
+
+        if (propertyValidators !== null) {
+            for (const [propertyName, validator] of propertyValidators) {
+                if (!Object.prototype.hasOwnProperty.call(objectValue, propertyName)) {
+                    continue;
+                }
+                errors.push(...validator(objectValue[propertyName], `${path}/${propertyName}`));
+            }
+        }
+
+        if (!checkAdditional) {
+            return;
+        }
+        for (const objectKey of Object.keys(objectValue)) {
+            if (definedPropKeys!.has(objectKey)) {
+                continue;
+            }
+            if (additionalIsFalse) {
+                errors.push({
+                    path,
+                    message: `Additional property "${objectKey}" is not allowed`,
+                    keyword: "additionalProperties",
+                });
+                continue;
+            }
+            errors.push(...additionalValidator!(objectValue[objectKey], `${path}/${objectKey}`));
+        }
+    };
+}
+
+function buildArrayValidationStep(schema: JsonSchema): ValidationStep | null {
+    const hasMinItems = schema.minItems !== undefined;
+    const hasMaxItems = schema.maxItems !== undefined;
+    const itemsValidator = schema.items ? compileSchema(schema.items) : null;
+    if (!hasMinItems && !hasMaxItems && itemsValidator === null) {
+        return null;
+    }
+
+    const minItems = schema.minItems;
+    const maxItems = schema.maxItems;
+    return (value, path, errors) => {
+        if (!Array.isArray(value)) {
+            return;
+        }
+        if (hasMinItems && value.length < minItems!) {
+            errors.push({
+                path,
+                message: `Array length ${value.length} is less than minItems ${minItems!}`,
+                keyword: "minItems",
+            });
+        }
+        if (hasMaxItems && value.length > maxItems!) {
+            errors.push({
+                path,
+                message: `Array length ${value.length} is greater than maxItems ${maxItems!}`,
+                keyword: "maxItems",
+            });
+        }
+        if (itemsValidator === null) {
+            return;
+        }
+        for (const [index, item] of value.entries()) {
+            errors.push(...itemsValidator(item, `${path}/${index}`));
+        }
     };
 }
 
