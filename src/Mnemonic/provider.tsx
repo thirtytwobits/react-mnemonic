@@ -379,7 +379,7 @@ function enumerateNamespaceKeys(
         }
         for (let index = 0; index < storageLength; index++) {
             const fullKey = getStorageKey.call(storage, index);
-            if (!fullKey || !fullKey.startsWith(prefix)) continue;
+            if (!fullKey?.startsWith(prefix)) continue;
             keys.push(fullKey.slice(prefix.length));
         }
         callbacks.onAccessSuccess();
@@ -977,9 +977,7 @@ export function MnemonicProvider({
          */
         if (devToolsRoot) {
             let infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
-            if (!devToolsRoot.capabilities.weakRef) {
-                infoMessage = `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
-            } else {
+            if (devToolsRoot.capabilities.weakRef) {
                 const existingLive = devToolsRoot.resolve(namespace);
                 if (existingLive) {
                     const duplicateMessage = `[Mnemonic DevTools] Duplicate provider namespace "${namespace}" detected. Each window must have at most one live MnemonicProvider per namespace.`;
@@ -1016,6 +1014,8 @@ export function MnemonicProvider({
                         bumpDevToolsVersion(devToolsRoot, namespace, "registry:namespace-registered");
                     }
                 }
+            } else {
+                infoMessage = `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
             }
             console.info(infoMessage);
         }

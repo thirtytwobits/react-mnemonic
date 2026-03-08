@@ -167,6 +167,7 @@ export type CompiledValidator = (value: unknown, path?: string) => JsonSchemaVal
 
 type ValidationStep = (value: unknown, path: string, errors: JsonSchemaValidationError[]) => void;
 type TypeValidationStep = (value: unknown, path: string, errors: JsonSchemaValidationError[]) => boolean;
+type ObjectValidationStep = (value: Record<string, unknown>, path: string, errors: JsonSchemaValidationError[]) => void;
 
 /** Module-level cache: schema object identity → compiled validator. */
 const compiledCache = new WeakMap<JsonSchema, CompiledValidator>();
@@ -199,6 +200,18 @@ export function compileSchema(schema: JsonSchema): CompiledValidator {
 /** Determines whether a value is a JSON primitive (not object/array). */
 function isJsonPrimitive(value: unknown): boolean {
     return value === null || typeof value !== "object";
+}
+
+function isJsonObjectRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function objectHasOwn(value: object, property: PropertyKey): boolean {
+    const hasOwn = (Object as typeof Object & { hasOwn?: (target: object, key: PropertyKey) => boolean }).hasOwn;
+    if (typeof hasOwn === "function") {
+        return hasOwn(value, property);
+    }
+    return Object.prototype.hasOwnProperty.call(value, property);
 }
 
 /**
@@ -263,10 +276,7 @@ function buildEnumValidationStep(schema: JsonSchema): ValidationStep | null {
 
     return (value, path, errors) => {
         const primitiveMatch = isJsonPrimitive(value) && enumPrimitiveSet.has(value);
-        const complexMatch =
-            !primitiveMatch &&
-            enumComplexMembers.length > 0 &&
-            enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
+        const complexMatch = !primitiveMatch && enumComplexMembers.some((entry) => jsonDeepEqual(value, entry));
         if (primitiveMatch || complexMatch) {
             return;
         }
@@ -375,8 +385,7 @@ function buildStringValidationStep(schema: JsonSchema): ValidationStep | null {
 }
 
 function buildObjectValidationStep(schema: JsonSchema): ValidationStep | null {
-    const requiredKeys = schema.required;
-    const hasRequired = requiredKeys !== undefined && requiredKeys.length > 0;
+    const requiredKeys = schema.required ?? [];
     const propertyValidators = schema.properties
         ? (Object.entries(schema.properties).map(([name, propertySchema]) => [
               name,
@@ -388,43 +397,77 @@ function buildObjectValidationStep(schema: JsonSchema): ValidationStep | null {
     const additionalValidator =
         checkAdditional && !additionalIsFalse ? compileSchema(schema.additionalProperties as JsonSchema) : null;
     const definedPropKeys = checkAdditional ? new Set(Object.keys(schema.properties ?? {})) : null;
+    const objectValidationSteps: ObjectValidationStep[] = [];
 
-    if (!hasRequired && propertyValidators === null && !checkAdditional) {
+    if (requiredKeys.length > 0) {
+        objectValidationSteps.push(createRequiredPropertyStep(requiredKeys));
+    }
+    if (propertyValidators !== null) {
+        objectValidationSteps.push(createDeclaredPropertyStep(propertyValidators));
+    }
+    if (checkAdditional) {
+        objectValidationSteps.push(
+            createAdditionalPropertyStep({
+                additionalIsFalse,
+                additionalValidator,
+                definedPropKeys: definedPropKeys ?? new Set<string>(),
+            }),
+        );
+    }
+
+    if (objectValidationSteps.length === 0) {
         return null;
     }
 
     return (value, path, errors) => {
-        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        if (!isJsonObjectRecord(value)) {
             return;
         }
 
-        const objectValue = value as Record<string, unknown>;
-        if (hasRequired) {
-            for (const requiredKey of requiredKeys!) {
-                if (!Object.prototype.hasOwnProperty.call(objectValue, requiredKey)) {
-                    errors.push({
-                        path,
-                        message: `Missing required property "${requiredKey}"`,
-                        keyword: "required",
-                    });
-                }
-            }
+        for (const step of objectValidationSteps) {
+            step(value, path, errors);
         }
+    };
+}
 
-        if (propertyValidators !== null) {
-            for (const [propertyName, validator] of propertyValidators) {
-                if (!Object.prototype.hasOwnProperty.call(objectValue, propertyName)) {
-                    continue;
-                }
-                errors.push(...validator(objectValue[propertyName], `${path}/${propertyName}`));
+function createRequiredPropertyStep(requiredKeys: readonly string[]): ObjectValidationStep {
+    return (value, path, errors) => {
+        for (const requiredKey of requiredKeys) {
+            if (objectHasOwn(value, requiredKey)) {
+                continue;
             }
+            errors.push({
+                path,
+                message: `Missing required property "${requiredKey}"`,
+                keyword: "required",
+            });
         }
+    };
+}
 
-        if (!checkAdditional) {
-            return;
+function createDeclaredPropertyStep(propertyValidators: [string, CompiledValidator][]): ObjectValidationStep {
+    return (value, path, errors) => {
+        for (const [propertyName, validator] of propertyValidators) {
+            if (!objectHasOwn(value, propertyName)) {
+                continue;
+            }
+            errors.push(...validator(value[propertyName], `${path}/${propertyName}`));
         }
-        for (const objectKey of Object.keys(objectValue)) {
-            if (definedPropKeys!.has(objectKey)) {
+    };
+}
+
+function createAdditionalPropertyStep({
+    additionalIsFalse,
+    additionalValidator,
+    definedPropKeys,
+}: {
+    additionalIsFalse: boolean;
+    additionalValidator: CompiledValidator | null;
+    definedPropKeys: Set<string>;
+}): ObjectValidationStep {
+    return (value, path, errors) => {
+        for (const objectKey of Object.keys(value)) {
+            if (definedPropKeys.has(objectKey)) {
                 continue;
             }
             if (additionalIsFalse) {
@@ -435,7 +478,7 @@ function buildObjectValidationStep(schema: JsonSchema): ValidationStep | null {
                 });
                 continue;
             }
-            errors.push(...additionalValidator!(objectValue[objectKey], `${path}/${objectKey}`));
+            errors.push(...additionalValidator!(value[objectKey], `${path}/${objectKey}`));
         }
     };
 }

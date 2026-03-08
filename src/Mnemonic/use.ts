@@ -44,6 +44,13 @@ function serializeEnvelope(version: number, payload: unknown): string {
     } satisfies MnemonicEnvelope);
 }
 
+function withReadMetadata<T>(value: T, rewriteRaw?: string, pendingSchema?: KeySchema): ReadResult<T> {
+    const result: ReadResult<T> = { value };
+    if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
+    if (pendingSchema !== undefined) result.pendingSchema = pendingSchema;
+    return result;
+}
+
 function isDevelopmentRuntime(): boolean {
     return getRuntimeNodeEnv() === "development";
 }
@@ -459,10 +466,7 @@ export function useMnemonicKey<T>(
             derivePendingSchema?: (value: T) => KeySchema;
         }): ReadResult<T> => {
             if (!reconcile) {
-                const result: ReadResult<T> = { value };
-                if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
-                if (pendingSchema !== undefined) result.pendingSchema = pendingSchema;
-                return result;
+                return withReadMetadata(value, rewriteRaw, pendingSchema);
             }
 
             const context: ReconcileContext = {
@@ -471,14 +475,13 @@ export function useMnemonicKey<T>(
                 ...(latestVersion === undefined ? {} : { latestVersion }),
             };
 
-            let baselineSerialized: string | undefined;
-            if (serializeForPersist) {
+            const baselineSerialized = (() => {
                 try {
-                    baselineSerialized = serializeForPersist(value);
+                    return serializeForPersist(value);
                 } catch {
-                    baselineSerialized = rewriteRaw;
+                    return rewriteRaw;
                 }
-            }
+            })();
 
             try {
                 const reconciled = reconcile(value, context);
@@ -488,10 +491,7 @@ export function useMnemonicKey<T>(
                     baselineSerialized === undefined || nextSerialized !== baselineSerialized
                         ? nextSerialized
                         : rewriteRaw;
-                const result: ReadResult<T> = { value: reconciled };
-                if (nextRewriteRaw !== undefined) result.rewriteRaw = nextRewriteRaw;
-                if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;
-                return result;
+                return withReadMetadata(reconciled, nextRewriteRaw, nextPendingSchema);
             } catch (err) {
                 const typedErr =
                     err instanceof SchemaError
