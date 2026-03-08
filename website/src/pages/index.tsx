@@ -41,9 +41,9 @@ const features: FeatureItem[] = [
             "useMnemonicKey returns { value, set, reset, remove } — the same mental model as useState, with persistence built in.",
     },
     {
-        title: "AI-Friendly",
+        title: "AI-First Persistence",
         description:
-            "Designed with rigorous typing and predictable behavior, with a dedicated AI contract guide for deterministic implementation work.",
+            "The docs now include an AI-friendliness benchmark centered on one-shot persistence correctness, not just bundle size.",
     },
     {
         title: "SSR-safe by default",
@@ -144,6 +144,18 @@ function HomepageExample() {
                             Need the deterministic implementation contract?{" "}
                             <Link to="/docs/guides/ai-contract-guide">Read the AI Contract Guide</Link>.
                         </p>
+                        <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
+                            <p style={{ marginBottom: "0.75rem" }}>
+                                Evaluating alternatives? See the comparison guide for reproducible bundle measurements
+                                and SSR/API tradeoff notes.
+                            </p>
+                            <Link
+                                className="button button--outline button--secondary button--md"
+                                to="/docs/guides/comparisons-and-benchmarks"
+                            >
+                                Compare Approaches
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>

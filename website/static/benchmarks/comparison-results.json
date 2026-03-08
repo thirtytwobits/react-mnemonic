@@ -1,0 +1,107 @@
+{
+    "generatedAt": "2026-03-08T18:26:55.027Z",
+    "methodology": {
+        "bundler": "esbuild",
+        "bundlerVersion": "0.27.3",
+        "format": "esm",
+        "minified": true,
+        "externalized": ["react", "react-dom", "react/jsx-runtime"],
+        "task": "Persisted theme toggle for the common-task entries",
+        "advancedTask": "Schema-aware profile persistence with migration for react-mnemonic only"
+    },
+    "versions": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1",
+        "react-mnemonic": "1.0.0-beta.0",
+        "zustand": "5.0.11",
+        "jotai": "2.18.0",
+        "use-local-storage-state": "19.5.0",
+        "usehooks-ts": "3.1.1",
+        "esbuild": "0.27.3"
+    },
+    "caveats": [
+        "These measurements compare the incremental bundle cost beyond React itself.",
+        "The common-task entries intentionally model the same user-facing task, not identical internal architectures.",
+        "The advanced react-mnemonic entry is included to show the cost of opting into schema-aware persistence; it is not a like-for-like cross-library comparison."
+    ],
+    "benchmarks": [
+        {
+            "id": "react-mnemonic-theme",
+            "label": "react-mnemonic",
+            "category": "common-task",
+            "scenario": "Persisted theme toggle",
+            "packageName": "react-mnemonic",
+            "packageVersion": "1.0.0-beta.0",
+            "bundleBytes": 22335,
+            "bundleKiB": 21.81,
+            "gzipBytes": 7906,
+            "gzipKiB": 7.72,
+            "entry": "benchmarks/comparison/entries/react-mnemonic-theme.tsx"
+        },
+        {
+            "id": "zustand-persist-theme",
+            "label": "zustand/persist",
+            "category": "common-task",
+            "scenario": "Persisted theme toggle",
+            "packageName": "zustand",
+            "packageVersion": "5.0.11",
+            "bundleBytes": 2912,
+            "bundleKiB": 2.84,
+            "gzipBytes": 1452,
+            "gzipKiB": 1.42,
+            "entry": "benchmarks/comparison/entries/zustand-persist-theme.tsx"
+        },
+        {
+            "id": "jotai-atom-with-storage-theme",
+            "label": "jotai/atomWithStorage",
+            "category": "common-task",
+            "scenario": "Persisted theme toggle",
+            "packageName": "jotai",
+            "packageVersion": "2.18.0",
+            "bundleBytes": 10570,
+            "bundleKiB": 10.32,
+            "gzipBytes": 4296,
+            "gzipKiB": 4.2,
+            "entry": "benchmarks/comparison/entries/jotai-atom-with-storage-theme.tsx"
+        },
+        {
+            "id": "use-local-storage-state-theme",
+            "label": "use-local-storage-state",
+            "category": "common-task",
+            "scenario": "Persisted theme toggle",
+            "packageName": "use-local-storage-state",
+            "packageVersion": "19.5.0",
+            "bundleBytes": 1569,
+            "bundleKiB": 1.53,
+            "gzipBytes": 805,
+            "gzipKiB": 0.79,
+            "entry": "benchmarks/comparison/entries/use-local-storage-state-theme.tsx"
+        },
+        {
+            "id": "usehooks-ts-theme",
+            "label": "usehooks-ts/useLocalStorage",
+            "category": "common-task",
+            "scenario": "Persisted theme toggle",
+            "packageName": "usehooks-ts",
+            "packageVersion": "3.1.1",
+            "bundleBytes": 4342,
+            "bundleKiB": 4.24,
+            "gzipBytes": 1961,
+            "gzipKiB": 1.92,
+            "entry": "benchmarks/comparison/entries/usehooks-ts-theme.tsx"
+        },
+        {
+            "id": "react-mnemonic-schema",
+            "label": "react-mnemonic (schema workflow)",
+            "category": "advanced-task",
+            "scenario": "Schema-aware profile persistence with migration",
+            "packageName": "react-mnemonic",
+            "packageVersion": "1.0.0-beta.0",
+            "bundleBytes": 24532,
+            "bundleKiB": 23.96,
+            "gzipBytes": 8567,
+            "gzipKiB": 8.37,
+            "entry": "benchmarks/comparison/entries/react-mnemonic-schema.tsx"
+        }
+    ]
+}

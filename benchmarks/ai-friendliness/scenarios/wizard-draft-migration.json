@@ -1,0 +1,60 @@
+{
+    "id": "wizard-draft-migration",
+    "title": "Wizard draft with schema evolution",
+    "focus": "migration vs reconcile",
+    "prompt": "Build an onboarding wizard draft that survives reloads and can upgrade old saved drafts when the step model changes.",
+    "starterAppPath": "benchmarks/ai-friendliness/starters/wizard-draft-migration/app.tsx",
+    "expectedPersistenceDecisions": [
+        "Persist the draft because the prompt explicitly says it survives reloads.",
+        "Use schema/version upgrade behavior rather than ad hoc raw JSON upgrades.",
+        "Keep migration and reconcile concerns distinct."
+    ],
+    "criticalFailureConditions": [
+        "There is no versioned upgrade path for old drafts.",
+        "A react-mnemonic submission invents local package typings instead of using the published exports.",
+        "The submission bypasses the target persistence library.",
+        "The first attempt does not compile or test cleanly."
+    ],
+    "allowedImplementationShapes": {
+        "react-mnemonic": [
+            "createSchemaRegistry with migrations",
+            "schema version on the key and reconcile for post-migration policy"
+        ],
+        "zustand/persist": ["persist middleware with version and migrate", "manual draft normalization where needed"],
+        "jotai/atomWithStorage": ["atomWithStorage with explicit version envelope and upgrade logic in app code"],
+        "use-local-storage-state": ["Hook usage with explicit version envelope and upgrade logic in app code"],
+        "usehooks-ts/useLocalStorage": ["Hook usage with explicit version envelope and upgrade logic in app code"]
+    },
+    "automatedChecks": [
+        {
+            "id": "targetLibraryUsage",
+            "description": "Uses the target persistence library",
+            "weight": 10,
+            "critical": true
+        },
+        {
+            "id": "publishedPackageTypes",
+            "description": "Uses published package types instead of local react-mnemonic shims",
+            "weight": 25,
+            "critical": true
+        },
+        {
+            "id": "schemaWorkflow",
+            "description": "Implements version-aware upgrade behavior",
+            "weight": 30,
+            "critical": true
+        },
+        {
+            "id": "durableStateChoice",
+            "description": "Treats the draft as durable wizard state",
+            "weight": 15,
+            "critical": false
+        },
+        {
+            "id": "avoidBypassingTargetLibrary",
+            "description": "Does not bypass the target library with raw storage calls",
+            "weight": 20,
+            "critical": true
+        }
+    ]
+}

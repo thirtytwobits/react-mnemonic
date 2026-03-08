@@ -1,0 +1,61 @@
+{
+    "id": "theme-preference",
+    "title": "Persisted theme preference",
+    "focus": "durable preference plus cross-tab sync",
+    "prompt": "Build a settings panel with a light/dark theme toggle that survives reloads and stays in sync across multiple tabs.",
+    "starterAppPath": "benchmarks/ai-friendliness/starters/theme-preference/app.tsx",
+    "expectedPersistenceDecisions": [
+        "Persist the theme as durable user state.",
+        "Select the target library rather than raw localStorage calls.",
+        "Enable or implement cross-tab sync because the prompt explicitly asks for it."
+    ],
+    "criticalFailureConditions": [
+        "The submission bypasses the target persistence library.",
+        "A react-mnemonic submission invents local package typings instead of using the published exports.",
+        "The persisted theme does not include cross-tab behavior.",
+        "The first attempt does not compile or test cleanly."
+    ],
+    "allowedImplementationShapes": {
+        "react-mnemonic": [
+            "MnemonicProvider plus useMnemonicKey or defineMnemonicKey",
+            "listenCrossTab: true on the persisted key"
+        ],
+        "zustand/persist": [
+            "zustand store with persist middleware",
+            "storage event handling when cross-tab behavior is required"
+        ],
+        "jotai/atomWithStorage": [
+            "atomWithStorage plus useAtom",
+            "storage subscription behavior for cross-tab updates"
+        ],
+        "use-local-storage-state": ["useLocalStorageState with storageSync left on or explicitly enabled"],
+        "usehooks-ts/useLocalStorage": ["useLocalStorage plus explicit storage event handling for cross-tab updates"]
+    },
+    "automatedChecks": [
+        {
+            "id": "targetLibraryUsage",
+            "description": "Uses the target persistence library",
+            "weight": 15,
+            "critical": true
+        },
+        {
+            "id": "publishedPackageTypes",
+            "description": "Uses published package types instead of local react-mnemonic shims",
+            "weight": 25,
+            "critical": true
+        },
+        { "id": "crossTabBehavior", "description": "Selects a cross-tab sync path", "weight": 25, "critical": true },
+        {
+            "id": "durableThemeChoice",
+            "description": "Treats theme as durable preference state",
+            "weight": 15,
+            "critical": false
+        },
+        {
+            "id": "avoidBypassingTargetLibrary",
+            "description": "Does not bypass the target library with raw storage calls",
+            "weight": 25,
+            "critical": true
+        }
+    ]
+}
