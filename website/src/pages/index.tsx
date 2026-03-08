@@ -105,8 +105,8 @@ function HomepageHeader() {
                 </div>
                 <p style={{ marginTop: "1rem", maxWidth: "44rem" }}>
                     Evaluating alternatives? The comparison guide publishes reproducible bundle measurements plus SSR
-                    and API tradeoff notes for `react-mnemonic`, Zustand persist, Jotai `atomWithStorage`,
-                    `use-local-storage-state`, and `usehooks-ts`.
+                    and API tradeoff notes for <code>react-mnemonic</code>, Zustand persist, Jotai{" "}
+                    <code>atomWithStorage</code>, <code>use-local-storage-state</code>, and <code>usehooks-ts</code>.
                 </p>
             </div>
         </header>

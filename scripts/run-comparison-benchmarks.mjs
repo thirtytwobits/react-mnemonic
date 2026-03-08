@@ -110,7 +110,17 @@ async function ensureReady() {
         await run(npmCmd, ["ci"], benchmarkDir);
     }
 
-    await stat(path.join(rootDir, "dist", "index.js"));
+    const distIndexPath = path.join(rootDir, "dist", "index.js");
+    try {
+        await stat(distIndexPath);
+    } catch (error) {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+            throw new Error(
+                `${distIndexPath} not found - run \`npm run build\` from the project root before running benchmarks.`,
+            );
+        }
+        throw error;
+    }
 }
 
 async function readJson(filePath) {
