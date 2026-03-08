@@ -29,8 +29,8 @@ are synchronized automatically via React's state management.
 
 ## Custom backends
 
-For non-localStorage backends (e.g., IndexedDB), implement `onExternalChange`
-on your `StorageLike`:
+For non-localStorage persistence stacks (for example, a synchronous cache backed
+by IndexedDB), implement `onExternalChange` on your `StorageLike`:
 
 ```ts
 const idbStorage: StorageLike = {

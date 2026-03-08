@@ -56,8 +56,8 @@ function DemoContent() {
             <section className="demo-section">
                 <h2>Shopping Cart</h2>
                 <p>
-                    Uses a custom <code>StorageLike</code> adapter backed by IndexedDB via <code>idb-keyval</code>,
-                    running in its own <code>MnemonicProvider</code>.
+                    Uses a custom <code>StorageLike</code> adapter backed by IndexedDB via <code>idb-keyval</code>, with
+                    a synchronous in-memory facade in its own <code>MnemonicProvider</code>.
                 </p>
                 <ShoppingCart />
             </section>

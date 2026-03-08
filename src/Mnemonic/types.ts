@@ -95,7 +95,8 @@ export interface MnemonicProviderOptions {
      * Storage backend to use for persistence.
      *
      * Defaults to `window.localStorage` in browser environments. You can provide
-     * a custom implementation (e.g., sessionStorage, AsyncStorage, or a mock for testing).
+     * a synchronous custom implementation (e.g., sessionStorage, an in-memory
+     * cache facade over IndexedDB, or a mock for testing).
      *
      * @default window.localStorage
      *
@@ -681,11 +682,16 @@ export interface SchemaRegistry {
 }
 
 /**
- * Storage interface compatible with localStorage and custom storage implementations.
+ * Storage interface compatible with localStorage and synchronous custom storage implementations.
  *
  * Defines the minimum contract required for a storage backend. Compatible with
  * browser Storage API (localStorage, sessionStorage) and custom implementations
  * for testing or alternative storage solutions.
+ *
+ * All methods in this contract are intentionally synchronous. Promise-returning
+ * adapters such as React Native `AsyncStorage` are not directly supported by
+ * `StorageLike`; instead, keep a synchronous in-memory cache and flush to async
+ * persistence outside the hook contract.
  *
  * @remarks
  * **Error handling contract**
@@ -710,6 +716,10 @@ export interface SchemaRegistry {
  * In all error cases the library falls back to its in-memory cache, so
  * components continue to function when the storage backend is unavailable.
  *
+ * Promise-returning `getItem`, `setItem`, or `removeItem` implementations are
+ * treated as an invalid contract at runtime. Mnemonic logs the misuse once and
+ * falls back to its in-memory cache for safety.
+ *
  * @example
  * ```typescript
  * // In-memory storage for testing
@@ -731,6 +741,8 @@ export type StorageLike = {
      *
      * @param key - The storage key to retrieve
      * @returns The stored value as a string, or null if not found
+     *
+     * @remarks Must return synchronously. Returning a Promise is unsupported.
      */
     getItem(key: string): string | null;
 
@@ -739,6 +751,8 @@ export type StorageLike = {
      *
      * @param key - The storage key
      * @param value - The string value to store
+     *
+     * @remarks Must complete synchronously. Returning a Promise is unsupported.
      */
     setItem(key: string, value: string): void;
 
@@ -746,6 +760,8 @@ export type StorageLike = {
      * Removes a key-value pair from storage.
      *
      * @param key - The storage key to remove
+     *
+     * @remarks Must complete synchronously. Returning a Promise is unsupported.
      */
     removeItem(key: string): void;
 
