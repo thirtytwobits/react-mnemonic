@@ -282,7 +282,8 @@ export function MnemonicProvider({
 
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
-        const st = storage ?? defaultBrowserStorage();
+        const browserLocalStorage = defaultBrowserStorage();
+        const st = storage ?? browserLocalStorage;
         const ssrHydration = ssr?.hydration ?? "immediate";
 
         /**
@@ -318,6 +319,12 @@ export function MnemonicProvider({
         };
 
         const canEnumerateKeys = detectEnumerableStorage();
+        const crossTabSyncMode: Mnemonic["crossTabSyncMode"] =
+            browserLocalStorage !== undefined && st === browserLocalStorage
+                ? "browser-storage-event"
+                : typeof st?.onExternalChange === "function"
+                  ? "custom-external-change"
+                  : "none";
 
         const isProductionRuntime = () => {
             const env = (globalThis as any)?.process?.env?.NODE_ENV;
@@ -795,6 +802,7 @@ export function MnemonicProvider({
             reloadFromStorage,
             schemaMode: schemaMode as SchemaMode,
             ssrHydration,
+            crossTabSyncMode,
             ...(schemaRegistry ? { schemaRegistry: schemaRegistry as SchemaRegistry } : {}),
         };
 

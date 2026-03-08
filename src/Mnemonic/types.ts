@@ -949,6 +949,14 @@ export type Mnemonic = {
     ssrHydration: MnemonicHydrationMode;
 
     /**
+     * How this provider can observe external changes from other tabs/processes.
+     *
+     * Hooks use this for development diagnostics when callers opt into
+     * cross-tab synchronization on a backend that cannot actually deliver it.
+     */
+    crossTabSyncMode: "browser-storage-event" | "custom-external-change" | "none";
+
+    /**
      * The schema registry for this provider, if one was supplied.
      *
      * Hooks use this to look up schemas, resolve migration paths, and

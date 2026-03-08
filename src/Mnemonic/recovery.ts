@@ -14,6 +14,23 @@ function uniqueKeys(keys: readonly string[]): string[] {
     return [...new Set(keys)];
 }
 
+function isDevelopmentRuntime(): boolean {
+    return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
+}
+
+const recoveryDiagnosticWarnings = new WeakMap<object, Set<string>>();
+
+function warnRecoveryOnce(api: object, id: string, message: string): void {
+    let warnings = recoveryDiagnosticWarnings.get(api);
+    if (!warnings) {
+        warnings = new Set<string>();
+        recoveryDiagnosticWarnings.set(api, warnings);
+    }
+    if (warnings.has(id)) return;
+    warnings.add(id);
+    console.warn(message);
+}
+
 /**
  * Hook for namespace-scoped recovery actions such as hard reset and selective clear.
  *
@@ -68,16 +85,30 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
 
     const clearAll = useCallback(() => {
         if (!api.canEnumerateKeys) {
+            if (isDevelopmentRuntime()) {
+                warnRecoveryOnce(
+                    api,
+                    "recovery-clear-all-non-enumerable",
+                    `[Mnemonic] clearAll() requires an enumerable storage backend in namespace "${namespace}". Use clearKeys([...]) with an explicit durable-key list, or supply a storage backend that implements length and key(index).`,
+                );
+            }
             throw new Error(
                 "clearAll requires an enumerable storage backend. Use clearKeys([...]) with an explicit key list instead.",
             );
         }
         return clearResolvedKeys("clear-all", api.keys());
-    }, [api, clearResolvedKeys]);
+    }, [api, clearResolvedKeys, namespace]);
 
     const clearMatching = useCallback(
         (predicate: (key: string) => boolean) => {
             if (!api.canEnumerateKeys) {
+                if (isDevelopmentRuntime()) {
+                    warnRecoveryOnce(
+                        api,
+                        "recovery-clear-matching-non-enumerable",
+                        `[Mnemonic] clearMatching() requires an enumerable storage backend in namespace "${namespace}". Use clearKeys([...]) with an explicit durable-key list, or supply a storage backend that implements length and key(index).`,
+                    );
+                }
                 throw new Error(
                     "clearMatching requires an enumerable storage backend. Use clearKeys([...]) with an explicit key list instead.",
                 );
@@ -87,7 +118,7 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
                 api.keys().filter((key) => predicate(key)),
             );
         },
-        [api, clearResolvedKeys],
+        [api, clearResolvedKeys, namespace],
     );
 
     return useMemo(

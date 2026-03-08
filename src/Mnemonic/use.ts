@@ -25,6 +25,84 @@ import type {
 } from "./types";
 
 const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
+const diagnosticContractRegistry = new WeakMap<object, Map<string, string>>();
+const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
+const diagnosticObjectIds = new WeakMap<object, number>();
+let nextDiagnosticObjectId = 1;
+
+function isDevelopmentRuntime(): boolean {
+    return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
+}
+
+function getDiagnosticWarnings(api: object): Set<string> {
+    let warnings = diagnosticWarningRegistry.get(api);
+    if (!warnings) {
+        warnings = new Set<string>();
+        diagnosticWarningRegistry.set(api, warnings);
+    }
+    return warnings;
+}
+
+function warnOnce(api: object, id: string, message: string): void {
+    const warnings = getDiagnosticWarnings(api);
+    if (warnings.has(id)) return;
+    warnings.add(id);
+    console.warn(message);
+}
+
+function stableDiagnosticValue(value: unknown): string {
+    if (typeof value === "function") return "[factory]";
+    if (value === undefined) return "undefined";
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return Object.prototype.toString.call(value);
+    }
+}
+
+function getDiagnosticObjectId(value: object): number {
+    const existing = diagnosticObjectIds.get(value);
+    if (existing !== undefined) return existing;
+    const id = nextDiagnosticObjectId++;
+    diagnosticObjectIds.set(value, id);
+    return id;
+}
+
+function buildContractFingerprint<T>({
+    api,
+    key,
+    defaultValue,
+    codecOpt,
+    schema,
+    reconcile,
+    listenCrossTab,
+    ssrOptions,
+}: {
+    api: object;
+    key: string;
+    defaultValue: UseMnemonicKeyOptions<T>["defaultValue"];
+    codecOpt: UseMnemonicKeyOptions<T>["codec"];
+    schema: UseMnemonicKeyOptions<T>["schema"];
+    reconcile: UseMnemonicKeyOptions<T>["reconcile"];
+    listenCrossTab: UseMnemonicKeyOptions<T>["listenCrossTab"];
+    ssrOptions: UseMnemonicKeyOptions<T>["ssr"];
+}): string {
+    const codecSignature =
+        codecOpt === undefined ? "default-json-codec" : `codec#${getDiagnosticObjectId(codecOpt as object)}`;
+    const reconcileSignature = reconcile ? `reconcile#${getDiagnosticObjectId(reconcile as object)}` : "no-reconcile";
+
+    return JSON.stringify({
+        key,
+        defaultValue: stableDiagnosticValue(defaultValue),
+        codec: codecSignature,
+        schemaVersion: schema?.version ?? null,
+        listenCrossTab: Boolean(listenCrossTab),
+        reconcile: reconcileSignature,
+        ssrHydration: ssrOptions?.hydration ?? null,
+        hasServerValue: ssrOptions?.serverValue !== undefined,
+        providerHydration: (api as { ssrHydration?: string }).ssrHydration ?? null,
+    });
+}
 
 function resolveMnemonicKeyArgs<T>(
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
@@ -103,6 +181,20 @@ export function useMnemonicKey<T>(
     const schemaRegistry = api.schemaRegistry;
     const hydrationMode = ssrOptions?.hydration ?? api.ssrHydration;
     const [hasMounted, setHasMounted] = useState(hydrationMode !== "client-only");
+    const contractFingerprint = useMemo(
+        () =>
+            buildContractFingerprint({
+                api,
+                key,
+                defaultValue,
+                codecOpt,
+                schema,
+                reconcile,
+                listenCrossTab,
+                ssrOptions,
+            }),
+        [api, key, defaultValue, codecOpt, schema, reconcile, listenCrossTab, ssrOptions],
+    );
 
     /**
      * Helper to get the fallback/default value.
@@ -576,6 +668,56 @@ export function useMnemonicKey<T>(
         return decodeForRead(raw);
     }, [decodeForRead, getServerValue, raw]);
     const value = decoded.value;
+
+    useEffect(() => {
+        if (!isDevelopmentRuntime()) return;
+
+        if (listenCrossTab && api.crossTabSyncMode === "none" && typeof window !== "undefined") {
+            warnOnce(
+                api,
+                `listenCrossTab:${key}`,
+                `[Mnemonic] useMnemonicKey("${key}") enabled listenCrossTab, but the active storage backend cannot notify external changes. Use localStorage or implement storage.onExternalChange(...) on your custom backend.`,
+            );
+        }
+
+        if (codecOpt && schema?.version !== undefined && api.schemaRegistry) {
+            warnOnce(
+                api,
+                `codec+schema:${key}`,
+                `[Mnemonic] useMnemonicKey("${key}") received both a custom codec and schema.version. Schema-managed reads/writes do not use the codec path. Remove the codec for schema-managed storage, or remove schema.version if you intended codec-only persistence.`,
+            );
+        }
+
+        let keyContracts = diagnosticContractRegistry.get(api);
+        if (!keyContracts) {
+            keyContracts = new Map<string, string>();
+            diagnosticContractRegistry.set(api, keyContracts);
+        }
+
+        const previousContract = keyContracts.get(key);
+        if (previousContract === undefined) {
+            keyContracts.set(key, contractFingerprint);
+            return;
+        }
+        if (previousContract === contractFingerprint) {
+            return;
+        }
+
+        warnOnce(
+            api,
+            `contract-conflict:${key}`,
+            `[Mnemonic] Conflicting useMnemonicKey contracts detected for key "${key}" in namespace "${api.prefix.slice(0, -1)}". Reuse a shared descriptor with defineMnemonicKey(...) or align defaultValue/codec/schema/reconcile options so every consumer describes the same persisted contract.`,
+        );
+    }, [
+        api,
+        key,
+        contractFingerprint,
+        listenCrossTab,
+        codecOpt,
+        schema?.version,
+        api.schemaRegistry,
+        api.crossTabSyncMode,
+    ]);
 
     useEffect(() => {
         if (hasMounted) return;

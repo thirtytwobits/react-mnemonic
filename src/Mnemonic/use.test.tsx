@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
 import { useMnemonicKey } from "./use";
@@ -88,6 +88,18 @@ function buildInvalidEnvelopeFuzzCases(count: number): string[] {
     }
 
     return Array.from(cases);
+}
+
+const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+
+function setNodeEnv(value: string) {
+    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process = {
+        ...(originalProcess ?? { env: {} }),
+        env: {
+            ...(originalProcess?.env ?? {}),
+            NODE_ENV: value,
+        },
+    };
 }
 
 /** Renders a hook within MnemonicProvider and returns accessor for the result. */
@@ -352,6 +364,146 @@ describe("useMnemonicKey – basic read/write", () => {
         expect(storage.store.get("ns.theme")).toBe(JSON.stringify({ version: 1, payload: "dark" }));
     });
 });
+
+describe("useMnemonicKey – development diagnostics", () => {
+    beforeEach(() => {
+        setNodeEnv("test");
+    });
+
+    afterEach(() => {
+        setNodeEnv("test");
+    });
+
+    it("warns in development when listenCrossTab is used on a backend without external notifications", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                listenCrossTab: true,
+            }),
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('useMnemonicKey("theme") enabled listenCrossTab'));
+        warnSpy.mockRestore();
+    });
+
+    it("does not warn for listenCrossTab when the custom backend exposes onExternalChange", () => {
+        setNodeEnv("development");
+        const storage = {
+            ...createMockStorage(),
+            onExternalChange: () => () => undefined,
+        };
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <DiagnosticConsumer
+                    hook={() =>
+                        useMnemonicKey("theme", {
+                            defaultValue: "light",
+                            listenCrossTab: true,
+                        })
+                    }
+                />
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
+    it("warns in development when codec and schema version are combined for the same key", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const registry = createSchemaRegistry({
+            schemas: [defineKeySchema("theme", 1, mnemonicSchema.string())],
+        });
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const DateCodec = createCodec<Date>(
+            (d) => d.toISOString(),
+            (s) => new Date(s),
+        );
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage} schemaMode="default" schemaRegistry={registry}>
+                <DiagnosticConsumer
+                    hook={() =>
+                        useMnemonicKey("theme", {
+                            defaultValue: new Date("2024-01-01T00:00:00.000Z"),
+                            codec: DateCodec,
+                            schema: { version: 1 },
+                        })
+                    }
+                />
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("received both a custom codec and schema.version"),
+        );
+        warnSpy.mockRestore();
+    });
+
+    it("warns in development when the same key is declared with conflicting contracts", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        function First() {
+            useMnemonicKey("theme", { defaultValue: "light" });
+            return null;
+        }
+
+        function Second() {
+            useMnemonicKey("theme", { defaultValue: "dark" });
+            return null;
+        }
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <First />
+                <Second />
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Conflicting useMnemonicKey contracts detected"));
+        warnSpy.mockRestore();
+    });
+
+    it("does not warn when repeated consumers share the same key contract", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        function First() {
+            useMnemonicKey("theme", { defaultValue: "light" });
+            return null;
+        }
+
+        function Second() {
+            useMnemonicKey("theme", { defaultValue: "light" });
+            return null;
+        }
+
+        render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <First />
+                <Second />
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+});
+
+function DiagnosticConsumer<T>({ hook }: { hook: () => T }) {
+    hook();
+    return null;
+}
 
 describe("useMnemonicKey – codecs", () => {
     let storage: ReturnType<typeof createMockStorage>;
