@@ -52,7 +52,9 @@ function warnOnce(api: object, id: string, message: string): void {
 
 function stableDiagnosticValue(value: unknown): string {
     if (typeof value === "function") {
-        return `[factory#${getDiagnosticObjectId(value as object)}]`;
+        const source = Function.prototype.toString.call(value).replace(/\s+/g, " ").trim();
+        const name = value.name || "anonymous";
+        return `[factory:${name}/${value.length}:${source}]`;
     }
     if (typeof value === "bigint") return `${value.toString()}n`;
     if (typeof value === "symbol") return value.toString();

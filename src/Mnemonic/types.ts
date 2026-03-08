@@ -953,8 +953,7 @@ export type Mnemonic = {
      *
      * Hooks use this for development diagnostics when callers opt into
      * cross-tab synchronization on a backend that cannot actually deliver it.
-     */
-    /**
+     *
      * When omitted, consumers should treat this as equivalent to `"none"`.
      */
     crossTabSyncMode?: "browser-storage-event" | "custom-external-change" | "none";

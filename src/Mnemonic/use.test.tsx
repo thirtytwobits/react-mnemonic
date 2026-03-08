@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+import { StrictMode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 import { MnemonicProvider } from "./provider";
@@ -505,6 +506,32 @@ describe("useMnemonicKey – development diagnostics", () => {
         );
 
         expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
+    it("does not warn in StrictMode when a single consumer uses an inline default factory", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        function StrictModeConsumer() {
+            useMnemonicKey("theme", {
+                defaultValue: () => "light",
+            });
+            return null;
+        }
+
+        render(
+            <StrictMode>
+                <MnemonicProvider namespace="ns" storage={storage}>
+                    <StrictModeConsumer />
+                </MnemonicProvider>
+            </StrictMode>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalledWith(
+            expect.stringContaining("Conflicting useMnemonicKey contracts detected"),
+        );
         warnSpy.mockRestore();
     });
 });
