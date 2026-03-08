@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import React from "react";
-import { act } from "react";
 import { hydrateRoot } from "react-dom/client";
+import { act as domAct } from "react-dom/test-utils";
 import { renderToString } from "react-dom/server";
 import { JSDOM } from "jsdom";
 import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
@@ -88,6 +88,7 @@ Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
 
 const container = dom.window.document.getElementById("root");
 assert.ok(container);
+const act = React.act ?? domAct;
 
 await act(async () => {
     hydrateRoot(container, app);

@@ -9,6 +9,8 @@ import { useMnemonicKey } from "./use";
 import { createSchemaRegistry } from "./schema-registry";
 import type { KeySchema, MigrationRule, StorageLike } from "./types";
 
+type MnemonicKeyState = ReturnType<typeof useMnemonicKey<unknown>>;
+
 function createMockStorage(): StorageLike & { store: Map<string, string> } {
     const store = new Map<string, string>();
     return {
@@ -57,33 +59,44 @@ describe("property-based persistence invariants", () => {
             fc.property(fc.jsonValue(), (value) => {
                 const storage = createMockStorage();
                 const normalizedValue = JSON.parse(JSON.stringify(value)) as unknown;
-                const first = renderHook(storage, "prop-envelope", () =>
+                const first = renderHook<MnemonicKeyState>(storage, "prop-envelope", () =>
                     useMnemonicKey<unknown>("value", {
                         defaultValue: null,
                     }),
                 );
+                let firstUnmounted = false;
+                let second: { result: { current: MnemonicKeyState }; unmount: () => void } | null = null;
 
-                act(() => {
-                    first.result.current.set(value);
-                });
+                try {
+                    act(() => {
+                        first.result.current.set(value);
+                    });
 
-                expect(storage.store.get("prop-envelope.value")).toBe(
-                    JSON.stringify({
-                        version: 0,
-                        payload: JSON.stringify(value),
-                    }),
-                );
+                    expect(storage.store.get("prop-envelope.value")).toBe(
+                        JSON.stringify({
+                            version: 0,
+                            payload: JSON.stringify(value),
+                        }),
+                    );
 
-                first.unmount();
+                    first.unmount();
+                    firstUnmounted = true;
 
-                const second = renderHook(storage, "prop-envelope", () =>
-                    useMnemonicKey<unknown>("value", {
-                        defaultValue: null,
-                    }),
-                );
+                    second = renderHook<MnemonicKeyState>(storage, "prop-envelope", () =>
+                        useMnemonicKey<unknown>("value", {
+                            defaultValue: null,
+                        }),
+                    );
 
-                expect(second.result.current.value).toEqual(normalizedValue);
-                second.unmount();
+                    expect(second.result.current.value).toEqual(normalizedValue);
+                } finally {
+                    if (!firstUnmounted) {
+                        first.unmount();
+                    }
+                    if (second) {
+                        second.unmount();
+                    }
+                }
             }),
             { numRuns: 50 },
         );
