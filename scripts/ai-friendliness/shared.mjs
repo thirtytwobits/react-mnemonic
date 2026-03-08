@@ -49,18 +49,19 @@ export async function ensurePathExists(filePath, description) {
     }
 }
 
-async function collectFileContents(absoluteDir) {
+async function collectFileContents(absoluteDir, relativeDir = "") {
     const entries = await readdir(absoluteDir, { withFileTypes: true });
     const parts = [];
 
     for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
         const entryPath = path.join(absoluteDir, entry.name);
+        const entryRelativePath = path.join(relativeDir, entry.name);
         if (entry.isDirectory()) {
-            parts.push(await collectFileContents(entryPath));
+            parts.push(await collectFileContents(entryPath, entryRelativePath));
             continue;
         }
 
-        parts.push(await readFile(entryPath, "utf8"));
+        parts.push(`/* FILE: ${entryRelativePath} */\n${await readFile(entryPath, "utf8")}`);
     }
 
     return parts.join("\n");

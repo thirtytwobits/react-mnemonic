@@ -1,0 +1,14 @@
+{
+    "reviewer": "Scott Dixon",
+    "reviewedAt": "2026-03-08",
+    "summary": "Validation fixture showing that semantic scoring should penalize local shadow typings even when the runtime API shape looks plausible.",
+    "scenarios": {
+        "theme-preference": {
+            "persistenceAppropriateness": 2,
+            "semanticNuanceCorrectness": 2,
+            "unnecessaryUserIntervention": 1,
+            "criticalSemanticMiss": true,
+            "notes": "The code uses react-mnemonic at runtime but invents a local ambient typing shim instead of trusting the published package contract."
+        }
+    }
+}

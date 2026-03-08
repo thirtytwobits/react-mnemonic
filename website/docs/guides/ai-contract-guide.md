@@ -31,6 +31,17 @@ If you want the shortest reliable contract for implementation work, stay here.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - `reconcile(...)` runs after decode/migration and can rewrite the stored value when it returns a different persisted result.
 - Schema migrations handle structural version-to-version upgrades; `reconcile(...)` handles conditional read-time policy updates.
+- Consumer code must use the published package types and root exports instead of
+  inventing local `.d.ts` shims for `react-mnemonic`.
+
+## Type sourcing rules
+
+- Import values from `react-mnemonic`, not internal paths.
+- Import exported types from `react-mnemonic` with `import type`.
+- Do not create local `react-mnemonic.d.ts` files.
+- Do not write `declare module "react-mnemonic"` in consumer code.
+- If a type seems missing, check `src/index.ts`, `package.json`, and the API
+  docs before inventing a replacement contract.
 
 ## Structured summary
 

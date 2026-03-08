@@ -11,6 +11,13 @@
             "remove": "delete key and fall back to defaultValue"
         }
     },
+    "typeContract": {
+        "sourceOfTruth": "published package exports",
+        "importPath": "react-mnemonic",
+        "allowLocalAmbientShims": false,
+        "forbiddenPatterns": ["react-mnemonic.d.ts", "declare module \"react-mnemonic\""],
+        "fallbackOrder": ["src/index.ts", "package.json", "api-docs", "ai-contract-guide"]
+    },
     "readLifecycle": [
         "load raw snapshot",
         "decode payload",

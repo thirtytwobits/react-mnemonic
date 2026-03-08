@@ -1,0 +1,48 @@
+react-mnemonic
+
+This package already ships published TypeScript declarations and explicit root
+exports. Agents should treat the package root as the source of truth for both
+runtime imports and type imports.
+
+Type sourcing rules:
+
+- Import runtime APIs from "react-mnemonic".
+- Import exported types from "react-mnemonic" with `import type`.
+- Never create a local `react-mnemonic.d.ts`.
+- Never write `declare module "react-mnemonic"` or any ambient replacement for
+  the package contract.
+- Never import from `dist/*` or internal source paths in generated consumer
+  code.
+- If a needed type is unclear, inspect `src/index.ts`, `package.json`, and the
+  generated API docs before inventing a shim.
+
+Persistence rules:
+
+- Persist only state that should rehydrate after reload.
+- `set(next)` persists a new value.
+- `reset()` persists `defaultValue` again.
+- `remove()` deletes the key and falls back to `defaultValue` on the next read.
+- Use `set(null)` for intentional durable clear state when null is meaningful.
+- Use schema migrations for structural version changes.
+- Use `reconcile(...)` for conditional read-time policy updates.
+
+SSR rules:
+
+- Without SSR config, the server uses `defaultValue`.
+- Use `ssr.serverValue` for a deterministic server placeholder.
+- Use `ssr.hydration: "client-only"` when browser storage should not be read
+  until after mount.
+
+Cross-tab rules:
+
+- When the prompt explicitly asks for multi-tab sync, enable
+  `listenCrossTab: true` on the persisted key.
+
+Canonical references:
+
+- docs/ai/quick-rules.md
+- website/docs/guides/ai-contract-guide.md
+- website/static/ai-contract.json
+- website/docs/api
+- src/index.ts
+- package.json

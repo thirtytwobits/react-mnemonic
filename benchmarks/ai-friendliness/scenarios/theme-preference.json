@@ -11,6 +11,7 @@
     ],
     "criticalFailureConditions": [
         "The submission bypasses the target persistence library.",
+        "A react-mnemonic submission invents local package typings instead of using the published exports.",
         "The persisted theme does not include cross-tab behavior.",
         "The first attempt does not compile or test cleanly."
     ],
@@ -34,6 +35,12 @@
         {
             "id": "targetLibraryUsage",
             "description": "Uses the target persistence library",
+            "weight": 15,
+            "critical": true
+        },
+        {
+            "id": "publishedPackageTypes",
+            "description": "Uses published package types instead of local react-mnemonic shims",
             "weight": 25,
             "critical": true
         },
@@ -41,7 +48,7 @@
         {
             "id": "durableThemeChoice",
             "description": "Treats theme as durable preference state",
-            "weight": 25,
+            "weight": 15,
             "critical": false
         },
         {

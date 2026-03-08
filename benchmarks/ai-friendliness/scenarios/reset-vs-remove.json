@@ -11,6 +11,7 @@
     ],
     "criticalFailureConditions": [
         "Reset and remove are treated as identical operations.",
+        "A react-mnemonic submission invents local package typings instead of using the published exports.",
         "The submission bypasses the target persistence library.",
         "The first attempt does not compile or test cleanly."
     ],
@@ -25,19 +26,25 @@
         {
             "id": "targetLibraryUsage",
             "description": "Uses the target persistence library",
+            "weight": 20,
+            "critical": true
+        },
+        {
+            "id": "publishedPackageTypes",
+            "description": "Uses published package types instead of local react-mnemonic shims",
             "weight": 25,
             "critical": true
         },
         {
             "id": "resetRemoveSemantics",
             "description": "Treats reset and remove as different behaviors",
-            "weight": 35,
+            "weight": 25,
             "critical": true
         },
         {
             "id": "durableStateChoice",
             "description": "Treats the preference as durable state",
-            "weight": 20,
+            "weight": 10,
             "critical": false
         },
         {

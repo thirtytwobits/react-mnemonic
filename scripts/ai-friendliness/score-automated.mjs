@@ -36,6 +36,18 @@ function matchesAny(text, patterns) {
     return patterns.some((pattern) => pattern.test(text));
 }
 
+function usesPublishedPackageTypes(library, submissionText) {
+    if (library !== "react-mnemonic") {
+        return true;
+    }
+
+    return !matchesAny(submissionText, [
+        /\/\*\s*FILE:\s*.*\.d\.ts\s*\*\//,
+        /declare\s+module\s+["']react-mnemonic["']/,
+        /reference\s+path=.*react-mnemonic/i,
+    ]);
+}
+
 function includesStorageEventHandling(text) {
     return matchesAny(text, [
         /listenCrossTab\s*:\s*true/,
@@ -120,6 +132,7 @@ function hasExplicitSsrStrategy({ library, submissionText }) {
 
 const automatedCheckHandlers = {
     targetLibraryUsage: ({ library, submissionText }) => libraryRules[library].usesTargetLibrary(submissionText),
+    publishedPackageTypes: ({ library, submissionText }) => usesPublishedPackageTypes(library, submissionText),
     avoidBypassingTargetLibrary: ({ library, submissionText }) =>
         !libraryRules[library].bypassesTargetLibrary(submissionText),
     durableStateChoice: ({ scenario, submissionText }) => usesDurableStateForScenario({ scenario, submissionText }),

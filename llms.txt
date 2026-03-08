@@ -1,0 +1,23 @@
+react-mnemonic
+
+Compact rules for coding agents:
+
+- Import values and types from "react-mnemonic" only.
+- Do not create local .d.ts files for react-mnemonic.
+- Do not write `declare module "react-mnemonic"`.
+- Do not import from dist/* or internal private paths.
+- If types seem missing, inspect package exports and API docs before inventing shims.
+- Persist only durable state.
+- Use set(null) for durable clear intent.
+- Use remove() to forget a key.
+- Use reset() to persist defaultValue again.
+- Use schema migration for structural upgrades and reconcile(...) for read-time policy refreshes.
+- SSR defaults to defaultValue; use ssr.serverValue and hydration: "client-only" when needed.
+
+Canonical references:
+
+- docs/ai/quick-rules.md
+- website/docs/guides/ai-contract-guide.md
+- website/static/ai-contract.json
+- src/index.ts
+- package.json

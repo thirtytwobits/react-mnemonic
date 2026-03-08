@@ -11,6 +11,7 @@
     ],
     "criticalFailureConditions": [
         "Clearing the nickname deletes the key instead of persisting an intentional empty value.",
+        "A react-mnemonic submission invents local package typings instead of using the published exports.",
         "The submission bypasses the target persistence library.",
         "The first attempt does not compile or test cleanly."
     ],
@@ -28,19 +29,25 @@
         {
             "id": "targetLibraryUsage",
             "description": "Uses the target persistence library",
-            "weight": 20,
+            "weight": 15,
+            "critical": true
+        },
+        {
+            "id": "publishedPackageTypes",
+            "description": "Uses published package types instead of local react-mnemonic shims",
+            "weight": 25,
             "critical": true
         },
         {
             "id": "nullableSemantics",
             "description": "Represents intentional clear as nullable durable state",
-            "weight": 40,
+            "weight": 25,
             "critical": true
         },
         {
             "id": "durableStateChoice",
             "description": "Treats the nickname as durable profile state",
-            "weight": 20,
+            "weight": 15,
             "critical": false
         },
         {

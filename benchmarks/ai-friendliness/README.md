@@ -95,6 +95,9 @@ The repo ships two validation runs on purpose:
 - `validation-fixtures/negative-control`
   Raw-`localStorage` anti-patterns used to verify the harness can detect the
   behaviors we do not want.
+- `validation-fixtures/shadow-types`
+  A `react-mnemonic` runtime implementation that still fails because it invents
+  a local ambient typing shim instead of using the published package types.
 
 Those runs validate the benchmark itself. They are not public model-vs-library
 claims.
