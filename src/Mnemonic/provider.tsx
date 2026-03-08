@@ -305,8 +305,8 @@ export function MnemonicProvider({
         /** Whether a non-quota DOMException has already been logged since the last successful storage access. */
         let accessErrorLogged = false;
 
-        /** Whether an invalid async StorageLike contract has already been logged since the last valid sync access. */
-        let asyncContractErrorLogged = false;
+        /** Whether the storage backend has violated the synchronous StorageLike contract. */
+        let asyncContractViolationDetected = false;
 
         const detectEnumerableStorage = () => {
             if (!st) return false;
@@ -496,17 +496,23 @@ export function MnemonicProvider({
         };
 
         /**
-         * Logs an unsupported async storage contract once, then falls back to
-         * the in-memory cache until a valid synchronous storage call succeeds.
+         * Marks the storage backend as incompatible with the synchronous
+         * StorageLike contract, consumes the offending thenable to avoid
+         * unhandled rejections, and logs the problem once.
          */
-        const logAsyncStorageContractError = (method: "getItem" | "setItem" | "removeItem"): void => {
-            if (asyncContractErrorLogged) return;
+        const handleAsyncStorageContractViolation = (
+            method: "getItem" | "setItem" | "removeItem",
+            thenable: PromiseLike<unknown>,
+        ): void => {
+            asyncContractViolationDetected = true;
+            void Promise.resolve(thenable).catch(() => undefined);
+            if (accessErrorLogged) return;
             console.error(
                 `[Mnemonic] StorageLike.${method} returned a Promise. ` +
                     "StorageLike must remain synchronous for react-mnemonic v1. " +
                     "Wrap async persistence behind a synchronous cache facade instead.",
             );
-            asyncContractErrorLogged = true;
+            accessErrorLogged = true;
         };
 
         /**
@@ -518,20 +524,19 @@ export function MnemonicProvider({
          */
         const readThrough = (key: string): string | null => {
             if (cache.has(key)) return cache.get(key) ?? null;
-            if (!st) {
+            if (!st || asyncContractViolationDetected) {
                 cache.set(key, null);
                 return null;
             }
             try {
                 const raw = st.getItem(fullKey(key));
                 if (isPromiseLike(raw)) {
-                    logAsyncStorageContractError("getItem");
+                    handleAsyncStorageContractViolation("getItem", raw);
                     cache.set(key, null);
                     return null;
                 }
                 cache.set(key, raw);
                 accessErrorLogged = false;
-                asyncContractErrorLogged = false;
                 return raw;
             } catch (err) {
                 logAccessError(err);
@@ -549,15 +554,14 @@ export function MnemonicProvider({
          */
         const writeRaw = (key: string, raw: string) => {
             cache.set(key, raw);
-            if (st) {
+            if (st && !asyncContractViolationDetected) {
                 try {
                     const result = st.setItem(fullKey(key), raw);
                     if (isPromiseLike(result)) {
-                        logAsyncStorageContractError("setItem");
+                        handleAsyncStorageContractViolation("setItem", result);
                     } else {
                         quotaErrorLogged = false;
                         accessErrorLogged = false;
-                        asyncContractErrorLogged = false;
                     }
                 } catch (err) {
                     if (!quotaErrorLogged && err instanceof DOMException && err.name === "QuotaExceededError") {
@@ -582,14 +586,13 @@ export function MnemonicProvider({
          */
         const removeRaw = (key: string) => {
             cache.set(key, null);
-            if (st) {
+            if (st && !asyncContractViolationDetected) {
                 try {
                     const result = st.removeItem(fullKey(key));
                     if (isPromiseLike(result)) {
-                        logAsyncStorageContractError("removeItem");
+                        handleAsyncStorageContractViolation("removeItem", result);
                     } else {
                         accessErrorLogged = false;
-                        asyncContractErrorLogged = false;
                     }
                 } catch (err) {
                     logAccessError(err);
@@ -642,6 +645,11 @@ export function MnemonicProvider({
          * @returns Array of unprefixed key names
          */
         const keys = () => {
+            if (asyncContractViolationDetected) {
+                return Array.from(cache.entries())
+                    .filter(([, value]) => value != null)
+                    .map(([key]) => key);
+            }
             if (!canEnumerateKeys || !st) return [];
             const out: string[] = [];
             try {
@@ -687,7 +695,7 @@ export function MnemonicProvider({
          * signals that data has changed externally (e.g., from another tab).
          */
         const reloadFromStorage = (changedKeys?: string[]) => {
-            if (!st) return;
+            if (!st || asyncContractViolationDetected) return;
             let changed = false;
 
             // Empty array → explicit no-op
@@ -707,12 +715,11 @@ export function MnemonicProvider({
                         try {
                             const raw = st.getItem(fk);
                             if (isPromiseLike(raw)) {
-                                logAsyncStorageContractError("getItem");
+                                handleAsyncStorageContractViolation("getItem", raw);
                                 fresh = null;
                             } else {
                                 fresh = raw;
                                 accessErrorLogged = false;
-                                asyncContractErrorLogged = false;
                             }
                         } catch (err) {
                             logAccessError(err);
@@ -742,12 +749,11 @@ export function MnemonicProvider({
                 try {
                     const raw = st.getItem(fullKey(key));
                     if (isPromiseLike(raw)) {
-                        logAsyncStorageContractError("getItem");
+                        handleAsyncStorageContractViolation("getItem", raw);
                         fresh = null;
                     } else {
                         fresh = raw;
                         accessErrorLogged = false;
-                        asyncContractErrorLogged = false;
                     }
                 } catch (err) {
                     logAccessError(err);

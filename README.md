@@ -677,6 +677,14 @@ version and remount the provider.
 import { MnemonicProvider } from "react-mnemonic";
 import type { StorageLike } from "react-mnemonic";
 
+const cache = new Map<string, string>();
+const queueIndexedDbWrite = (key: string, value: string) => {
+    // application-specific async persistence
+};
+const queueIndexedDbDelete = (key: string) => {
+    // application-specific async persistence
+};
+
 const idbStorage: StorageLike = {
     getItem: (key) => cache.get(key) ?? null,
     setItem: (key, value) => {

@@ -246,8 +246,9 @@ describe("MnemonicProvider – storage edge cases", () => {
     });
 
     it("rejects promise-returning getItem implementations and falls back to memory", () => {
+        const getItem = vi.fn(() => Promise.resolve("later"));
         const badStorage = {
-            getItem: () => Promise.resolve("later"),
+            getItem,
             setItem: () => {},
             removeItem: () => {},
         } as unknown as StorageLike;
@@ -265,6 +266,8 @@ describe("MnemonicProvider – storage edge cases", () => {
         );
 
         expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(getItem).toHaveBeenCalledTimes(1);
         expect(spy).toHaveBeenCalledWith(expect.stringContaining("StorageLike.getItem returned a Promise"));
 
         spy.mockRestore();
@@ -320,10 +323,12 @@ describe("MnemonicProvider – storage edge cases", () => {
     });
 
     it("rejects promise-returning write methods, logs once, and keeps working from memory", () => {
+        const setItem = vi.fn(() => Promise.resolve());
+        const removeItem = vi.fn(() => Promise.resolve());
         const badStorage = {
             getItem: () => null,
-            setItem: () => Promise.resolve(),
-            removeItem: () => Promise.resolve(),
+            setItem,
+            removeItem,
         } as unknown as StorageLike;
 
         let store: ReturnType<typeof useMnemonic>;
@@ -340,9 +345,11 @@ describe("MnemonicProvider – storage edge cases", () => {
 
         store!.setRaw("k", "v");
         expect(store!.getRawSnapshot("k")).toBe("v");
+        expect(setItem).toHaveBeenCalledTimes(1);
 
         store!.removeRaw("k");
         expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(removeItem).not.toHaveBeenCalled();
 
         expect(spy).toHaveBeenCalledWith(expect.stringContaining("StorageLike.setItem returned a Promise"));
         expect(spy).toHaveBeenCalledTimes(1);
