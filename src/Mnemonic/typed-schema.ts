@@ -86,22 +86,40 @@ function toTypeArray(type: JsonSchemaType | JsonSchemaType[] | undefined): JsonS
     return Array.isArray(type) ? [...type] : [type];
 }
 
+function appendNullType(
+    type: JsonSchemaType | JsonSchemaType[] | undefined,
+): JsonSchemaType | JsonSchemaType[] | undefined {
+    const types = toTypeArray(type);
+    if (types === null) {
+        return undefined;
+    }
+
+    return types.includes("null") ? types : [...types, "null"];
+}
+
 function nullableSchema<T>(schema: TypedJsonSchema<T>): TypedJsonSchema<T | null> {
     if (schema.enum) {
+        const nullableType = appendNullType(schema.type);
         return {
             ...schema,
+            ...(nullableType ? { type: nullableType } : {}),
             enum: schema.enum.includes(null) ? schema.enum : [...schema.enum, null],
         } as TypedJsonSchema<T | null>;
     }
 
     if ("const" in schema) {
         const { const: constValue, ...rest } = schema as TypedJsonSchema<T> & { const?: JsonConstValue | null };
+        const nullableType = appendNullType(rest.type);
         if (constValue === null || constValue === undefined) {
-            return schema as TypedJsonSchema<T | null>;
+            return {
+                ...schema,
+                ...(nullableType ? { type: nullableType } : {}),
+            } as TypedJsonSchema<T | null>;
         }
 
         return {
             ...rest,
+            ...(nullableType ? { type: nullableType } : {}),
             enum: [constValue, null],
         } as TypedJsonSchema<T | null>;
     }

@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { validateJsonSchema } from "./json-schema";
+import type { TypedJsonSchema } from "./typed-schema";
 import { mnemonicSchema } from "./typed-schema";
 import { defineKeySchema, defineMigration, defineWriteMigration } from "./schema-helpers";
 import { SchemaError } from "./schema";
@@ -43,6 +44,20 @@ describe("mnemonicSchema", () => {
         expect(validateJsonSchema("sepia", themeSchema)).not.toEqual([]);
     });
 
+    it("widens existing type constraints for enum-backed nullable schemas", () => {
+        const stringEnumSchema = mnemonicSchema.nullable({
+            type: "string",
+            enum: ["light", "dark"],
+        } as TypedJsonSchema<"light" | "dark">);
+
+        expect(stringEnumSchema).toEqual({
+            type: ["string", "null"],
+            enum: ["light", "dark", null],
+        });
+
+        expect(validateJsonSchema(null, stringEnumSchema)).toEqual([]);
+    });
+
     it("preserves nullable const schemas without duplicating null", () => {
         const nullOnlySchema = mnemonicSchema.nullable(mnemonicSchema.literal(null));
 
@@ -52,6 +67,20 @@ describe("mnemonicSchema", () => {
 
         expect(validateJsonSchema(null, nullOnlySchema)).toEqual([]);
         expect(validateJsonSchema("nope", nullOnlySchema)).not.toEqual([]);
+    });
+
+    it("widens existing type constraints for const-backed nullable schemas", () => {
+        const stringConstSchema = mnemonicSchema.nullable({
+            type: "string",
+            const: "light",
+        } as TypedJsonSchema<"light">);
+
+        expect(stringConstSchema).toEqual({
+            type: ["string", "null"],
+            enum: ["light", null],
+        });
+
+        expect(validateJsonSchema(null, stringConstSchema)).toEqual([]);
     });
 
     it("builds record schemas using additionalProperties", () => {

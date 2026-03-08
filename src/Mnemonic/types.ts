@@ -13,6 +13,8 @@ import type { SchemaError } from "./schema";
 import type { JsonSchema } from "./json-schema";
 import type { InferJsonSchemaValue } from "./typed-schema";
 
+declare const keySchemaValueBrand: unique symbol;
+
 /**
  * Codec for encoding and decoding values to and from storage.
  *
@@ -380,7 +382,7 @@ export type KeySchema<TValue = unknown, K extends string = string, TSchema exten
      * `defineKeySchema(...)`, `defineMnemonicKey(...)`, and `defineMigration(...)`
      * can preserve a single source of truth between schema shape and value type.
      */
-    readonly __valueType?: TValue;
+    readonly [keySchemaValueBrand]?: TValue;
 };
 
 /**
