@@ -107,7 +107,7 @@ export function aggregateReport({ benchmark, validationRuns, evaluationRuns }) {
         scoring: {
             followUpPenalty: benchmark.metrics.followUpPenalty,
             formula: "semanticScore = 0.7 * automatedSemanticScore + 0.3 * humanReviewScore",
-            interventionFormula: "interventionAdjustedScore = max(0, semanticScore - 12 * followUpPrompts)",
+            interventionFormula: `interventionAdjustedScore = max(0, semanticScore - ${benchmark.metrics.followUpPenalty} * followUpPrompts)`,
             oneShotPass: {
                 automatedSemanticScore: ">= 85",
                 humanReviewScore: ">= 75",

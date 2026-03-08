@@ -115,7 +115,7 @@ function hasExplicitSsrStrategy({ library, submissionText }) {
             return /skipHydration/.test(submissionText) && /rehydrate/.test(submissionText);
         case "use-local-storage-state":
             return /defaultServerValue/.test(submissionText);
-        case "usehooks-ts\/useLocalStorage":
+        case "usehooks-ts/useLocalStorage":
             return /initializeWithValue:\s*false/.test(submissionText);
         case "jotai/atomWithStorage":
             return matchesAny(submissionText, [
