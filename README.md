@@ -15,6 +15,12 @@ through a single hook that works like `useState`.
 
 `1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag. We are working on large changes as part of the beta1 milestone and expect beta 1 to then receive only fixes and polish ahead of the first production release.
 
+If you are evaluating alternatives, see the
+[Comparison Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/comparisons-and-benchmarks).
+It publishes reproducible bundle measurements plus controlled SSR and API
+tradeoff notes for `react-mnemonic`, Zustand persist, Jotai
+`atomWithStorage`, `use-local-storage-state`, and `usehooks-ts`.
+
 ## Features
 
 - **`useState`-like API** -- `useMnemonicKey` returns `{ value, set, reset, remove }`
@@ -109,6 +115,10 @@ contract importable and explicit for both humans and AI-assisted tooling.
 For a deterministic implementation reference aimed at AI agents and advanced
 users, see the
 [AI Contract Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/ai-contract-guide).
+
+If you need evidence for where `react-mnemonic` is heavier, more explicit, or
+better suited to SSR-sensitive persistence than lighter hooks, see the
+[Comparison Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/comparisons-and-benchmarks).
 
 Persist only the durable slice of your app state. `useMnemonicKey` stores
 whatever you pass to `set`, so keep transient UI state like loading flags,
@@ -243,6 +253,10 @@ Tradeoffs versus the lightweight JSON-only path:
 - more setup upfront
 - best fit when a key is schema-managed and long-lived
 - not necessary for simple keys where `defaultValue` inference is already enough
+
+For a side-by-side comparison against competing persistence libraries, including
+bundle-size measurements and qualitative SSR/API notes, see the
+[Comparison Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/comparisons-and-benchmarks).
 
 ## API
 

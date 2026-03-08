@@ -1,0 +1,179 @@
+---
+sidebar_position: 4
+title: Comparisons and Benchmarks
+description: Reproducible bundle measurements and controlled comparison notes for react-mnemonic and common alternatives.
+---
+
+import report from "@site/static/benchmarks/comparison-results.json";
+
+export const commonBenchmarks = [...report.benchmarks]
+    .filter((benchmark) => benchmark.category === "common-task")
+    .sort((left, right) => left.gzipBytes - right.gzipBytes);
+
+export const advancedBenchmarks = report.benchmarks.filter((benchmark) => benchmark.category === "advanced-task");
+
+# Comparisons and Benchmarks
+
+This page is the "show your work" companion to the homepage copy.
+
+`react-mnemonic` is intentionally more explicit than lighter persistence hooks,
+but that explicitness has real tradeoffs. The goal here is not to "win" every
+category. The goal is to publish fair, reproducible receipts so people can
+choose the right tool for their app.
+
+## What this compares
+
+- `react-mnemonic`
+- `zustand/persist`
+- `jotai/atomWithStorage`
+- `use-local-storage-state`
+- `usehooks-ts/useLocalStorage`
+
+The common-task bundle comparison uses the same user-facing example for every
+library: a persisted light/dark theme toggle.
+
+## Methodology
+
+- Bundler: `{report.methodology.bundler}` `{report.methodology.bundlerVersion}`
+- Output: minified ESM bundle
+- React externalized: `{report.methodology.externalized.join(", ")}`
+- Pinned comparison dependencies live in `benchmarks/comparison/package.json`
+- Benchmark entrypoints live in `benchmarks/comparison/entries/`
+- Machine-readable output is generated into `website/static/benchmarks/comparison-results.json`
+
+Refresh the report with:
+
+```bash
+npm --prefix benchmarks/comparison ci
+npm run build
+npm run benchmarks:compare
+```
+
+### Caveats
+
+{report.caveats.map((caveat) => (
+
+<div key={caveat}>- {caveat}</div>
+))}
+
+## Bundle Footprint
+
+These measurements represent the incremental cost of the persistence layer for
+the same "persisted theme toggle" task.
+
+<table>
+    <thead>
+        <tr>
+            <th>Library</th>
+            <th>Version</th>
+            <th>Scenario</th>
+            <th>Minified (KiB)</th>
+            <th>Gzip (KiB)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {commonBenchmarks.map((benchmark) => (
+            <tr key={benchmark.id}>
+                <td>{benchmark.label}</td>
+                <td>{benchmark.packageVersion}</td>
+                <td>{benchmark.scenario}</td>
+                <td>{benchmark.bundleKiB}</td>
+                <td>{benchmark.gzipKiB}</td>
+            </tr>
+        ))}
+    </tbody>
+</table>
+
+### Read on the numbers
+
+- `use-local-storage-state` and `zustand/persist` are the lightest options in
+  this common-task bundle comparison.
+- `react-mnemonic` is not aiming to be the smallest persisted-value hook. Its
+  bigger footprint buys explicit schemas, recovery flows, namespace isolation,
+  and more first-class SSR controls.
+- `jotai/atomWithStorage` sits in the middle here because you get the atom
+  model plus storage utilities, not just a single-purpose localStorage hook.
+
+## Advanced react-mnemonic workflow
+
+This is not a cross-library apples-to-apples comparison. It exists to show the
+incremental cost of opting into versioned schemas and migrations in
+`react-mnemonic`.
+
+<table>
+    <thead>
+        <tr>
+            <th>Entry</th>
+            <th>Scenario</th>
+            <th>Minified (KiB)</th>
+            <th>Gzip (KiB)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {advancedBenchmarks.map((benchmark) => (
+            <tr key={benchmark.id}>
+                <td>{benchmark.label}</td>
+                <td>{benchmark.scenario}</td>
+                <td>{benchmark.bundleKiB}</td>
+                <td>{benchmark.gzipKiB}</td>
+            </tr>
+        ))}
+    </tbody>
+</table>
+
+The jump from the common `react-mnemonic` entry to the schema-aware entry is
+small relative to the base library size. That is useful if your app genuinely
+needs migrations and read-time reconciliation, but it is still added surface
+area you should choose deliberately.
+
+## SSR and Hydration Behavior
+
+This section is qualitative. It focuses on what each library makes explicit for
+the "persist browser storage in a server-rendered app" problem.
+
+| Library                       | Default server render contract                     | Explicit server placeholder control      | Explicit "delay storage read until after mount" control | Notes                                                    |
+| ----------------------------- | -------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `react-mnemonic`              | Server render uses `defaultValue`                  | `ssr.serverValue`                        | `ssr.hydration: "client-only"`                          | Strongest built-in SSR contract in this comparison       |
+| `use-local-storage-state`     | Server render uses `defaultValue`                  | `defaultServerValue`                     | Not a separate first-class mode                         | Strong SSR-oriented hook API for direct localStorage use |
+| `usehooks-ts/useLocalStorage` | Server render starts from the initial value        | No separate server placeholder value     | `initializeWithValue: false`                            | Good for lighter SSR-safe localStorage usage             |
+| `zustand/persist`             | Store initializes first, then persistence hydrates | Manual                                   | `skipHydration` plus `rehydrate()`                      | Flexible, but more store-level wiring                    |
+| `jotai/atomWithStorage`       | Atom starts from `initialValue`                    | No dedicated per-atom server placeholder | Manual client-only rendering pattern                    | Works, but SSR mismatch handling is more app-managed     |
+
+## API ergonomics for the same task
+
+The common "persist a theme" task looks like this conceptually:
+
+| Library                       | Shape of the persisted theme example                   | Built-in version/migrate support | Built-in recovery helpers         | Built-in namespace boundary |
+| ----------------------------- | ------------------------------------------------------ | -------------------------------- | --------------------------------- | --------------------------- |
+| `react-mnemonic`              | Provider + `useMnemonicKey("theme", { defaultValue })` | Yes                              | Yes                               | Yes                         |
+| `zustand/persist`             | Store factory + `persist(...)` middleware              | Yes                              | Manual                            | Manual                      |
+| `jotai/atomWithStorage`       | `atomWithStorage(...)` + `useAtom(...)`                | No first-class versioning        | Manual                            | Manual                      |
+| `use-local-storage-state`     | Single hook call                                       | No                               | Partial (`removeItem`)            | Manual                      |
+| `usehooks-ts/useLocalStorage` | Single hook call                                       | No                               | Partial (returns remove callback) | Manual                      |
+
+### Where react-mnemonic is intentionally more explicit
+
+- Namespace boundaries are provider-scoped instead of relying on every hook
+  callsite to keep string keys coordinated manually.
+- SSR behavior is part of the hook contract instead of being left to generic
+  storage timing workarounds.
+- Recovery flows, versioned envelopes, and read-time reconciliation are
+  designed as first-class persistence concerns, not add-on conventions.
+
+### Where alternatives are stronger today
+
+- If you want the smallest direct localStorage hook for a simple value,
+  `use-local-storage-state` and `usehooks-ts` have a lower footprint.
+- If your team already uses Zustand broadly, `persist` benefits from the wider
+  ecosystem and store middleware story.
+- If your app is already modeled around atoms, `jotai/atomWithStorage` keeps
+  persistence aligned with that mental model.
+
+## Bottom line
+
+Choose `react-mnemonic` when you want persistence to be a named, explicit part
+of your architecture: schemas, migrations, recovery UX, namespace isolation,
+and deterministic SSR behavior.
+
+Choose a lighter hook or store utility when the problem is narrower: "keep this
+single client value in localStorage" and move on.

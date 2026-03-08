@@ -41,9 +41,9 @@ const features: FeatureItem[] = [
             "useMnemonicKey returns { value, set, reset, remove } — the same mental model as useState, with persistence built in.",
     },
     {
-        title: "AI-Friendly",
+        title: "Receipts Included",
         description:
-            "Designed with rigorous typing and predictable behavior, with a dedicated AI contract guide for deterministic implementation work.",
+            "The docs publish a comparison guide with reproducible bundle numbers and controlled SSR/API tradeoffs against common alternatives.",
     },
     {
         title: "SSR-safe by default",
@@ -92,10 +92,22 @@ function HomepageHeader() {
                     >
                         AI Contract Guide
                     </Link>
+                    <Link
+                        className={clsx("button button--outline button--lg", styles.heroOutlineButton)}
+                        to="/docs/guides/comparisons-and-benchmarks"
+                        style={{ marginLeft: "1rem" }}
+                    >
+                        Compare Approaches
+                    </Link>
                 </div>
                 <div className={styles.installSnippet}>
                     <code>npm install react-mnemonic</code>
                 </div>
+                <p style={{ marginTop: "1rem", maxWidth: "44rem" }}>
+                    Evaluating alternatives? The comparison guide publishes reproducible bundle measurements plus SSR
+                    and API tradeoff notes for `react-mnemonic`, Zustand persist, Jotai `atomWithStorage`,
+                    `use-local-storage-state`, and `usehooks-ts`.
+                </p>
             </div>
         </header>
     );
