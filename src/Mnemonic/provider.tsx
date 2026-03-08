@@ -321,9 +321,7 @@ export function MnemonicProvider({
         const canEnumerateKeys = detectEnumerableStorage();
         let crossTabSyncMode: NonNullable<Mnemonic["crossTabSyncMode"]> = "none";
         const isExplicitNativeBrowserStorage =
-            st !== undefined &&
-            storage !== undefined &&
-            getNativeBrowserStorages().some((candidate) => candidate === st);
+            st !== undefined && storage !== undefined && getNativeBrowserStorages().includes(st);
         if ((storage === undefined && st !== undefined) || isExplicitNativeBrowserStorage) {
             crossTabSyncMode = "browser-storage-event";
         } else if (typeof st?.onExternalChange === "function") {

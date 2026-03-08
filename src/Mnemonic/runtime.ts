@@ -12,10 +12,11 @@ function getGlobalProcess(): RuntimeProcess | undefined {
 }
 
 export function getRuntimeNodeEnv(): string | undefined {
-    if (typeof process !== "undefined") {
-        return process.env?.NODE_ENV ?? getGlobalProcess()?.env?.NODE_ENV;
+    const runtimeProcess = getGlobalProcess();
+    if (runtimeProcess?.env?.NODE_ENV !== undefined) {
+        return runtimeProcess.env.NODE_ENV;
     }
-    return getGlobalProcess()?.env?.NODE_ENV;
+    return undefined;
 }
 
 export function getNativeBrowserStorages(): StorageLike[] {
