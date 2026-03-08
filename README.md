@@ -21,7 +21,7 @@ through a single hook that works like `useState`.
 - **JSON Schema validation** -- optional schema-based validation using a built-in JSON Schema subset
 - **Namespace isolation** -- `MnemonicProvider` prefixes every key to prevent collisions
 - **Cross-tab sync** -- opt-in `listenCrossTab` uses the browser `storage` event
-- **Pluggable storage** -- bring your own backend via the `StorageLike` interface (IndexedDB, sessionStorage, etc.)
+- **Pluggable storage** -- use `localStorage`, `sessionStorage`, or a synchronous `StorageLike` facade over custom persistence
 - **Schema versioning and migration** -- upgrade stored data with versioned schemas and migration rules
 - **Typed schema cohesion helpers** -- define one schema object and reuse it across runtime validation, key descriptors, and migrations
 - **Structural migration helpers** -- optional tree utilities for idempotent insert/rename/dedupe migration steps
@@ -382,6 +382,13 @@ interface StorageLike {
 }
 ```
 
+`StorageLike` is intentionally synchronous in v1 because Mnemonic's core
+store is built on React's synchronous snapshot contract. Async backends are
+still possible, but they need a synchronous facade: keep an in-memory cache for
+`getItem`/`setItem`/`removeItem`, then flush to IndexedDB or another async
+system outside the hook contract. Promise-returning `StorageLike` methods are
+unsupported and are treated as a storage misuse fallback at runtime.
+
 `onExternalChange` enables cross-tab sync for non-localStorage backends (e.g.
 IndexedDB over `BroadcastChannel`). The library handles all error cases
 internally -- see the `StorageLike` JSDoc for the full error-handling contract.
@@ -670,21 +677,39 @@ version and remount the provider.
 import { MnemonicProvider } from "react-mnemonic";
 import type { StorageLike } from "react-mnemonic";
 
+const cache = new Map<string, string>();
+const queueIndexedDbWrite = (key: string, value: string) => {
+    // application-specific async persistence
+};
+const queueIndexedDbDelete = (key: string) => {
+    // application-specific async persistence
+};
+
 const idbStorage: StorageLike = {
-  getItem: (key) => /* read from IndexedDB */,
-  setItem: (key, value) => /* write to IndexedDB */,
-  removeItem: (key) => /* delete from IndexedDB */,
-  onExternalChange: (cb) => {
-    const bc = new BroadcastChannel("my-app-sync");
-    bc.onmessage = (e) => cb(e.data.keys);
-    return () => bc.close();
-  },
+    getItem: (key) => cache.get(key) ?? null,
+    setItem: (key, value) => {
+        cache.set(key, value);
+        queueIndexedDbWrite(key, value);
+    },
+    removeItem: (key) => {
+        cache.delete(key);
+        queueIndexedDbDelete(key);
+    },
+    onExternalChange: (cb) => {
+        const bc = new BroadcastChannel("my-app-sync");
+        bc.onmessage = (e) => cb(e.data.keys);
+        return () => bc.close();
+    },
 };
 
 <MnemonicProvider namespace="my-app" storage={idbStorage}>
-  <App />
-</MnemonicProvider>
+    <App />
+</MnemonicProvider>;
 ```
+
+If your real persistence layer is async, initialize that adapter before
+rendering the provider and return a synchronous `StorageLike` facade, like the
+IndexedDB demo in the docs site.
 
 ### DevTools
 

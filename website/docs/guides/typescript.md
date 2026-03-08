@@ -190,4 +190,5 @@ type SchemaMode = "default" | "strict" | "autoschema";
 ### `StorageLike`
 
 The minimal interface for pluggable storage backends. See
-[Custom Storage](/docs/guides/custom-storage) for details.
+[Custom Storage](/docs/guides/custom-storage) for details. The contract is
+intentionally synchronous; async persistence belongs behind a sync facade.

@@ -1,13 +1,24 @@
 ---
 sidebar_position: 5
 title: Custom Storage
-description: Plug in IndexedDB, sessionStorage, or any storage backend.
+description: Use sessionStorage or a synchronous facade over custom persistence.
 ---
 
 # Custom Storage
 
 Mnemonic defaults to `localStorage` but accepts any backend that implements the
 `StorageLike` interface.
+
+## Architecture note: `StorageLike` is sync-only
+
+`StorageLike` is intentionally synchronous in v1. Mnemonic reads storage
+through React's synchronous snapshot contract, so `getItem`, `setItem`, and
+`removeItem` must all finish immediately.
+
+That means AsyncStorage-style adapters are not a drop-in fit for this surface.
+If your real persistence layer is async, wrap it behind a synchronous in-memory
+cache and let that cache satisfy `StorageLike`. Promise-returning methods are
+unsupported and are treated as a runtime contract violation.
 
 ## The `StorageLike` interface
 
@@ -67,6 +78,9 @@ function App() {
     );
 }
 ```
+
+This pattern keeps the hook contract synchronous while still letting IndexedDB
+handle durability in the background.
 
 ## `sessionStorage`
 

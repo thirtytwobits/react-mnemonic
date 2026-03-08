@@ -245,6 +245,34 @@ describe("MnemonicProvider – storage edge cases", () => {
         expect(store!.getRawSnapshot("k")).toBeNull();
     });
 
+    it("rejects promise-returning getItem implementations and falls back to memory", () => {
+        const getItem = vi.fn(() => Promise.resolve("later"));
+        const badStorage = {
+            getItem,
+            setItem: () => {},
+            removeItem: () => {},
+        } as unknown as StorageLike;
+
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="async-read" storage={badStorage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(getItem).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("StorageLike.getItem returned a Promise"));
+
+        spy.mockRestore();
+    });
+
     it("treats throwing enumeration capability getters as non-enumerable during initialization", () => {
         const badStorage = {
             getItem: () => null,
@@ -292,6 +320,41 @@ describe("MnemonicProvider – storage edge cases", () => {
         expect(store!.getRawSnapshot("k")).toBe("v");
         // But not in underlying storage
         expect(storage.store.has("ns.k")).toBe(false);
+    });
+
+    it("rejects promise-returning write methods, logs once, and keeps working from memory", () => {
+        const setItem = vi.fn(() => Promise.resolve());
+        const removeItem = vi.fn(() => Promise.resolve());
+        const badStorage = {
+            getItem: () => null,
+            setItem,
+            removeItem,
+        } as unknown as StorageLike;
+
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="async-write" storage={badStorage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        store!.setRaw("k", "v");
+        expect(store!.getRawSnapshot("k")).toBe("v");
+        expect(setItem).toHaveBeenCalledTimes(1);
+
+        store!.removeRaw("k");
+        expect(store!.getRawSnapshot("k")).toBeNull();
+        expect(removeItem).not.toHaveBeenCalled();
+
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("StorageLike.setItem returned a Promise"));
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        spy.mockRestore();
     });
 
     it("logs QuotaExceededError once then squelches until a write succeeds", () => {
