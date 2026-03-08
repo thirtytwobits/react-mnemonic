@@ -1,0 +1,14 @@
+{
+    "reviewer": "Reviewer name",
+    "reviewedAt": "2026-03-08",
+    "summary": "Short summary of the run quality.",
+    "scenarios": {
+        "theme-preference": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Explain the score."
+        }
+    }
+}

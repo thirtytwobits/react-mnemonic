@@ -1,0 +1,56 @@
+{
+    "reviewer": "Scott Dixon",
+    "reviewedAt": "2026-03-08",
+    "summary": "Reference fixtures intentionally model ideal one-shot react-mnemonic behavior.",
+    "scenarios": {
+        "theme-preference": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Uses mnemonic persistence and explicit cross-tab sync."
+        },
+        "saved-filters-ephemeral-search": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Persists filters while leaving search draft ephemeral."
+        },
+        "nullable-nickname": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Persists null intentionally instead of removing the key."
+        },
+        "wizard-draft-migration": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Separates migration and reconcile responsibilities."
+        },
+        "ssr-theme-badge": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Uses explicit SSR placeholder and client-only hydration."
+        },
+        "dismissed-banner": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Applies the simple durable banner recipe."
+        },
+        "reset-vs-remove": {
+            "persistenceAppropriateness": 5,
+            "semanticNuanceCorrectness": 5,
+            "unnecessaryUserIntervention": 5,
+            "criticalSemanticMiss": false,
+            "notes": "Preserves reset and remove as distinct persistence behaviors."
+        }
+    }
+}

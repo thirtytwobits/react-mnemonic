@@ -12,9 +12,10 @@ export const commonBenchmarks = [...report.benchmarks]
     .sort((left, right) => left.gzipBytes - right.gzipBytes);
 
 export const advancedBenchmarks = report.benchmarks.filter((benchmark) => benchmark.category === "advanced-task");
-export const aiResults = [...aiReport.results].sort(
+export const validationRuns = [...aiReport.validationRuns].sort(
     (left, right) => right.interventionAdjustedScore - left.interventionAdjustedScore,
 );
+export const publishableAiResults = [...aiReport.publishableSummary];
 
 # Comparisons and Benchmarks
 
@@ -36,27 +37,41 @@ For `react-mnemonic`, the most important benchmark is not bundle size. It is:
   user steering?
 
 To measure that, the repo now includes an AI-friendliness benchmark under
-`benchmarks/ai-friendliness/`. It is built around "golden prompts" for common
-app-building tasks and scores:
+`benchmarks/ai-friendliness/`. It is now structured as a fixed-model,
+multi-library protocol:
 
-- `oneShotPassRate`
-- `meanFollowUpPrompts`
-- `semanticScore`
-- `interventionAdjustedScore`
+- the same seven UI-building scenarios for every library
+- the same initial user prompts, without storage implementation hints
+- automated semantic scoring plus a short human review rubric
+- model metadata captured in every run manifest so results stay reproducible
 
 The benchmark assumes the agent-facing surfaces from issues #29 and #30 are
 available: canonical `docs/ai/` content, instruction packs, `llms.txt`
 exports, and prompt guardrails.
 
+### Benchmark protocol
+
+- Comparison axis: `libraries, fixed model`
+- Scoring mode: `hybrid`
+- Scenarios: `{aiReport.scenarios.length}`
+- One-shot threshold: automated `>= 85`, human `>= 75`, zero follow-ups, and no critical failures
+- Human rubric dimensions: persistence appropriateness, semantic nuance correctness, and unnecessary user intervention
+
+The machine-readable report records:
+
+- model provider, model ID, run date, and prompt-pack version
+- per-scenario transcript and submission paths
+- follow-up prompt count plus first-attempt compile/test status
+- automated semantic score, human review score, semantic score, and intervention-adjusted score
+
 ### Scorer validation runs
 
-The included report below validates the benchmark harness with two extremes:
+The included validation report proves the harness can separate the behavior we
+want from the behavior we do not want before any public model-vs-library table
+is published:
 
 - a reference `react-mnemonic` implementation for each scenario
 - a naive raw-`localStorage` negative control
-
-These are not claims about a specific model. They prove the benchmark can
-separate the behavior we want from the behavior we do not want.
 
 <table>
     <thead>
@@ -70,7 +85,7 @@ separate the behavior we want from the behavior we do not want.
         </tr>
     </thead>
     <tbody>
-        {aiResults.map((result) => (
+        {validationRuns.map((result) => (
             <tr key={result.runId}>
                 <td>{result.label}</td>
                 <td>{result.runType}</td>
@@ -83,6 +98,45 @@ separate the behavior we want from the behavior we do not want.
     </tbody>
 </table>
 
+### Public comparison status
+
+{publishableAiResults.length > 0 ? (
+
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Library</th>
+<th>One-shot pass rate</th>
+<th>Mean follow-ups</th>
+<th>Semantic score</th>
+<th>Adjusted score</th>
+</tr>
+</thead>
+<tbody>
+{publishableAiResults.map((result) => (
+<tr key={`${result.model.provider}-${result.model.modelId}-${result.library}`}>
+<td>
+{result.model.provider}/{result.model.modelId}
+</td>
+<td>{result.library}</td>
+<td>{result.oneShotPassRate}%</td>
+<td>{result.meanFollowUpPrompts}</td>
+<td>{result.semanticScore}</td>
+<td>{result.interventionAdjustedScore}</td>
+</tr>
+))}
+</tbody>
+</table>
+) : (
+<p>
+There are currently no publishable fixed-model comparison results in the report.
+The repo ships the full protocol, starter apps, validation fixtures, rubric,
+and manifest schemas now; public tables appear only after one model has been
+run across the full library shortlist.
+</p>
+)}
+
 ### Why this matters more than bundle size
 
 - A smaller persistence hook is not automatically easier for an agent to use
@@ -90,8 +144,9 @@ separate the behavior we want from the behavior we do not want.
 - `react-mnemonic` is intentionally optimizing for the path where a user says
   "build the UI" and the agent still chooses durable state, SSR options, and
   migration hooks correctly.
-- The benchmark is designed so real model runs can be added later without
-  changing the scoring method.
+- The benchmark protocol is stable before public cross-library results are
+  published, so new runs extend the same scoreboard instead of changing the
+  rules after the fact.
 
 ## What this compares
 
@@ -129,8 +184,8 @@ npm run benchmarks:compare
 ))}
 
 - The AI-friendliness benchmark currently ships with scorer-validation runs
-  only. Plugging in actual model transcripts or generated submissions is the
-  next step, not something this page is pretending has already happened.
+  and protocol scaffolding. Real comparison tables only appear once one fixed
+  model has been run across the complete library shortlist.
 
 ## Bundle Footprint
 

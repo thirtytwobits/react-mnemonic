@@ -1,0 +1,49 @@
+{
+    "id": "dismissed-banner",
+    "title": "Dismissed banner",
+    "focus": "simple durable UI state without user micromanagement",
+    "prompt": "Build a dashboard announcement banner that stays dismissed after the user closes it, even after refresh.",
+    "starterAppPath": "benchmarks/ai-friendliness/starters/dismissed-banner/app.tsx",
+    "expectedPersistenceDecisions": [
+        "Persist the dismissed state because the prompt explicitly says it survives refresh.",
+        "Use the target persistence library rather than raw localStorage calls."
+    ],
+    "criticalFailureConditions": [
+        "Dismissal state is not durable across refresh.",
+        "The submission bypasses the target persistence library.",
+        "The first attempt does not compile or test cleanly."
+    ],
+    "allowedImplementationShapes": {
+        "react-mnemonic": ["Persist a boolean dismissed key with useMnemonicKey"],
+        "zustand/persist": ["Persist a dismissed boolean in store state"],
+        "jotai/atomWithStorage": ["Persist a dismissed boolean atom"],
+        "use-local-storage-state": ["Persist a dismissed boolean with the hook"],
+        "usehooks-ts/useLocalStorage": ["Persist a dismissed boolean with the hook"]
+    },
+    "automatedChecks": [
+        {
+            "id": "targetLibraryUsage",
+            "description": "Uses the target persistence library",
+            "weight": 25,
+            "critical": true
+        },
+        {
+            "id": "durableStateChoice",
+            "description": "Treats dismissal as durable state",
+            "weight": 35,
+            "critical": false
+        },
+        {
+            "id": "avoidBypassingTargetLibrary",
+            "description": "Does not bypass the target library with raw storage calls",
+            "weight": 20,
+            "critical": true
+        },
+        {
+            "id": "simpleDismissRecipe",
+            "description": "Uses a simple durable boolean recipe",
+            "weight": 20,
+            "critical": false
+        }
+    ]
+}
