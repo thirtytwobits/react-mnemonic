@@ -14,6 +14,7 @@ import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { validateJsonSchema, inferJsonSchema } from "./json-schema";
+import { getRuntimeNodeEnv } from "./runtime";
 import type { JsonSchema } from "./json-schema";
 import type {
     UseMnemonicKeyOptions,
@@ -24,8 +25,6 @@ import type {
     MnemonicKeyDescriptor,
 } from "./types";
 
-declare const process: { env?: { NODE_ENV?: string } } | undefined;
-
 const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
 const diagnosticContractRegistry = new WeakMap<object, Map<string, string>>();
 const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
@@ -33,10 +32,7 @@ const diagnosticObjectIds = new WeakMap<object, number>();
 let nextDiagnosticObjectId = 1;
 
 function isDevelopmentRuntime(): boolean {
-    if (process?.env?.NODE_ENV !== undefined) {
-        return process.env.NODE_ENV === "development";
-    }
-    return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
+    return getRuntimeNodeEnv() === "development";
 }
 
 function getDiagnosticWarnings(api: object): Set<string> {

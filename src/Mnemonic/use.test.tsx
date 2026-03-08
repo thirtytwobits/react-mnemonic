@@ -436,6 +436,27 @@ describe("useMnemonicKey – development diagnostics", () => {
         warnSpy.mockRestore();
     });
 
+    it("does not warn for listenCrossTab when native localStorage is passed explicitly", () => {
+        setNodeEnv("development");
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="explicit-localstorage-warning-check" storage={window.localStorage}>
+                <DiagnosticConsumer
+                    hook={() =>
+                        useMnemonicKey("theme", {
+                            defaultValue: "light",
+                            listenCrossTab: true,
+                        })
+                    }
+                />
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+
     it("warns in development when codec and schema version are combined for the same key", () => {
         setNodeEnv("development");
         const storage = createMockStorage();

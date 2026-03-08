@@ -461,6 +461,21 @@ describe("MnemonicProvider – storage edge cases", () => {
             }
         }
     });
+
+    it("treats an explicitly supplied native localStorage backend as browser storage sync", () => {
+        let store: ReturnType<typeof useMnemonic>;
+        const onStore = vi.fn((s) => {
+            store = s;
+        });
+
+        render(
+            <MnemonicProvider namespace="explicit-localstorage" storage={window.localStorage}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        expect(store!.crossTabSyncMode).toBe("browser-storage-event");
+    });
 });
 
 describe("MnemonicProvider – DOMException/SecurityError logging", () => {

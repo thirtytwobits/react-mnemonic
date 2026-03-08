@@ -3,6 +3,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useMnemonic } from "./provider";
+import { getRuntimeNodeEnv } from "./runtime";
 import type {
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,
@@ -10,17 +11,12 @@ import type {
     UseMnemonicRecoveryOptions,
 } from "./types";
 
-declare const process: { env?: { NODE_ENV?: string } } | undefined;
-
 function uniqueKeys(keys: readonly string[]): string[] {
     return [...new Set(keys)];
 }
 
 function isDevelopmentRuntime(): boolean {
-    if (process?.env?.NODE_ENV !== undefined) {
-        return process.env.NODE_ENV === "development";
-    }
-    return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
+    return getRuntimeNodeEnv() === "development";
 }
 
 const recoveryDiagnosticWarnings = new WeakMap<object, Set<string>>();
