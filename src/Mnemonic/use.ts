@@ -155,13 +155,7 @@ export function useMnemonicKey<T>(
      * Decode a string payload using a codec (for codec-managed / no-schema keys).
      */
     const decodeStringPayload = useCallback(
-        <V>(payload: unknown, activeCodec: { decode: (encoded: string) => V }) => {
-            if (typeof payload !== "string") {
-                throw new SchemaError(
-                    "INVALID_ENVELOPE",
-                    `Envelope payload must be a string for codec-managed key "${key}"`,
-                );
-            }
+        <V>(payload: string, activeCodec: { decode: (encoded: string) => V }) => {
             try {
                 return activeCodec.decode(payload);
             } catch (err) {
@@ -318,7 +312,7 @@ export function useMnemonicKey<T>(
             pendingSchema?: KeySchema;
             persistedVersion: number;
             latestVersion?: number;
-            serializeForPersist?: (value: T) => string;
+            serializeForPersist: (value: T) => string;
             derivePendingSchema?: (value: T) => KeySchema;
         }): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
             if (!reconcile) {
@@ -346,14 +340,6 @@ export function useMnemonicKey<T>(
             try {
                 const reconciled = reconcile(value, context);
                 const nextPendingSchema = derivePendingSchema ? derivePendingSchema(reconciled) : pendingSchema;
-
-                if (!serializeForPersist) {
-                    const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value: reconciled };
-                    if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
-                    if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;
-                    return result;
-                }
-
                 const nextSerialized = serializeForPersist(reconciled);
                 const nextRewriteRaw =
                     baselineSerialized === undefined || nextSerialized !== baselineSerialized
@@ -471,11 +457,7 @@ export function useMnemonicKey<T>(
                         serializeForPersist: encodeForWrite,
                     });
                 } catch (err) {
-                    const typedErr =
-                        err instanceof SchemaError || err instanceof CodecError
-                            ? err
-                            : new CodecError(`Codec decode failed for key "${key}"`, err);
-                    return { value: getFallback(typedErr) };
+                    return { value: getFallback(err as SchemaError | CodecError) };
                 }
             }
 

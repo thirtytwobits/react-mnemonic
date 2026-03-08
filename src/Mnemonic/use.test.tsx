@@ -461,6 +461,42 @@ describe("useMnemonicKey – codecs", () => {
         );
     });
 
+    it("does not rewrite codec-managed persisted values when reconcile returns the same value", async () => {
+        const initialRaw = env(
+            JSON.stringify({
+                theme: "dark",
+                density: "comfortable",
+            }),
+        );
+        storage.store.set("ns.preferences", initialRaw);
+
+        const setItem = vi.spyOn(storage, "setItem");
+        const reconcile = vi.fn((value: { theme: string; density: string }) => value);
+
+        const { result, rerender } = renderHook(storage, "ns", () =>
+            useMnemonicKey("preferences", {
+                defaultValue: { theme: "light", density: "comfortable" },
+                reconcile,
+            }),
+        );
+
+        expect(result.current.value).toEqual({
+            theme: "dark",
+            density: "comfortable",
+        });
+
+        await waitFor(() => {
+            expect(setItem).not.toHaveBeenCalled();
+            expect(storage.store.get("ns.preferences")).toBe(initialRaw);
+        });
+
+        const callsAfterInitialRead = reconcile.mock.calls.length;
+        rerender();
+        expect(reconcile).toHaveBeenCalledTimes(callsAfterInitialRead + 1);
+        expect(setItem).not.toHaveBeenCalled();
+        expect(storage.store.get("ns.preferences")).toBe(initialRaw);
+    });
+
     it("handles encode failure gracefully", () => {
         const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
         const BadCodec: Codec<string> = {
