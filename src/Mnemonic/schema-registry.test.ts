@@ -202,4 +202,60 @@ describe("createSchemaRegistry", () => {
             new SchemaError("MIGRATION_GRAPH_INVALID", 'Backward migration "profile" 2 -> 1 is not supported'),
         );
     });
+
+    it("rejects schema and migration versions that are not non-negative integers", () => {
+        expect(() =>
+            createSchemaRegistry({
+                schemas: [
+                    {
+                        ...profileV1,
+                        version: -1,
+                    },
+                ],
+            }),
+        ).toThrowError(
+            new SchemaError(
+                "MIGRATION_GRAPH_INVALID",
+                'Schema version for key "profile" must be a non-negative integer',
+            ),
+        );
+
+        expect(() =>
+            createSchemaRegistry({
+                schemas: [profileV1, profileV2],
+                migrations: [
+                    {
+                        key: "profile",
+                        fromVersion: 1.5,
+                        toVersion: 2,
+                        migrate: (value) => value,
+                    },
+                ],
+            }),
+        ).toThrowError(
+            new SchemaError(
+                "MIGRATION_GRAPH_INVALID",
+                'Migration fromVersion for key "profile" must be a non-negative integer',
+            ),
+        );
+
+        expect(() =>
+            createSchemaRegistry({
+                schemas: [profileV1, profileV2],
+                migrations: [
+                    {
+                        key: "profile",
+                        fromVersion: 1,
+                        toVersion: -2,
+                        migrate: (value) => value,
+                    },
+                ],
+            }),
+        ).toThrowError(
+            new SchemaError(
+                "MIGRATION_GRAPH_INVALID",
+                'Migration toVersion for key "profile" must be a non-negative integer',
+            ),
+        );
+    });
 });

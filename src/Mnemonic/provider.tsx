@@ -171,6 +171,7 @@ type DevToolsRegistryRoot = {
  * @param props.enableDevTools - Enable DevTools debugging interface (defaults to false)
  * @param props.schemaMode - Schema enforcement mode (default: "default")
  * @param props.schemaRegistry - Optional schema registry for storing schemas and migrations
+ * @param props.ssr - Optional SSR defaults for descendant hooks
  *
  * @example
  * ```tsx
@@ -235,11 +236,27 @@ type DevToolsRegistryRoot = {
  * }
  * ```
  *
+ * @example
+ * ```tsx
+ * // Delay persisted storage reads until after client mount
+ * function App() {
+ *   return (
+ *     <MnemonicProvider
+ *       namespace="myApp"
+ *       ssr={{ hydration: "client-only" }}
+ *     >
+ *       <MyComponents />
+ *     </MnemonicProvider>
+ *   );
+ * }
+ * ```
+ *
  * @remarks
  * - Creates a stable store instance that only recreates when namespace, storage, or enableDevTools change
  * - All storage operations are cached in memory for fast reads
  * - Storage failures are handled gracefully (logged but not thrown)
- * - In SSR environments, the provider works but no storage persistence occurs
+ * - In SSR environments, the provider is safe by default: hooks render
+ *   `defaultValue` unless configured with an explicit `ssr.serverValue`
  * - The store implements React's useSyncExternalStore contract for efficient updates
  *
  * @see {@link useMnemonicKey} - Hook for using persistent state
@@ -252,6 +269,7 @@ export function MnemonicProvider({
     enableDevTools = false,
     schemaMode = "default",
     schemaRegistry,
+    ssr,
 }: MnemonicProviderProps) {
     if (schemaMode === "strict" && !schemaRegistry) {
         throw new Error("MnemonicProvider strict mode requires schemaRegistry");
@@ -263,6 +281,7 @@ export function MnemonicProvider({
     const store = useMemo<MnemonicInternal>(() => {
         const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
+        const ssrHydration = ssr?.hydration ?? "immediate";
 
         /**
          * In-memory cache of raw string values.
@@ -714,6 +733,7 @@ export function MnemonicProvider({
             dump,
             reloadFromStorage,
             schemaMode: schemaMode as SchemaMode,
+            ssrHydration,
             ...(schemaRegistry ? { schemaRegistry: schemaRegistry as SchemaRegistry } : {}),
         };
 
@@ -816,7 +836,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration]);
 
     // Subscribe to external storage changes (e.g., cross-tab BroadcastChannel)
     useEffect(() => {

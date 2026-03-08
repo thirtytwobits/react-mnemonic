@@ -9,7 +9,7 @@
  * encoding/decoding, and JSON Schema validation.
  */
 
-import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback } from "react";
+import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback, useState } from "react";
 import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError } from "./codecs";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
@@ -23,6 +23,8 @@ import type {
     MnemonicKeyState,
     MnemonicKeyDescriptor,
 } from "./types";
+
+const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
 
 function resolveMnemonicKeyArgs<T>(
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
@@ -86,10 +88,21 @@ export function useMnemonicKey<T>(
     const resolvedOptions = descriptor.options;
     const api = useMnemonic();
 
-    const { defaultValue, onMount, onChange, listenCrossTab, codec: codecOpt, schema, reconcile } = resolvedOptions;
+    const {
+        defaultValue,
+        onMount,
+        onChange,
+        listenCrossTab,
+        codec: codecOpt,
+        schema,
+        reconcile,
+        ssr: ssrOptions,
+    } = resolvedOptions;
     const codec = codecOpt ?? JSONCodec;
     const schemaMode = api.schemaMode;
     const schemaRegistry = api.schemaRegistry;
+    const hydrationMode = ssrOptions?.hydration ?? api.ssrHydration;
+    const [hasMounted, setHasMounted] = useState(hydrationMode !== "client-only");
 
     /**
      * Helper to get the fallback/default value.
@@ -102,6 +115,14 @@ export function useMnemonicKey<T>(
                 : defaultValue,
         [defaultValue],
     );
+
+    const getServerValue = useCallback(() => {
+        const serverValue = ssrOptions?.serverValue;
+        if (serverValue === undefined) {
+            return getFallback();
+        }
+        return typeof serverValue === "function" ? (serverValue as () => T)() : serverValue;
+    }, [getFallback, ssrOptions?.serverValue]);
 
     const parseEnvelope = useCallback(
         (rawText: string): { ok: true; envelope: MnemonicEnvelope } | { ok: false; error: SchemaError } => {
@@ -134,13 +155,7 @@ export function useMnemonicKey<T>(
      * Decode a string payload using a codec (for codec-managed / no-schema keys).
      */
     const decodeStringPayload = useCallback(
-        <V>(payload: unknown, activeCodec: { decode: (encoded: string) => V }) => {
-            if (typeof payload !== "string") {
-                throw new SchemaError(
-                    "INVALID_ENVELOPE",
-                    `Envelope payload must be a string for codec-managed key "${key}"`,
-                );
-            }
+        <V>(payload: string, activeCodec: { decode: (encoded: string) => V }) => {
             try {
                 return activeCodec.decode(payload);
             } catch (err) {
@@ -297,7 +312,7 @@ export function useMnemonicKey<T>(
             pendingSchema?: KeySchema;
             persistedVersion: number;
             latestVersion?: number;
-            serializeForPersist?: (value: T) => string;
+            serializeForPersist: (value: T) => string;
             derivePendingSchema?: (value: T) => KeySchema;
         }): { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } => {
             if (!reconcile) {
@@ -325,14 +340,6 @@ export function useMnemonicKey<T>(
             try {
                 const reconciled = reconcile(value, context);
                 const nextPendingSchema = derivePendingSchema ? derivePendingSchema(reconciled) : pendingSchema;
-
-                if (!serializeForPersist) {
-                    const result: { value: T; rewriteRaw?: string; pendingSchema?: KeySchema } = { value: reconciled };
-                    if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
-                    if (nextPendingSchema !== undefined) result.pendingSchema = nextPendingSchema;
-                    return result;
-                }
-
                 const nextSerialized = serializeForPersist(reconciled);
                 const nextRewriteRaw =
                     baselineSerialized === undefined || nextSerialized !== baselineSerialized
@@ -450,11 +457,7 @@ export function useMnemonicKey<T>(
                         serializeForPersist: encodeForWrite,
                     });
                 } catch (err) {
-                    const typedErr =
-                        err instanceof SchemaError || err instanceof CodecError
-                            ? err
-                            : new CodecError(`Codec decode failed for key "${key}"`, err);
-                    return { value: getFallback(typedErr) };
+                    return { value: getFallback(err as SchemaError | CodecError) };
                 }
             }
 
@@ -539,14 +542,45 @@ export function useMnemonicKey<T>(
      * Subscribe to raw storage changes using React's useSyncExternalStore.
      * This ensures efficient, tearing-free updates when storage changes.
      */
-    const raw = useSyncExternalStore(
-        (listener) => api.subscribeRaw(key, listener),
-        () => api.getRawSnapshot(key),
-        () => null, // SSR snapshot - no storage in server environment
+    const getServerRawSnapshot = useCallback(
+        (): string | typeof SSR_SNAPSHOT_TOKEN | null =>
+            ssrOptions?.serverValue === undefined ? null : SSR_SNAPSHOT_TOKEN,
+        [ssrOptions?.serverValue],
     );
 
-    const decoded = useMemo(() => decodeForRead(raw), [decodeForRead, raw]);
+    const deferStorageRead = hydrationMode === "client-only" && !hasMounted;
+    const subscribe = useCallback(
+        (listener: () => void) => {
+            if (deferStorageRead) {
+                return () => undefined;
+            }
+            return api.subscribeRaw(key, listener);
+        },
+        [api, deferStorageRead, key],
+    );
+
+    const raw = useSyncExternalStore(
+        subscribe,
+        () => (deferStorageRead ? getServerRawSnapshot() : api.getRawSnapshot(key)),
+        getServerRawSnapshot,
+    );
+
+    const decoded = useMemo(() => {
+        if (raw === SSR_SNAPSHOT_TOKEN) {
+            return {
+                value: getServerValue(),
+                rewriteRaw: undefined,
+                pendingSchema: undefined,
+            };
+        }
+        return decodeForRead(raw);
+    }, [decodeForRead, getServerValue, raw]);
     const value = decoded.value;
+
+    useEffect(() => {
+        if (hasMounted) return;
+        setHasMounted(true);
+    }, [hasMounted]);
 
     // Persist opportunistic read-time upgrades (migrations, autoschema rewrite).
     useEffect(() => {

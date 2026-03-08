@@ -3,7 +3,7 @@
 
 // @vitest-environment node
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { MnemonicProvider } from "./provider";
@@ -43,6 +43,9 @@ function ssrRender(
         schemaMode?: "default" | "strict" | "autoschema";
         schemaRegistry?: SchemaRegistry;
         enableDevTools?: boolean;
+        ssr?: {
+            hydration?: "immediate" | "client-only";
+        };
     },
     child: React.ReactElement,
 ): string {
@@ -124,11 +127,76 @@ describe("SSR integration (node environment)", () => {
 
         const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Theme));
 
-        // Server snapshot is always null, so the default is used
+        // Default SSR snapshot is null, so the default is used
         // even though storage has "dark". This is the SSR contract:
         // the server renders with the default, client hydrates and
         // may update once storage is read.
         expect(html).toContain("light");
+    });
+
+    it("renderToString can use an explicit serverValue", () => {
+        const storage = createMockStorage();
+        storage.store.set("ssr.theme", JSON.stringify({ version: 0, payload: JSON.stringify("dark") }));
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                ssr: {
+                    serverValue: "system",
+                },
+            });
+            return React.createElement("span", null, value);
+        }
+
+        const html = ssrRender({ namespace: "ssr", storage }, React.createElement(Theme));
+
+        expect(html).toContain("system");
+        expect(html).not.toContain("dark");
+    });
+
+    it("renderToString with serverValue skips reconcile and autoschema registration on the server", () => {
+        const storage = createMockStorage();
+        storage.store.set("ssr.theme", env(JSON.stringify("dark")));
+
+        const registerSchema = vi.fn();
+        const reconcile = vi.fn((value: "light" | "dark" | "system") => value);
+        const registry: SchemaRegistry = {
+            getSchema() {
+                return undefined;
+            },
+            getLatestSchema() {
+                return undefined;
+            },
+            getMigrationPath() {
+                return null;
+            },
+            registerSchema,
+        };
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                reconcile,
+                ssr: {
+                    serverValue: "system",
+                },
+            });
+            return React.createElement("span", null, value);
+        }
+
+        const html = ssrRender(
+            {
+                namespace: "ssr",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+            React.createElement(Theme),
+        );
+
+        expect(html).toContain("system");
+        expect(reconcile).not.toHaveBeenCalled();
+        expect(registerSchema).not.toHaveBeenCalled();
     });
 
     it("renderToString does not throw with listenCrossTab enabled", () => {

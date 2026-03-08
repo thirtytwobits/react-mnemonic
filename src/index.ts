@@ -44,5 +44,8 @@ export type {
     MnemonicDevToolsCapabilities,
     MnemonicDevToolsMeta,
     MnemonicDevToolsRegistry,
+    MnemonicHydrationMode,
+    MnemonicProviderSSRConfig,
+    MnemonicKeySSRConfig,
     Unsubscribe,
 } from "./Mnemonic/types";

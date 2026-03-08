@@ -176,6 +176,25 @@ export interface MnemonicProviderOptions {
      * @see {@link KeySchema} - Schema definition stored in the registry
      */
     schemaRegistry?: SchemaRegistry;
+
+    /**
+     * Server-rendering and hydration defaults for descendant hooks.
+     *
+     * Provider-level SSR settings establish the default hydration strategy for
+     * all `useMnemonicKey(...)` calls in this namespace. Individual hooks may
+     * still override the strategy when a specific key needs different behavior.
+     *
+     * @example
+     * ```tsx
+     * <MnemonicProvider
+     *   namespace="app"
+     *   ssr={{ hydration: "client-only" }}
+     * >
+     *   <App />
+     * </MnemonicProvider>
+     * ```
+     */
+    ssr?: MnemonicProviderSSRConfig;
 }
 
 /**
@@ -210,6 +229,61 @@ export interface MnemonicProviderOptions {
  * @see {@link KeySchema} - Individual schema definition
  */
 export type SchemaMode = "strict" | "default" | "autoschema";
+
+/**
+ * Controls when a hook should read persisted storage during client rendering.
+ *
+ * - `"immediate"` — Default. The server snapshot is used during SSR/hydration,
+ *   and the hook reads persisted storage as soon as React switches to the
+ *   client snapshot.
+ *
+ * - `"client-only"` — Defers all storage reads until after the component has
+ *   mounted on the client. This is useful when you want a deterministic server
+ *   placeholder and prefer the persisted value to appear only after hydration
+ *   completes.
+ */
+export type MnemonicHydrationMode = "immediate" | "client-only";
+
+/**
+ * Provider-level SSR defaults shared by descendant hooks.
+ */
+export interface MnemonicProviderSSRConfig {
+    /**
+     * Default hydration strategy for descendant `useMnemonicKey(...)` hooks.
+     *
+     * @default "immediate"
+     */
+    hydration?: MnemonicHydrationMode;
+}
+
+/**
+ * Hook-level SSR controls for `useMnemonicKey(...)`.
+ *
+ * Lets a key render a deterministic server snapshot and optionally delay
+ * reading persisted storage until after client mount.
+ *
+ * @template T - The decoded value type for the key
+ */
+export interface MnemonicKeySSRConfig<T> {
+    /**
+     * Value to expose during SSR and hydration instead of `defaultValue`.
+     *
+     * This value is not persisted automatically. Once hydration completes,
+     * the hook transitions to the stored value (if any) or back to
+     * `defaultValue`.
+     *
+     * Factory functions should be deterministic across server render and
+     * client hydration to avoid markup mismatches.
+     */
+    serverValue?: T | (() => T);
+
+    /**
+     * Hydration strategy for this key.
+     *
+     * When omitted, inherits the provider default.
+     */
+    hydration?: MnemonicHydrationMode;
+}
 
 /**
  * Weak-reference shape used by the devtools registry.
@@ -854,6 +928,11 @@ export type Mnemonic = {
     schemaMode: SchemaMode;
 
     /**
+     * Default hydration strategy inherited by descendant hooks.
+     */
+    ssrHydration: MnemonicHydrationMode;
+
+    /**
      * The schema registry for this provider, if one was supplied.
      *
      * Hooks use this to look up schemas, resolve migration paths, and
@@ -1250,6 +1329,23 @@ export type UseMnemonicKeyOptions<T> = {
      * automatically via React's state management.
      */
     listenCrossTab?: boolean;
+
+    /**
+     * Server-rendering controls for this key.
+     *
+     * Use this when the server should render a value other than
+     * `defaultValue`, or when persisted storage should only be read after the
+     * component has mounted on the client.
+     *
+     * @example
+     * ```typescript
+     * ssr: {
+     *   serverValue: { theme: "system" },
+     *   hydration: "client-only",
+     * }
+     * ```
+     */
+    ssr?: MnemonicKeySSRConfig<T>;
 
     /**
      * Optional schema controls for this key.

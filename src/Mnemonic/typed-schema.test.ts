@@ -32,6 +32,59 @@ describe("mnemonicSchema", () => {
         expect(validateJsonSchema({ email: "missing-required@example.com" }, profileSchema)).not.toEqual([]);
     });
 
+    it("treats optional wrappers as non-mutating so the original schema remains required elsewhere", () => {
+        const nameSchema = mnemonicSchema.string({ minLength: 1 });
+        const optionalNameSchema = mnemonicSchema.optional(nameSchema);
+
+        const requiredObject = mnemonicSchema.object({
+            name: nameSchema,
+        });
+        const optionalObject = mnemonicSchema.object({
+            name: optionalNameSchema,
+        });
+
+        expect(requiredObject).toEqual({
+            type: "object",
+            properties: {
+                name: { type: "string", minLength: 1 },
+            },
+            required: ["name"],
+        });
+
+        expect(optionalObject).toEqual({
+            type: "object",
+            properties: {
+                name: { type: "string", minLength: 1 },
+            },
+        });
+
+        expect(validateJsonSchema({}, requiredObject)).not.toEqual([]);
+        expect(validateJsonSchema({}, optionalObject)).toEqual([]);
+    });
+
+    it("allows already-optional schemas to be wrapped again without leaking metadata or throwing", () => {
+        const optionalTheme = mnemonicSchema.optional(mnemonicSchema.enum(["light", "dark"] as const));
+
+        expect(() => mnemonicSchema.optional(optionalTheme)).not.toThrow();
+
+        const schema = mnemonicSchema.object({
+            theme: mnemonicSchema.optional(optionalTheme),
+        });
+
+        expect(schema).toEqual({
+            type: "object",
+            properties: {
+                theme: {
+                    enum: ["light", "dark"],
+                },
+            },
+        });
+
+        expect(validateJsonSchema({}, schema)).toEqual([]);
+        expect(validateJsonSchema({ theme: "light" }, schema)).toEqual([]);
+        expect(validateJsonSchema({ theme: "sepia" }, schema)).not.toEqual([]);
+    });
+
     it("supports nullable schemas for enum-backed values", () => {
         const themeSchema = mnemonicSchema.nullable(mnemonicSchema.enum(["light", "dark"] as const));
 
@@ -56,6 +109,22 @@ describe("mnemonicSchema", () => {
         });
 
         expect(validateJsonSchema(null, stringEnumSchema)).toEqual([]);
+    });
+
+    it("preserves already-null enum schemas without duplicating null in type or enum", () => {
+        const alreadyNullableEnumSchema = mnemonicSchema.nullable({
+            type: ["string", "null"],
+            enum: ["light", null],
+        } as TypedJsonSchema<"light" | null>);
+
+        expect(alreadyNullableEnumSchema).toEqual({
+            type: ["string", "null"],
+            enum: ["light", null],
+        });
+
+        expect(validateJsonSchema("light", alreadyNullableEnumSchema)).toEqual([]);
+        expect(validateJsonSchema(null, alreadyNullableEnumSchema)).toEqual([]);
+        expect(validateJsonSchema("dark", alreadyNullableEnumSchema)).not.toEqual([]);
     });
 
     it("preserves nullable const schemas without duplicating null", () => {
@@ -83,6 +152,64 @@ describe("mnemonicSchema", () => {
         expect(validateJsonSchema(null, stringConstSchema)).toEqual([]);
     });
 
+    it("preserves explicit const-null schemas that already carry nullable type information", () => {
+        const typedNullConstSchema = mnemonicSchema.nullable({
+            type: ["string", "null"],
+            const: null,
+        } as TypedJsonSchema<null>);
+
+        expect(typedNullConstSchema).toEqual({
+            type: ["string", "null"],
+            const: null,
+        });
+
+        expect(validateJsonSchema(null, typedNullConstSchema)).toEqual([]);
+        expect(validateJsonSchema("light", typedNullConstSchema)).not.toEqual([]);
+    });
+
+    it("widens literal schemas without explicit type into nullable enums", () => {
+        const nullableLiteralSchema = mnemonicSchema.nullable(mnemonicSchema.literal("light"));
+
+        expect(nullableLiteralSchema).toEqual({
+            enum: ["light", null],
+        });
+
+        expect(validateJsonSchema("light", nullableLiteralSchema)).toEqual([]);
+        expect(validateJsonSchema(null, nullableLiteralSchema)).toEqual([]);
+        expect(validateJsonSchema("dark", nullableLiteralSchema)).not.toEqual([]);
+    });
+
+    it("widens ordinary typed schemas to include null while preserving their existing constraints", () => {
+        const displayNameSchema = mnemonicSchema.nullable(mnemonicSchema.string({ minLength: 2, maxLength: 20 }));
+
+        expect(displayNameSchema).toEqual({
+            type: ["string", "null"],
+            minLength: 2,
+            maxLength: 20,
+        });
+
+        expect(validateJsonSchema("Ada", displayNameSchema)).toEqual([]);
+        expect(validateJsonSchema(null, displayNameSchema)).toEqual([]);
+        expect(validateJsonSchema("A", displayNameSchema)).not.toEqual([]);
+        expect(validateJsonSchema(42, displayNameSchema)).not.toEqual([]);
+    });
+
+    it("does not duplicate null when an ordinary typed schema is already nullable", () => {
+        const existingNullableSchema = mnemonicSchema.nullable({
+            type: ["string", "null"],
+            minLength: 2,
+        } as TypedJsonSchema<string | null>);
+
+        expect(existingNullableSchema).toEqual({
+            type: ["string", "null"],
+            minLength: 2,
+        });
+
+        expect(validateJsonSchema("Ada", existingNullableSchema)).toEqual([]);
+        expect(validateJsonSchema(null, existingNullableSchema)).toEqual([]);
+        expect(validateJsonSchema("A", existingNullableSchema)).not.toEqual([]);
+    });
+
     it("builds record schemas using additionalProperties", () => {
         const counterMapSchema = mnemonicSchema.record(mnemonicSchema.integer({ minimum: 0 }));
 
@@ -93,6 +220,29 @@ describe("mnemonicSchema", () => {
                 minimum: 0,
             },
         });
+    });
+
+    it("builds number, boolean, and null schemas that validate their intended values", () => {
+        const telemetrySchema = mnemonicSchema.object({
+            score: mnemonicSchema.number({ minimum: 0, maximum: 100 }),
+            enabled: mnemonicSchema.boolean(),
+            resetAt: mnemonicSchema.nullValue(),
+        });
+
+        expect(telemetrySchema).toEqual({
+            type: "object",
+            properties: {
+                score: { type: "number", minimum: 0, maximum: 100 },
+                enabled: { type: "boolean" },
+                resetAt: { type: "null" },
+            },
+            required: ["score", "enabled", "resetAt"],
+        });
+
+        expect(validateJsonSchema({ score: 42.5, enabled: true, resetAt: null }, telemetrySchema)).toEqual([]);
+        expect(validateJsonSchema({ score: -1, enabled: true, resetAt: null }, telemetrySchema)).not.toEqual([]);
+        expect(validateJsonSchema({ score: 42.5, enabled: "yes", resetAt: null }, telemetrySchema)).not.toEqual([]);
+        expect(validateJsonSchema({ score: 42.5, enabled: true, resetAt: "later" }, telemetrySchema)).not.toEqual([]);
     });
 
     it("throws when nullable is used with a schema the JSON subset cannot represent", () => {

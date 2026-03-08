@@ -750,6 +750,49 @@ describe("schema mode behavior", () => {
         errSpy.mockRestore();
     });
 
+    it("autoschema reads seeded JSON payloads directly without invoking the codec", async () => {
+        const storage = createMockStorage();
+        const registry = createRegistry();
+        const decode = vi.fn(() => {
+            throw new Error("decode should not run for seeded JSON payloads");
+        });
+
+        storage.store.set("ns.settings", JSON.stringify({ version: 0, payload: { theme: "light", accents: true } }));
+
+        const result = renderHook(
+            () =>
+                useMnemonicKey("settings", {
+                    defaultValue: { theme: "dark", accents: false },
+                    codec: {
+                        encode: JSON.stringify,
+                        decode,
+                    },
+                }),
+            {
+                namespace: "ns",
+                storage,
+                schemaMode: "autoschema",
+                schemaRegistry: registry,
+            },
+        );
+
+        expect(result.current.value).toEqual({ theme: "light", accents: true });
+        expect(decode).not.toHaveBeenCalled();
+
+        await waitFor(() => {
+            expect(storage.store.get("ns.settings")).toBe(schemaEnv({ theme: "light", accents: true }, 1));
+            expect(registry.getSchema("settings", 1)).toEqual(
+                expect.objectContaining({
+                    key: "settings",
+                    version: 1,
+                    schema: expect.objectContaining({
+                        type: "object",
+                    }),
+                }),
+            );
+        });
+    });
+
     it("autoschema reconciles inferred values before registering and rewriting them", async () => {
         const storage = createMockStorage();
         const registry = createRegistry();

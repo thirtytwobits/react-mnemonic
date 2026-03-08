@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
                 "guides/reset-and-recovery",
                 "guides/clearable-persisted-values",
                 "guides/persisted-vs-ephemeral-state",
+                "guides/server-rendering",
                 "guides/custom-codecs",
                 "guides/custom-storage",
                 "guides/cross-tab-sync",
