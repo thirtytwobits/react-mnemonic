@@ -116,18 +116,13 @@ export function useMnemonicKey<T>(
         [defaultValue],
     );
 
-    const getServerValue = useCallback(
-        (error?: CodecError | SchemaError) => {
-            const serverValue = ssrOptions?.serverValue;
-            if (serverValue === undefined) {
-                return getFallback(error);
-            }
-            return typeof serverValue === "function"
-                ? (serverValue as (error?: CodecError | SchemaError) => T)(error)
-                : serverValue;
-        },
-        [getFallback, ssrOptions?.serverValue],
-    );
+    const getServerValue = useCallback(() => {
+        const serverValue = ssrOptions?.serverValue;
+        if (serverValue === undefined) {
+            return getFallback();
+        }
+        return typeof serverValue === "function" ? (serverValue as () => T)() : serverValue;
+    }, [getFallback, ssrOptions?.serverValue]);
 
     const parseEnvelope = useCallback(
         (rawText: string): { ok: true; envelope: MnemonicEnvelope } | { ok: false; error: SchemaError } => {
@@ -588,7 +583,7 @@ export function useMnemonicKey<T>(
     );
 
     const decoded = useMemo(() => {
-        if (raw?.startsWith(SSR_SNAPSHOT_PREFIX)) {
+        if (raw === SSR_SNAPSHOT_PREFIX) {
             return {
                 value: getServerValue(),
                 rewriteRaw: undefined,

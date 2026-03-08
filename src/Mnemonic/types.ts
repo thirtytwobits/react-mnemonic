@@ -275,7 +275,7 @@ export interface MnemonicKeySSRConfig<T> {
      * Factory functions should be deterministic across server render and
      * client hydration to avoid markup mismatches.
      */
-    serverValue?: T | ((error?: CodecError | SchemaError) => T);
+    serverValue?: T | (() => T);
 
     /**
      * Hydration strategy for this key.
