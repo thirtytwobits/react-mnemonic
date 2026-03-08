@@ -1,9 +1,9 @@
 ---
-title: Single Source Of Truth Schemas
+title: Single Source of Truth Schemas
 description: Reuse one schema object for runtime validation, key descriptors, and migrations.
 ---
 
-# Single Source Of Truth Schemas
+# Single Source of Truth Schemas
 
 react-mnemonic now has a first-class path for keeping runtime schema validation
 and TypeScript types aligned.
