@@ -102,6 +102,15 @@ function setNodeEnv(value: string) {
     };
 }
 
+function restoreProcess() {
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (originalProcess === undefined) {
+        delete (globalWithProcess as { process?: unknown }).process;
+        return;
+    }
+    globalWithProcess.process = originalProcess;
+}
+
 /** Renders a hook within MnemonicProvider and returns accessor for the result. */
 function renderHook<T>(
     storage: ReturnType<typeof createMockStorage>,
@@ -371,7 +380,7 @@ describe("useMnemonicKey – development diagnostics", () => {
     });
 
     afterEach(() => {
-        setNodeEnv("test");
+        restoreProcess();
     });
 
     it("warns in development when listenCrossTab is used on a backend without external notifications", () => {

@@ -20,8 +20,17 @@ function setNodeEnv(value: string) {
     };
 }
 
+function restoreProcess() {
+    const globalWithProcess = globalThis as { process?: { env?: Record<string, string | undefined> } };
+    if (originalProcess === undefined) {
+        delete (globalWithProcess as { process?: unknown }).process;
+        return;
+    }
+    globalWithProcess.process = originalProcess;
+}
+
 afterEach(() => {
-    setNodeEnv("test");
+    restoreProcess();
 });
 
 function createEnumerableStorage(): StorageLike & { store: Map<string, string> } {
@@ -95,6 +104,21 @@ describe("useMnemonicRecovery", () => {
         expect(() => result.current.clearAll()).toThrow(/enumerable storage backend/);
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("clearAll() requires an enumerable storage backend"),
+        );
+
+        warnSpy.mockRestore();
+    });
+
+    it("warns in development before throwing for non-enumerable clearMatching", () => {
+        setNodeEnv("development");
+        const storage = createNonEnumerableStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const { result } = renderHook(storage, "app", () => useMnemonicRecovery());
+
+        expect(() => result.current.clearMatching(() => true)).toThrow(/enumerable storage backend/);
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("clearMatching() requires an enumerable storage backend"),
         );
 
         warnSpy.mockRestore();

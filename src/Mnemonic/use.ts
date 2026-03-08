@@ -51,12 +51,20 @@ function warnOnce(api: object, id: string, message: string): void {
 }
 
 function stableDiagnosticValue(value: unknown): string {
-    if (typeof value === "function") return "[factory]";
+    if (typeof value === "function") {
+        return `[factory#${getDiagnosticObjectId(value as object)}]`;
+    }
+    if (typeof value === "bigint") return `${value.toString()}n`;
+    if (typeof value === "symbol") return value.toString();
     if (value === undefined) return "undefined";
     try {
         return JSON.stringify(value);
     } catch {
-        return Object.prototype.toString.call(value);
+        const tag = Object.prototype.toString.call(value);
+        if (value !== null && (typeof value === "object" || typeof value === "function")) {
+            return `${tag}#${getDiagnosticObjectId(value as object)}`;
+        }
+        return tag;
     }
 }
 
@@ -672,7 +680,7 @@ export function useMnemonicKey<T>(
     useEffect(() => {
         if (!isDevelopmentRuntime()) return;
 
-        if (listenCrossTab && api.crossTabSyncMode === "none" && typeof window !== "undefined") {
+        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && typeof window !== "undefined") {
             warnOnce(
                 api,
                 `listenCrossTab:${key}`,
