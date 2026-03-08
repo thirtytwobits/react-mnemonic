@@ -33,7 +33,7 @@ const diagnosticObjectIds = new WeakMap<object, number>();
 let nextDiagnosticObjectId = 1;
 
 function isDevelopmentRuntime(): boolean {
-    if (typeof process !== "undefined" && process.env?.NODE_ENV != null) {
+    if (process?.env?.NODE_ENV !== undefined) {
         return process.env.NODE_ENV === "development";
     }
     return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
@@ -208,9 +208,8 @@ export function useMnemonicKey<T>(
     const developmentRuntime = isDevelopmentRuntime();
     const contractFingerprint = useMemo(
         () =>
-            !developmentRuntime
-                ? null
-                : buildContractFingerprint({
+            developmentRuntime
+                ? buildContractFingerprint({
                       api,
                       key,
                       defaultValue,
@@ -219,7 +218,8 @@ export function useMnemonicKey<T>(
                       reconcile,
                       listenCrossTab,
                       ssrOptions,
-                  }),
+                  })
+                : null,
         [developmentRuntime, api, key, defaultValue, codecOpt, schema, reconcile, listenCrossTab, ssrOptions],
     );
 

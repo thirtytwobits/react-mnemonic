@@ -17,7 +17,7 @@ function uniqueKeys(keys: readonly string[]): string[] {
 }
 
 function isDevelopmentRuntime(): boolean {
-    if (typeof process !== "undefined" && process.env?.NODE_ENV != null) {
+    if (process?.env?.NODE_ENV !== undefined) {
         return process.env.NODE_ENV === "development";
     }
     return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "development";
