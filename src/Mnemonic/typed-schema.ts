@@ -51,7 +51,7 @@ function cloneSchema<T>(schema: TypedJsonSchema<T>): TypedJsonSchema<T> {
     return clone;
 }
 
-function isOptionalSchema(schema: JsonSchema): boolean {
+function isOptionalSchema(schema: JsonSchema): schema is OptionalTypedJsonSchema<unknown> {
     return Boolean((schema as Record<PropertyKey, unknown>)[optionalSchemaMarker]);
 }
 
