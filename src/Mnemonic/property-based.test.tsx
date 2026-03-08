@@ -56,6 +56,7 @@ describe("property-based persistence invariants", () => {
         fc.assert(
             fc.property(fc.jsonValue(), (value) => {
                 const storage = createMockStorage();
+                const normalizedValue = JSON.parse(JSON.stringify(value)) as unknown;
                 const first = renderHook(storage, "prop-envelope", () =>
                     useMnemonicKey<unknown>("value", {
                         defaultValue: null,
@@ -81,7 +82,7 @@ describe("property-based persistence invariants", () => {
                     }),
                 );
 
-                expect(second.result.current.value).toEqual(value);
+                expect(second.result.current.value).toEqual(normalizedValue);
                 second.unmount();
             }),
             { numRuns: 50 },
