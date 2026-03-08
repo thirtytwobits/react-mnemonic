@@ -1,0 +1,21 @@
+{
+    "name": "react-mnemonic-react-ssr-fixture",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "check": "tsc --noEmit && tsx verify.tsx"
+    },
+    "dependencies": {
+        "jsdom": "^25.0.1",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@types/jsdom": "^21.1.7",
+        "@types/node": "^22.10.2",
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "tsx": "^4.20.3",
+        "typescript": "^5.7.3"
+    }
+}

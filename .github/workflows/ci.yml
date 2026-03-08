@@ -23,6 +23,8 @@ jobs:
             - run: npm run format:check
             - run: npm run build
             - run: npm run test
+            - if: matrix.node-version == 20
+              run: npm run test:consumers
 
     docs-build:
         runs-on: ubuntu-latest
