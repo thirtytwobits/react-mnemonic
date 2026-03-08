@@ -66,16 +66,17 @@ cd ..
 
 ### Library development
 
-| Command                 | Description                                   |
-| ----------------------- | --------------------------------------------- |
-| `npm run build`         | One-shot production build into `dist/`        |
-| `npm run dev`           | Watch mode — rebuilds `dist/` on file changes |
-| `npm run test`          | Run the full Vitest test suite once           |
-| `npm run test:coverage` | Run Vitest with LCOV + HTML coverage output   |
-| `npm run test:watch`    | Run Vitest in watch mode                      |
-| `npm run lint`          | Type-check with `tsc --noEmit`                |
-| `npm run format`        | Format all files with Prettier                |
-| `npm run format:check`  | Check formatting without writing              |
+| Command                  | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| `npm run build`          | One-shot production build into `dist/`          |
+| `npm run dev`            | Watch mode — rebuilds `dist/` on file changes   |
+| `npm run test`           | Run the full Vitest test suite once             |
+| `npm run test:consumers` | Pack the library and validate consumer fixtures |
+| `npm run test:coverage`  | Run Vitest with LCOV + HTML coverage output     |
+| `npm run test:watch`     | Run Vitest in watch mode                        |
+| `npm run lint`           | Type-check with `tsc --noEmit`                  |
+| `npm run format`         | Format all files with Prettier                  |
+| `npm run format:check`   | Check formatting without writing                |
 
 All commands are run from the **repository root**.
 
@@ -130,6 +131,32 @@ npm run test
 npm run test:watch
 ```
 
+### Test layers
+
+`react-mnemonic` now relies on several complementary test layers, each aimed at
+catching a different class of persistence failure:
+
+- **Unit and integration tests** exercise the everyday hook, provider, SSR,
+  schema, recovery, and devtools behavior.
+- **Property-based tests** stress invariants that should hold across many
+  generated inputs, such as JSON envelope round-trips and contiguous migration
+  chains.
+- **Malformed-envelope corpus and fuzz tests** focus on unknown or hostile
+  persisted input so the read path keeps failing closed with predictable
+  fallback behavior.
+- **Consumer compatibility fixtures** pack the built library, install it into
+  realistic consumer templates, and validate import/build/hydration behavior in
+  app-like environments.
+
+The consumer fixture runner is available as:
+
+```bash
+npm run test:consumers
+```
+
+Fixture templates live in `fixtures/consumers/` and are copied into a temporary
+directory before installation so the repo stays clean.
+
 ### Coverage
 
 ```bash
@@ -181,16 +208,18 @@ Coverage reports (HTML + LCOV) are written to `coverage/`.
 1. **Create a branch** from `main`.
 2. **Make your changes** — update source, tests, and documentation as needed.
 3. **Run tests:** `npm run test`
-4. **Type-check:** `npm run lint`
-5. **Format:** `npm run format`
-6. **Build the library:** `npm run build`
-7. **Build the docs site** (if docs changed): `npm run docs:site`
-8. **Commit** with a clear, imperative message (e.g., `Add schema migration guide`).
-9. **Open a PR** with a concise summary and testing notes.
+4. **Run consumer fixtures when packaging behavior changes:** `npm run test:consumers`
+5. **Type-check:** `npm run lint`
+6. **Format:** `npm run format`
+7. **Build the library:** `npm run build`
+8. **Build the docs site** (if docs changed): `npm run docs:site`
+9. **Commit** with a clear, imperative message (e.g., `Add schema migration guide`).
+10. **Open a PR** with a concise summary and testing notes.
 
 ### PR checklist
 
 - [ ] Tests pass (`npm run test`)
+- [ ] Consumer fixtures pass when packaging/SSR integration changes (`npm run test:consumers`)
 - [ ] Type-check passes (`npm run lint`)
 - [ ] Code is formatted (`npm run format:check`)
 - [ ] Library builds cleanly (`npm run build`)

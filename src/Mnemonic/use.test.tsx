@@ -42,55 +42,6 @@ function env(payload: string, version = 0): string {
     return JSON.stringify({ version, payload });
 }
 
-function createSeededRandom(seed: number) {
-    let state = seed >>> 0;
-    return () => {
-        state = (state * 1664525 + 1013904223) >>> 0;
-        return state / 0x100000000;
-    };
-}
-
-function buildInvalidEnvelopeFuzzCases(count: number): string[] {
-    const random = createSeededRandom(0xc0ffee);
-    const cases = new Set<string>([
-        "",
-        "not-json",
-        "{",
-        JSON.stringify(null),
-        JSON.stringify([]),
-        JSON.stringify({}),
-        JSON.stringify({ version: -1, payload: "x" }),
-        JSON.stringify({ version: 1.5, payload: "x" }),
-        JSON.stringify({ version: "1", payload: "x" }),
-        JSON.stringify({ version: 1 }),
-        JSON.stringify({ payload: "x" }),
-    ]);
-
-    const alphabet = 'abcdefghijklmnopqrstuvwxyz{}[]:,"';
-    while (cases.size < count) {
-        const mode = Math.floor(random() * 4);
-        if (mode === 0) {
-            const length = 1 + Math.floor(random() * 12);
-            let raw = "";
-            for (let index = 0; index < length; index++) {
-                raw += alphabet[Math.floor(random() * alphabet.length)] ?? "x";
-            }
-            cases.add(raw);
-            continue;
-        }
-
-        const candidate =
-            mode === 1
-                ? { version: Math.floor(random() * 5) + 0.25, payload: Math.floor(random() * 10) }
-                : mode === 2
-                  ? { version: -1 - Math.floor(random() * 5), payload: { nested: true } }
-                  : { version: Math.floor(random() * 5), extra: "missing-payload" };
-        cases.add(JSON.stringify(candidate));
-    }
-
-    return Array.from(cases);
-}
-
 const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
 const originalNodeEnv = originalProcess?.env?.NODE_ENV;
 
@@ -1178,30 +1129,5 @@ describe("useMnemonicKey – error-aware defaultValue factory", () => {
         expect(factory).toHaveBeenCalledWith(expect.any(SchemaError));
         const receivedError = factory.mock.calls[factory.mock.calls.length - 1]?.[0] as SchemaError;
         expect(receivedError.code).toBe("TYPE_MISMATCH");
-    });
-
-    it("fuzzes malformed persisted envelopes and always falls back with INVALID_ENVELOPE", () => {
-        const invalidRawValues = buildInvalidEnvelopeFuzzCases(24);
-
-        for (const [index, raw] of invalidRawValues.entries()) {
-            const localStorage = createMockStorage();
-            let receivedError: SchemaError | undefined;
-            localStorage.store.set(`ns${index}.corrupt`, raw);
-
-            const { result } = renderHook(localStorage, `ns${index}`, () =>
-                useMnemonicKey("corrupt", {
-                    defaultValue: (error) => {
-                        if (error instanceof SchemaError) {
-                            receivedError = error;
-                        }
-                        return "fallback";
-                    },
-                }),
-            );
-
-            expect(result.current.value).toBe("fallback");
-            expect(receivedError).toBeInstanceOf(SchemaError);
-            expect(receivedError?.code).toBe("INVALID_ENVELOPE");
-        }
     });
 });
