@@ -5,10 +5,10 @@ import path from "node:path";
 import {
     benchmarkDir,
     ensurePathExists,
-    fixedLibraryShortlist,
+    getFixedLibraryShortlist,
+    getSupportedLibraries,
     readJson,
     rootDir,
-    supportedLibraries,
 } from "./shared.mjs";
 
 function assert(condition, message) {
@@ -30,6 +30,8 @@ function isObject(value) {
 }
 
 export async function validateScenarioManifest(scenario) {
+    const fixedLibraryShortlist = await getFixedLibraryShortlist();
+
     assert(isNonEmptyString(scenario.id), "Scenario id must be a non-empty string");
     assert(isNonEmptyString(scenario.title), `Scenario ${scenario.id} is missing a title`);
     assert(isNonEmptyString(scenario.focus), `Scenario ${scenario.id} is missing a focus`);
@@ -106,6 +108,9 @@ export async function loadAndValidateHumanReview(reviewPath, scenarioIds) {
 }
 
 export async function validateRunManifest(manifest, scenarioMap) {
+    const fixedLibraryShortlist = await getFixedLibraryShortlist();
+    const supportedLibraries = await getSupportedLibraries();
+
     assert(isNonEmptyString(manifest.runId), "Run manifest is missing runId");
     assert(isNonEmptyString(manifest.label), `Run ${manifest.runId} is missing label`);
     assert(

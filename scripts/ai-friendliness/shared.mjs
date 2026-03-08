@@ -12,15 +12,7 @@ export const validationDir = path.join(benchmarkDir, "validation-fixtures");
 export const runDir = path.join(benchmarkDir, "runs");
 export const resultsPath = path.join(rootDir, "website", "static", "benchmarks", "ai-friendliness-results.json");
 
-export const fixedLibraryShortlist = [
-    "react-mnemonic",
-    "zustand/persist",
-    "jotai/atomWithStorage",
-    "use-local-storage-state",
-    "usehooks-ts/useLocalStorage",
-];
-
-export const supportedLibraries = [...fixedLibraryShortlist, "raw-localstorage"];
+let benchmarkMetaPromise;
 
 export function toPercent(value) {
     return Number((value * 100).toFixed(2));
@@ -36,6 +28,19 @@ export function mean(values) {
 
 export async function readJson(filePath) {
     return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+export async function loadBenchmarkMeta() {
+    benchmarkMetaPromise ??= readJson(path.join(benchmarkDir, "meta.json"));
+    return benchmarkMetaPromise;
+}
+
+export async function getFixedLibraryShortlist() {
+    return (await loadBenchmarkMeta()).fixedLibraryShortlist;
+}
+
+export async function getSupportedLibraries() {
+    return [...(await getFixedLibraryShortlist()), "raw-localstorage"];
 }
 
 export async function ensurePathExists(filePath, description) {
