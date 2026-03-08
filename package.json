@@ -22,6 +22,7 @@
     ],
     "scripts": {
         "build": "tsup",
+        "benchmarks:ai": "node ./scripts/run-ai-friendliness-benchmarks.mjs",
         "benchmarks:compare": "node ./scripts/run-comparison-benchmarks.mjs",
         "dev": "tsup --watch",
         "test": "vitest run",

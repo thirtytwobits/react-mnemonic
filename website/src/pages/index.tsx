@@ -41,9 +41,9 @@ const features: FeatureItem[] = [
             "useMnemonicKey returns { value, set, reset, remove } — the same mental model as useState, with persistence built in.",
     },
     {
-        title: "Receipts Included",
+        title: "AI-First Persistence",
         description:
-            "The docs publish a comparison guide with reproducible bundle numbers and controlled SSR/API tradeoffs against common alternatives.",
+            "The docs now include an AI-friendliness benchmark centered on one-shot persistence correctness, not just bundle size.",
     },
     {
         title: "SSR-safe by default",
@@ -92,22 +92,10 @@ function HomepageHeader() {
                     >
                         AI Contract Guide
                     </Link>
-                    <Link
-                        className={clsx("button button--outline button--lg", styles.heroOutlineButton)}
-                        to="/docs/guides/comparisons-and-benchmarks"
-                        style={{ marginLeft: "1rem" }}
-                    >
-                        Compare Approaches
-                    </Link>
                 </div>
                 <div className={styles.installSnippet}>
                     <code>npm install react-mnemonic</code>
                 </div>
-                <p style={{ marginTop: "1rem", maxWidth: "44rem" }}>
-                    Evaluating alternatives? The comparison guide publishes reproducible bundle measurements plus SSR
-                    and API tradeoff notes for <code>react-mnemonic</code>, Zustand persist, Jotai{" "}
-                    <code>atomWithStorage</code>, <code>use-local-storage-state</code>, and <code>usehooks-ts</code>.
-                </p>
             </div>
         </header>
     );
@@ -156,6 +144,18 @@ function HomepageExample() {
                             Need the deterministic implementation contract?{" "}
                             <Link to="/docs/guides/ai-contract-guide">Read the AI Contract Guide</Link>.
                         </p>
+                        <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
+                            <p style={{ marginBottom: "0.75rem" }}>
+                                Evaluating alternatives? See the comparison guide for reproducible bundle measurements
+                                and SSR/API tradeoff notes.
+                            </p>
+                            <Link
+                                className="button button--outline button--secondary button--md"
+                                to="/docs/guides/comparisons-and-benchmarks"
+                            >
+                                Compare Approaches
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -17,9 +17,10 @@ through a single hook that works like `useState`.
 
 If you are evaluating alternatives, see the
 [Comparison Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/comparisons-and-benchmarks).
-It publishes reproducible bundle measurements plus controlled SSR and API
-tradeoff notes for `react-mnemonic`, Zustand persist, Jotai
-`atomWithStorage`, `use-local-storage-state`, and `usehooks-ts`.
+It publishes reproducible bundle measurements, an AI-friendliness benchmark
+built around one-shot app-building prompts, and controlled SSR/API tradeoff
+notes for `react-mnemonic`, Zustand persist, Jotai `atomWithStorage`,
+`use-local-storage-state`, and `usehooks-ts`.
 
 ## Features
 

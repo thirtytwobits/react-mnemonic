@@ -1,0 +1,260 @@
+{
+    "generatedAt": "2026-03-08T18:26:54.985Z",
+    "benchmarkName": "One-Shot Persistence Success",
+    "assumptions": [
+        "Agent-oriented docs from docs/ai are available as canonical context.",
+        "Agent instruction packs and repo rules are present for Codex, Claude Code, Cursor, and Copilot.",
+        "llms.txt and llms-full.txt expose the same persistence guidance in compact form.",
+        "The benchmark user asks for visible product behavior, not storage mechanics."
+    ],
+    "metrics": {
+        "primary": ["oneShotPassRate", "meanFollowUpPrompts", "interventionAdjustedScore"],
+        "followUpPenalty": 12
+    },
+    "scenarios": [
+        {
+            "id": "theme-preference",
+            "title": "Persisted theme preference",
+            "focus": "durable preference plus cross-tab sync",
+            "prompt": "Build a settings panel with a light/dark theme toggle that survives reloads and stays in sync across multiple tabs."
+        },
+        {
+            "id": "saved-filters-ephemeral-search",
+            "title": "Saved filters with ephemeral search draft",
+            "focus": "persist only the durable slice",
+            "prompt": "Build a product search page with saved category filters that survive reloads, but keep the in-progress text search draft temporary."
+        },
+        {
+            "id": "nullable-nickname",
+            "title": "Clearable nullable field",
+            "focus": "null is distinct from missing",
+            "prompt": "Build a profile nickname editor where the user can intentionally clear the nickname and keep it empty across reloads."
+        },
+        {
+            "id": "wizard-draft-migration",
+            "title": "Wizard draft with schema evolution",
+            "focus": "migration vs reconcile",
+            "prompt": "Build an onboarding wizard draft that survives reloads and can upgrade old saved drafts when the step model changes."
+        },
+        {
+            "id": "ssr-theme-badge",
+            "title": "SSR theme badge",
+            "focus": "stable server output plus client hydration",
+            "prompt": "Build a server-rendered header badge that shows a stable theme placeholder on the server and then hydrates to the saved client preference after mount."
+        },
+        {
+            "id": "dismissed-banner",
+            "title": "Dismissed banner",
+            "focus": "simple durable UI state without user micromanagement",
+            "prompt": "Build a dashboard announcement banner that stays dismissed after the user closes it, even after refresh."
+        }
+    ],
+    "results": [
+        {
+            "runId": "negative-control-localstorage",
+            "label": "Naive raw-localStorage baseline",
+            "runType": "negative-control",
+            "model": "human-authored anti-pattern baseline",
+            "contextProfile": "no-mnemonic-guidance",
+            "oneShotPassRate": 0,
+            "meanFollowUpPrompts": 2.5,
+            "semanticScore": 20,
+            "interventionAdjustedScore": 4,
+            "scenarioResults": [
+                {
+                    "scenarioId": "theme-preference",
+                    "title": "Persisted theme preference",
+                    "prompt": "Build a settings panel with a light/dark theme toggle that survives reloads and stays in sync across multiple tabs.",
+                    "followUpPrompts": 2,
+                    "semanticScore": 25,
+                    "interventionAdjustedScore": 1,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "crossTab", "passed": false },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": false }
+                    ]
+                },
+                {
+                    "scenarioId": "saved-filters-ephemeral-search",
+                    "title": "Saved filters with ephemeral search draft",
+                    "prompt": "Build a product search page with saved category filters that survive reloads, but keep the in-progress text search draft temporary.",
+                    "followUpPrompts": 2,
+                    "semanticScore": 0,
+                    "interventionAdjustedScore": 0,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "durableChoice", "passed": false },
+                        { "key": "ephemeralBoundary", "passed": false },
+                        { "key": "avoidRawStorage", "passed": false }
+                    ]
+                },
+                {
+                    "scenarioId": "nullable-nickname",
+                    "title": "Clearable nullable field",
+                    "prompt": "Build a profile nickname editor where the user can intentionally clear the nickname and keep it empty across reloads.",
+                    "followUpPrompts": 3,
+                    "semanticScore": 20,
+                    "interventionAdjustedScore": 0,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "nullableSemantics", "passed": false },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": false }
+                    ]
+                },
+                {
+                    "scenarioId": "wizard-draft-migration",
+                    "title": "Wizard draft with schema evolution",
+                    "prompt": "Build an onboarding wizard draft that survives reloads and can upgrade old saved drafts when the step model changes.",
+                    "followUpPrompts": 4,
+                    "semanticScore": 20,
+                    "interventionAdjustedScore": 0,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "schemaWorkflow", "passed": false },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": false }
+                    ]
+                },
+                {
+                    "scenarioId": "ssr-theme-badge",
+                    "title": "SSR theme badge",
+                    "prompt": "Build a server-rendered header badge that shows a stable theme placeholder on the server and then hydrates to the saved client preference after mount.",
+                    "followUpPrompts": 3,
+                    "semanticScore": 20,
+                    "interventionAdjustedScore": 0,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "ssrHandling", "passed": false },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": false }
+                    ]
+                },
+                {
+                    "scenarioId": "dismissed-banner",
+                    "title": "Dismissed banner",
+                    "prompt": "Build a dashboard announcement banner that stays dismissed after the user closes it, even after refresh.",
+                    "followUpPrompts": 1,
+                    "semanticScore": 35,
+                    "interventionAdjustedScore": 23,
+                    "oneShotPass": false,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": false },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": false },
+                        { "key": "simpleRecipe", "passed": false }
+                    ]
+                }
+            ]
+        },
+        {
+            "runId": "reference-react-mnemonic",
+            "label": "Reference react-mnemonic patterns",
+            "runType": "reference",
+            "model": "human-authored reference",
+            "contextProfile": "post-issues-29-and-30",
+            "oneShotPassRate": 100,
+            "meanFollowUpPrompts": 0,
+            "semanticScore": 100,
+            "interventionAdjustedScore": 100,
+            "scenarioResults": [
+                {
+                    "scenarioId": "theme-preference",
+                    "title": "Persisted theme preference",
+                    "prompt": "Build a settings panel with a light/dark theme toggle that survives reloads and stays in sync across multiple tabs.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "crossTab", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true }
+                    ]
+                },
+                {
+                    "scenarioId": "saved-filters-ephemeral-search",
+                    "title": "Saved filters with ephemeral search draft",
+                    "prompt": "Build a product search page with saved category filters that survive reloads, but keep the in-progress text search draft temporary.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "ephemeralBoundary", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true }
+                    ]
+                },
+                {
+                    "scenarioId": "nullable-nickname",
+                    "title": "Clearable nullable field",
+                    "prompt": "Build a profile nickname editor where the user can intentionally clear the nickname and keep it empty across reloads.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "nullableSemantics", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true }
+                    ]
+                },
+                {
+                    "scenarioId": "wizard-draft-migration",
+                    "title": "Wizard draft with schema evolution",
+                    "prompt": "Build an onboarding wizard draft that survives reloads and can upgrade old saved drafts when the step model changes.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "schemaWorkflow", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true }
+                    ]
+                },
+                {
+                    "scenarioId": "ssr-theme-badge",
+                    "title": "SSR theme badge",
+                    "prompt": "Build a server-rendered header badge that shows a stable theme placeholder on the server and then hydrates to the saved client preference after mount.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "ssrHandling", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true }
+                    ]
+                },
+                {
+                    "scenarioId": "dismissed-banner",
+                    "title": "Dismissed banner",
+                    "prompt": "Build a dashboard announcement banner that stays dismissed after the user closes it, even after refresh.",
+                    "followUpPrompts": 0,
+                    "semanticScore": 100,
+                    "interventionAdjustedScore": 100,
+                    "oneShotPass": true,
+                    "checks": [
+                        { "key": "mnemonicUsage", "passed": true },
+                        { "key": "durableChoice", "passed": true },
+                        { "key": "avoidRawStorage", "passed": true },
+                        { "key": "simpleRecipe", "passed": true }
+                    ]
+                }
+            ]
+        }
+    ]
+}

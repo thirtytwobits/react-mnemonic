@@ -5,12 +5,16 @@ description: Reproducible bundle measurements and controlled comparison notes fo
 ---
 
 import report from "@site/static/benchmarks/comparison-results.json";
+import aiReport from "@site/static/benchmarks/ai-friendliness-results.json";
 
 export const commonBenchmarks = [...report.benchmarks]
     .filter((benchmark) => benchmark.category === "common-task")
     .sort((left, right) => left.gzipBytes - right.gzipBytes);
 
 export const advancedBenchmarks = report.benchmarks.filter((benchmark) => benchmark.category === "advanced-task");
+export const aiResults = [...aiReport.results].sort(
+    (left, right) => right.interventionAdjustedScore - left.interventionAdjustedScore,
+);
 
 # Comparisons and Benchmarks
 
@@ -20,6 +24,74 @@ This page is the "show your work" companion to the homepage copy.
 but that explicitness has real tradeoffs. The goal here is not to "win" every
 category. The goal is to publish fair, reproducible receipts so people can
 choose the right tool for their app.
+
+## AI friendliness benchmark
+
+For `react-mnemonic`, the most important benchmark is not bundle size. It is:
+
+- can an AI choose persistence without being told to reach for raw
+  `localStorage`?
+- can it persist the right state and leave ephemeral UI state alone?
+- can it select SSR, nullable, and migration semantics correctly without extra
+  user steering?
+
+To measure that, the repo now includes an AI-friendliness benchmark under
+`benchmarks/ai-friendliness/`. It is built around "golden prompts" for common
+app-building tasks and scores:
+
+- `oneShotPassRate`
+- `meanFollowUpPrompts`
+- `semanticScore`
+- `interventionAdjustedScore`
+
+The benchmark assumes the agent-facing surfaces from issues #29 and #30 are
+available: canonical `docs/ai/` content, instruction packs, `llms.txt`
+exports, and prompt guardrails.
+
+### Scorer validation runs
+
+The included report below validates the benchmark harness with two extremes:
+
+- a reference `react-mnemonic` implementation for each scenario
+- a naive raw-`localStorage` negative control
+
+These are not claims about a specific model. They prove the benchmark can
+separate the behavior we want from the behavior we do not want.
+
+<table>
+    <thead>
+        <tr>
+            <th>Run</th>
+            <th>Type</th>
+            <th>One-shot pass rate</th>
+            <th>Mean follow-ups</th>
+            <th>Semantic score</th>
+            <th>Adjusted score</th>
+        </tr>
+    </thead>
+    <tbody>
+        {aiResults.map((result) => (
+            <tr key={result.runId}>
+                <td>{result.label}</td>
+                <td>{result.runType}</td>
+                <td>{result.oneShotPassRate}%</td>
+                <td>{result.meanFollowUpPrompts}</td>
+                <td>{result.semanticScore}</td>
+                <td>{result.interventionAdjustedScore}</td>
+            </tr>
+        ))}
+    </tbody>
+</table>
+
+### Why this matters more than bundle size
+
+- A smaller persistence hook is not automatically easier for an agent to use
+  correctly in a real app-building task.
+- `react-mnemonic` is intentionally optimizing for the path where a user says
+  "build the UI" and the agent still chooses durable state, SSR options, and
+  migration hooks correctly.
+- The benchmark is designed so real model runs can be added later without
+  changing the scoring method.
 
 ## What this compares
 
@@ -55,6 +127,10 @@ npm run benchmarks:compare
 
 <div key={caveat}>- {caveat}</div>
 ))}
+
+- The AI-friendliness benchmark currently ships with scorer-validation runs
+  only. Plugging in actual model transcripts or generated submissions is the
+  next step, not something this page is pretending has already happened.
 
 ## Bundle Footprint
 

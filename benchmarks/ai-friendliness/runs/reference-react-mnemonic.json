@@ -1,0 +1,39 @@
+{
+    "runId": "reference-react-mnemonic",
+    "label": "Reference react-mnemonic patterns",
+    "runType": "reference",
+    "model": "human-authored reference",
+    "contextProfile": "post-issues-29-and-30",
+    "runs": [
+        {
+            "scenarioId": "theme-preference",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/theme-preference"
+        },
+        {
+            "scenarioId": "saved-filters-ephemeral-search",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/saved-filters-ephemeral-search"
+        },
+        {
+            "scenarioId": "nullable-nickname",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/nullable-nickname"
+        },
+        {
+            "scenarioId": "wizard-draft-migration",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/wizard-draft-migration"
+        },
+        {
+            "scenarioId": "ssr-theme-badge",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/ssr-theme-badge"
+        },
+        {
+            "scenarioId": "dismissed-banner",
+            "followUpPrompts": 0,
+            "submissionDir": "benchmarks/ai-friendliness/fixtures/reference/dismissed-banner"
+        }
+    ]
+}

@@ -1,0 +1,88 @@
+{
+    "benchmarkVersion": 1,
+    "benchmarkName": "One-Shot Persistence Success",
+    "assumptions": [
+        "Agent-oriented docs from docs/ai are available as canonical context.",
+        "Agent instruction packs and repo rules are present for Codex, Claude Code, Cursor, and Copilot.",
+        "llms.txt and llms-full.txt expose the same persistence guidance in compact form.",
+        "The benchmark user asks for visible product behavior, not storage mechanics."
+    ],
+    "metrics": {
+        "primary": ["oneShotPassRate", "meanFollowUpPrompts", "interventionAdjustedScore"],
+        "followUpPenalty": 12
+    },
+    "scenarios": [
+        {
+            "id": "theme-preference",
+            "title": "Persisted theme preference",
+            "focus": "durable preference plus cross-tab sync",
+            "prompt": "Build a settings panel with a light/dark theme toggle that survives reloads and stays in sync across multiple tabs.",
+            "weights": {
+                "mnemonicUsage": 25,
+                "crossTab": 25,
+                "durableChoice": 25,
+                "avoidRawStorage": 25
+            }
+        },
+        {
+            "id": "saved-filters-ephemeral-search",
+            "title": "Saved filters with ephemeral search draft",
+            "focus": "persist only the durable slice",
+            "prompt": "Build a product search page with saved category filters that survive reloads, but keep the in-progress text search draft temporary.",
+            "weights": {
+                "mnemonicUsage": 20,
+                "durableChoice": 30,
+                "ephemeralBoundary": 30,
+                "avoidRawStorage": 20
+            }
+        },
+        {
+            "id": "nullable-nickname",
+            "title": "Clearable nullable field",
+            "focus": "null is distinct from missing",
+            "prompt": "Build a profile nickname editor where the user can intentionally clear the nickname and keep it empty across reloads.",
+            "weights": {
+                "mnemonicUsage": 20,
+                "nullableSemantics": 40,
+                "durableChoice": 20,
+                "avoidRawStorage": 20
+            }
+        },
+        {
+            "id": "wizard-draft-migration",
+            "title": "Wizard draft with schema evolution",
+            "focus": "migration vs reconcile",
+            "prompt": "Build an onboarding wizard draft that survives reloads and can upgrade old saved drafts when the step model changes.",
+            "weights": {
+                "mnemonicUsage": 15,
+                "schemaWorkflow": 45,
+                "durableChoice": 20,
+                "avoidRawStorage": 20
+            }
+        },
+        {
+            "id": "ssr-theme-badge",
+            "title": "SSR theme badge",
+            "focus": "stable server output plus client hydration",
+            "prompt": "Build a server-rendered header badge that shows a stable theme placeholder on the server and then hydrates to the saved client preference after mount.",
+            "weights": {
+                "mnemonicUsage": 20,
+                "ssrHandling": 40,
+                "durableChoice": 20,
+                "avoidRawStorage": 20
+            }
+        },
+        {
+            "id": "dismissed-banner",
+            "title": "Dismissed banner",
+            "focus": "simple durable UI state without user micromanagement",
+            "prompt": "Build a dashboard announcement banner that stays dismissed after the user closes it, even after refresh.",
+            "weights": {
+                "mnemonicUsage": 25,
+                "durableChoice": 35,
+                "avoidRawStorage": 20,
+                "simpleRecipe": 20
+            }
+        }
+    ]
+}
