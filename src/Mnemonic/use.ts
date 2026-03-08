@@ -590,7 +590,7 @@ export function useMnemonicKey<T>(
     );
 
     const decoded = useMemo(() => {
-        if (raw != null && raw.startsWith(SSR_SNAPSHOT_PREFIX)) {
+        if (raw?.startsWith(SSR_SNAPSHOT_PREFIX)) {
             const serverDecoded = decodeForRead(raw.slice(SSR_SNAPSHOT_PREFIX.length));
             return {
                 value: serverDecoded.value,
