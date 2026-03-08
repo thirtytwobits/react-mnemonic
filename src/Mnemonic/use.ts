@@ -24,7 +24,7 @@ import type {
     MnemonicKeyDescriptor,
 } from "./types";
 
-const SSR_SNAPSHOT_PREFIX = "\u0000mnemonic:ssr:";
+const SSR_SNAPSHOT_TOKEN = Symbol("mnemonic:ssr-snapshot");
 
 function resolveMnemonicKeyArgs<T>(
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
@@ -543,7 +543,8 @@ export function useMnemonicKey<T>(
      * This ensures efficient, tearing-free updates when storage changes.
      */
     const getServerRawSnapshot = useCallback(
-        (): string | null => (ssrOptions?.serverValue === undefined ? null : SSR_SNAPSHOT_PREFIX),
+        (): string | typeof SSR_SNAPSHOT_TOKEN | null =>
+            ssrOptions?.serverValue === undefined ? null : SSR_SNAPSHOT_TOKEN,
         [ssrOptions?.serverValue],
     );
 
@@ -565,7 +566,7 @@ export function useMnemonicKey<T>(
     );
 
     const decoded = useMemo(() => {
-        if (raw === SSR_SNAPSHOT_PREFIX) {
+        if (raw === SSR_SNAPSHOT_TOKEN) {
             return {
                 value: getServerValue(),
                 rewriteRaw: undefined,

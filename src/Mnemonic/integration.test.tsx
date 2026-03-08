@@ -376,6 +376,28 @@ describe("SSR hydration contract", () => {
         expect(container.textContent).toContain("dark");
     });
 
+    it("does not confuse a raw storage string with the SSR snapshot token", () => {
+        storage.store.set("ns.theme", "\u0000mnemonic:ssr:");
+
+        function Theme() {
+            const { value } = useMnemonicKey("theme", {
+                defaultValue: "light" as "light" | "dark" | "system",
+                ssr: {
+                    serverValue: "system",
+                },
+            });
+            return <span>{value}</span>;
+        }
+
+        const { container } = render(
+            <MnemonicProvider namespace="ns" storage={storage}>
+                <Theme />
+            </MnemonicProvider>,
+        );
+
+        expect(container.textContent).toContain("light");
+    });
+
     it("hook-level client-only hydration defers storage reads until after mount", async () => {
         const reads: string[] = [];
         const trackedStorage: StorageLike & { store: Map<string, string> } = {
