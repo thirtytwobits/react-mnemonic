@@ -52,7 +52,7 @@ function warnOnce(api: object, id: string, message: string): void {
 
 function stableDiagnosticValue(value: unknown): string {
     if (typeof value === "function") {
-        const source = Function.prototype.toString.call(value).replace(/\s+/g, " ").trim();
+        const source = Function.prototype.toString.call(value).split(/\s+/).join(" ").trim();
         const name = value.name || "anonymous";
         return `[factory:${name}/${value.length}:${source}]`;
     }
@@ -682,7 +682,7 @@ export function useMnemonicKey<T>(
     useEffect(() => {
         if (!isDevelopmentRuntime()) return;
 
-        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && typeof globalThis.window !== "undefined") {
+        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && globalThis.window !== undefined) {
             warnOnce(
                 api,
                 `listenCrossTab:${key}`,
