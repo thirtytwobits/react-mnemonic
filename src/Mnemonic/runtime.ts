@@ -3,8 +3,6 @@
 
 import type { StorageLike } from "./types";
 
-declare const process: { env?: { NODE_ENV?: string } } | undefined;
-
 type RuntimeProcess = { env?: { NODE_ENV?: string } };
 
 function getGlobalProcess(): RuntimeProcess | undefined {

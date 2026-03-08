@@ -216,7 +216,18 @@ export function useMnemonicKey<T>(
                       ssrOptions,
                   })
                 : null,
-        [developmentRuntime, api, key, defaultValue, codecOpt, schema, reconcile, listenCrossTab, ssrOptions],
+        [
+            developmentRuntime,
+            api,
+            key,
+            defaultValue,
+            codecOpt,
+            schema?.version,
+            reconcile,
+            listenCrossTab,
+            ssrOptions?.hydration,
+            ssrOptions?.serverValue,
+        ],
     );
 
     /**
