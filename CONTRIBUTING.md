@@ -293,13 +293,13 @@ Runs on push to `main`:
 
 ### Releases (`release.yml`)
 
-Triggered by tagged releases matching `v*` (for example `v1.0.0-beta.0` or
-`v1.0.0`):
+Triggered by tagged releases matching `v*` (for example `v1.1.0-beta0` or
+`v1.1.0`):
 
 - Type-checks and format-checks the code
 - Builds and tests the library
 - Generates the API docs and builds the docs site
-- Publishes beta prereleases to the npm `beta` tag and stable releases to `latest`
+- Publishes every tagged release to the npm `latest` dist-tag
 - Uses npm trusted publishing via GitHub OIDC instead of a long-lived publish token
 - Includes npm provenance attestation
 

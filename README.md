@@ -13,7 +13,9 @@ Persistent, type-safe state management for React.
 page refreshes, synchronize across tabs, and stay type-safe end-to-end -- all
 through a single hook that works like `useState`.
 
-`1.0.0` is currently being shipped as a beta on the npm `beta` dist-tag. We are working on large changes as part of the beta1 milestone and expect beta 1 to then receive only fixes and polish ahead of the first production release.
+`1.1.0-beta0` is the current prerelease on the npm `latest` dist-tag. This minor
+`beta0` cut lands ahead of the `beta1` stabilization milestone, which is
+expected to receive only fixes and polish before the first production release.
 
 If you are evaluating alternatives, see the
 [Comparison Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/comparisons-and-benchmarks).
@@ -44,15 +46,15 @@ notes for `react-mnemonic`, Zustand persist, Jotai `atomWithStorage`,
 ## Installation
 
 ```bash
-npm install react-mnemonic@beta
+npm install react-mnemonic
 ```
 
 ```bash
-yarn add react-mnemonic@beta
+yarn add react-mnemonic
 ```
 
 ```bash
-pnpm add react-mnemonic@beta
+pnpm add react-mnemonic
 ```
 
 ### Peer dependencies

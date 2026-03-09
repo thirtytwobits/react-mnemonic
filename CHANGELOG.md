@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
-## [1.0.0-beta.0] - Unreleased
+## [1.1.0-beta0] - Unreleased
 
 ### Added
 
@@ -19,5 +19,5 @@ Versioning.
 
 ### Changed
 
-- Release automation now selects the npm dist-tag from the package version and validates docs in CI
+- Release automation now publishes tagged releases to the npm `latest` dist-tag and validates docs in CI
 - Public documentation now reflects the current DevTools registry contract
