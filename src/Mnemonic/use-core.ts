@@ -391,7 +391,9 @@ export function useMnemonicKey<T>(
     useEffect(() => {
         if (!developmentRuntime) return;
 
-        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && globalThis.window !== undefined) {
+        const globalWindow = (globalThis as { window?: Window }).window;
+
+        if (listenCrossTab && (api.crossTabSyncMode ?? "none") === "none" && globalWindow !== undefined) {
             warnOnce(
                 api,
                 `listenCrossTab:${key}`,

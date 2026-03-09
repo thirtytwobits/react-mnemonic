@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
-export { MnemonicProvider, type MnemonicProviderProps } from "./Mnemonic/provider";
+export { MnemonicProvider, type MnemonicProviderOptions, type MnemonicProviderProps } from "./Mnemonic/provider-core";
 export { useMnemonicKey } from "./Mnemonic/use-core";
 export { useMnemonicRecovery } from "./Mnemonic/recovery";
 export { defineMnemonicKey } from "./Mnemonic/key";
@@ -16,7 +16,6 @@ export type {
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,
     MnemonicRecoveryHook,
-    MnemonicProviderOptions,
     UseMnemonicKeyOptions,
     UseMnemonicRecoveryOptions,
     ReconcileContext,

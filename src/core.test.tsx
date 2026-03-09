@@ -79,6 +79,24 @@ describe("react-mnemonic/core", () => {
 
         spy.mockRestore();
     });
+
+    it("rejects schema provider props from the core entrypoint", () => {
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const unsafeProps = {
+            namespace: "core",
+            schemaMode: "strict",
+        } as unknown as ComponentProps<typeof MnemonicProvider>;
+
+        expect(() =>
+            render(
+                <MnemonicProvider {...unsafeProps}>
+                    <div />
+                </MnemonicProvider>,
+            ),
+        ).toThrow(/react-mnemonic\/core/);
+
+        spy.mockRestore();
+    });
 });
 
 function SchemaConsumer() {
