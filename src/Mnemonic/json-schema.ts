@@ -126,6 +126,25 @@ function matchesType(value: unknown, type: JsonSchemaType): boolean {
  * Structural deep equality for JSON values (null, booleans, numbers, strings,
  * arrays, and plain objects). Used by `enum` and `const` keywords.
  */
+function jsonDeepEqualArray(a: readonly unknown[], b: readonly unknown[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (!jsonDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+}
+
+function jsonDeepEqualObject(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+        if (!objectHasOwn(b, key)) return false;
+        if (!jsonDeepEqual(a[key], b[key])) return false;
+    }
+    return true;
+}
+
 export function jsonDeepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (a === null || b === null) return false;
@@ -133,25 +152,12 @@ export function jsonDeepEqual(a: unknown, b: unknown): boolean {
 
     if (Array.isArray(a)) {
         if (!Array.isArray(b)) return false;
-        if (a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) {
-            if (!jsonDeepEqual(a[i], b[i])) return false;
-        }
-        return true;
+        return jsonDeepEqualArray(a, b);
     }
 
     if (typeof a === "object") {
         if (Array.isArray(b)) return false;
-        const aObj = a as Record<string, unknown>;
-        const bObj = b as Record<string, unknown>;
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
-        if (aKeys.length !== bKeys.length) return false;
-        for (const key of aKeys) {
-            if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-            if (!jsonDeepEqual(aObj[key], bObj[key])) return false;
-        }
-        return true;
+        return jsonDeepEqualObject(a as Record<string, unknown>, b as Record<string, unknown>);
     }
 
     return false;
@@ -563,7 +569,7 @@ export function inferJsonSchema(sample: unknown): JsonSchema {
         case "string":
             return { type: "string" };
         case "number":
-            return Number.isInteger(sample) ? { type: "number" } : { type: "number" };
+            return { type: "number" };
         case "boolean":
             return { type: "boolean" };
         case "object":

@@ -397,14 +397,12 @@ export function useMnemonicKey<T>(
     const resolveTargetWriteSchema = useCallback((): KeySchema | undefined => {
         const explicitVersion = schema?.version;
         const latestSchema = getLatestSchemaForKey();
-        const explicitSchema = explicitVersion !== undefined ? getSchemaForVersion(explicitVersion) : undefined;
-        if (explicitSchema) {
-            return explicitSchema;
-        }
-        if (explicitVersion !== undefined) {
-            return schemaMode === "strict" ? undefined : latestSchema;
-        }
-        return latestSchema;
+        if (explicitVersion === undefined) return latestSchema;
+
+        const explicitSchema = getSchemaForVersion(explicitVersion);
+        if (explicitSchema) return explicitSchema;
+
+        return schemaMode === "strict" ? undefined : latestSchema;
     }, [getLatestSchemaForKey, getSchemaForVersion, schema?.version, schemaMode]);
 
     const encodeForWrite = useCallback(
@@ -849,7 +847,8 @@ export function useMnemonicKey<T>(
      */
     useEffect(() => {
         if (!listenCrossTab) return;
-        if (typeof window === "undefined") return;
+        const globalWindow = (globalThis as { window?: Window }).window;
+        if (globalWindow === undefined) return;
 
         const storageKey = api.prefix + key;
 
@@ -868,8 +867,8 @@ export function useMnemonicKey<T>(
             api.setRaw(key, e.newValue);
         };
 
-        window.addEventListener("storage", handler);
-        return () => window.removeEventListener("storage", handler);
+        globalWindow.addEventListener("storage", handler);
+        return () => globalWindow.removeEventListener("storage", handler);
     }, [listenCrossTab, api, key]);
 
     /**
