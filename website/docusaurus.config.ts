@@ -114,6 +114,7 @@ const config: Config = {
                     title: "Docs",
                     items: [
                         { label: "Getting Started", to: "/docs/getting-started/installation" },
+                        { label: "AI Docs", to: "/docs/ai" },
                         { label: "Guides", to: "/docs/guides/schema-modes" },
                         { label: "API Reference", to: "/docs/api" },
                     ],

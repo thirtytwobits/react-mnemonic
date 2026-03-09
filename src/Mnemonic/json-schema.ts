@@ -211,8 +211,7 @@ function objectHasOwn(value: object, property: PropertyKey): boolean {
     if (typeof hasOwn === "function") {
         return hasOwn(value, property);
     }
-    const fallbackHasOwn = Object.prototype.hasOwnProperty;
-    return fallbackHasOwn.call(value, property);
+    return Object.getOwnPropertyDescriptor(value, property) !== undefined;
 }
 
 /**

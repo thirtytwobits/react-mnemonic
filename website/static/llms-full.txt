@@ -1,0 +1,683 @@
+# react-mnemonic
+> Long-form AI retrieval export for the canonical react-mnemonic documentation.
+
+## Canonical source pages
+
+- AI Overview: https://thirtytwobits.github.io/react-mnemonic/docs/ai
+- Invariants: https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants
+- Decision Matrix: https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix
+- Recipes: https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes
+- Anti-Patterns: https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns
+- AI Assistant Setup: https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup
+
+## Machine-readable companion
+
+- https://thirtytwobits.github.io/react-mnemonic/ai-contract.json
+- https://thirtytwobits.github.io/react-mnemonic/llms.txt
+
+## Quick rules
+
+- `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Persisted keys are stored as `${namespace}.${key}`.
+- `defaultValue` is required and is the fallback for absent or invalid values.
+- `set(next)` persists a value, `reset()` persists `defaultValue`, and `remove()` deletes the key.
+- Use `set(null)` when a cleared state must survive reload.
+- SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.
+- Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.
+- `StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.
+- Import published values and types from `react-mnemonic`; do not invent local ambient shims.
+
+## AI Overview
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai
+
+# AI Overview
+
+This section is the authoritative, high-signal contract for humans and coding
+assistants using `react-mnemonic`.
+
+Use it when you need:
+
+- persistent-state semantics without reading the whole repo
+- a reliable rule for `set(...)`, `set(null)`, `remove()`, and `reset()`
+- the shortest correct explanation of SSR, migrations, `reconcile(...)`, and storage adapters
+- copy-pastable patterns that stay aligned with the public API
+
+## Start Here
+
+Read these pages in order when context is tight:
+
+1. [Invariants](https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants)
+2. [Decision Matrix](https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix)
+3. [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes)
+4. [Anti-Patterns](https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns)
+5. [AI Assistant Setup](https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup)
+
+## Quick Rules
+
+- `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Every stored key is namespaced as `${namespace}.${key}` in the underlying storage backend.
+- `defaultValue` is required and defines the fallback when a key is absent or invalid.
+- `set(next)` persists a new value for the key.
+- `reset()` persists `defaultValue` again.
+- `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
+- Use `set(null)` when "cleared" is a durable state that must survive reload.
+- SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
+- Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
+- `StorageLike` is intentionally synchronous in beta 1.
+- Consumer code should import published values and types from `react-mnemonic`, not internal paths or local ambient shims.
+
+## Canonical Retrieval Surfaces
+
+These AI-oriented surfaces are intentionally layered:
+
+- `/docs/ai/*` is the canonical prose source.
+- [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) is the compact retrieval index.
+- [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) is the long-form export for indexing or prompt stuffing.
+- [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) is the compact machine-readable contract.
+- [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) steers DeepWiki toward the highest-signal files.
+
+## What To Read In Code
+
+When prose is not enough, these source files define the runtime contract:
+
+- [`src/Mnemonic/use.ts`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/use.ts) for read/write lifecycle and hook semantics
+- [`src/Mnemonic/provider.tsx`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/provider.tsx) for namespaces, storage adapters, cross-tab sync, and SSR defaults
+- [`src/Mnemonic/types.ts`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/types.ts) for public types, `StorageLike`, schema modes, and SSR options
+- [`src/index.ts`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/index.ts) for the published public surface
+
+## High-Risk Areas
+
+These are the places where agents are most likely to be "almost right" while
+still shipping incorrect persistence behavior:
+
+- treating `remove()` as if it means "clear but remember the cleared state"
+- persisting runtime-only UI state such as loading flags, hover state, or validation errors
+- using `reconcile(...)` to paper over a real versioned schema change
+- assuming async storage adapters are supported directly
+- reading browser storage during SSR without an explicit hydration strategy
+
+If the task involves any of those areas, go straight to the linked AI pages
+instead of extrapolating from a single example.
+
+## Invariants
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants
+
+# Invariants
+
+This page is the shortest authoritative statement of what `react-mnemonic`
+guarantees.
+
+## Core Runtime Invariants
+
+- `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Every persisted key is stored as `${namespace}.${key}` in the underlying backend.
+- `defaultValue` is required and defines the fallback when a key is absent, malformed, or rejected by validation.
+- `set(next)` persists the next value for the key.
+- `reset()` persists `defaultValue` again.
+- `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
+- `listenCrossTab` is advisory. Native browser storage uses the `storage` event; custom adapters must implement `storage.onExternalChange(...)` for equivalent behavior.
+- `StorageLike` is synchronous. Returning a Promise from `getItem`, `setItem`, or `removeItem` is an invalid contract.
+- SSR defaults to `defaultValue` on the server unless `ssr.serverValue` is supplied.
+- `reconcile(...)` runs after decode and migration. If it returns a different persisted result, the library rewrites storage with that reconciled value.
+- Schema migrations handle structural version-to-version upgrades. `reconcile(...)` handles conditional read-time policy updates inside an already valid shape.
+
+## Type Sourcing Rules
+
+- Import values from `react-mnemonic`, not internal package paths.
+- Import exported types from `react-mnemonic` with `import type`.
+- Do not create local `react-mnemonic.d.ts` files.
+- Do not write `declare module "react-mnemonic"` in consumer code.
+- If a type seems missing, check `src/index.ts`, `package.json`, and the API docs before inventing a replacement contract.
+
+## Exact Read Lifecycle
+
+Normal client reads follow this order:
+
+1. Load the raw snapshot for the key from the provider cache and storage layer.
+2. If the raw value is absent, use `defaultValue`.
+3. Parse the versioned envelope.
+4. Decode the payload through the codec path or schema-managed JSON path.
+5. Validate against the stored schema version when a schema exists.
+6. Run schema migrations when the stored version is older than the latest registered version.
+7. Run `reconcile(...)` if provided.
+8. If migration, autoschema inference, or reconciliation changed the persisted representation, schedule a rewrite back to storage.
+9. If any read path is invalid, fall back to `defaultValue` and pass the relevant error to a fallback factory when applicable.
+
+SSR and hydration add one rule before the normal read path:
+
+1. On the server, the hook uses the SSR snapshot instead of reading browser storage.
+2. Without explicit SSR config, that snapshot renders `defaultValue`.
+3. With `ssr.serverValue`, that snapshot renders the provided placeholder.
+4. With `hydration: "client-only"`, persisted storage is not read until after mount.
+
+## Exact Write Lifecycle
+
+Writes follow this order:
+
+1. Resolve the next value directly or by calling the updater with the current decoded value.
+2. Choose the write path:
+    - schema-managed latest version by default
+    - explicit pinned schema version when configured
+    - codec-only v0 envelope when no schema applies
+3. Run a write-time migration when a registry rule has `fromVersion === toVersion`.
+4. Validate the value against the target schema when schema-managed.
+5. Encode the versioned envelope.
+6. Write the raw string through the provider cache and storage layer.
+7. Notify subscribers for the key.
+
+## Storage Adapter Boundaries
+
+Custom storage adapters are supported, but the contract is intentionally
+strict:
+
+- The adapter must be synchronous.
+- The adapter must expose `getItem`, `setItem`, and `removeItem`.
+- `key(index)` and `length` are optional and are only needed for enumeration-style features.
+- Cross-tab or external-process sync is not automatic for custom adapters. Add `onExternalChange(...)` when your backend can detect out-of-band writes.
+- If you wrap `localStorage`, preserve the native `storage` event semantics or implement `onExternalChange(...)` yourself.
+
+## Source Files
+
+- [`src/Mnemonic/use.ts`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/use.ts)
+- [`src/Mnemonic/provider.tsx`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/provider.tsx)
+- [`src/Mnemonic/types.ts`](https://github.com/thirtytwobits/react-mnemonic/blob/main/src/Mnemonic/types.ts)
+
+## Decision Matrix
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix
+
+# Decision Matrix
+
+Use these tables when the code is "almost obvious" but one wrong persistence
+choice would change user behavior after reload.
+
+## `set(null)` vs `remove()` vs `reset()`
+
+| Need                                  | Action      | Result after reload          |
+| ------------------------------------- | ----------- | ---------------------------- |
+| Keep an explicit "cleared" state      | `set(null)` | Still cleared                |
+| Forget the key entirely               | `remove()`  | Falls back to `defaultValue` |
+| Restore the default as a stored value | `reset()`   | Rehydrates `defaultValue`    |
+
+Rule of thumb:
+
+- Use `set(null)` for durable clear intent.
+- Use `remove()` for absence.
+- Use `reset()` when the default itself should become the new persisted value.
+
+## Migration vs `reconcile(...)`
+
+| Situation                                                     | Use                                                | Why                                                           |
+| ------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| Stored shape changed between explicit versions                | Schema migration                                   | Structural compatibility belongs to version transitions       |
+| Every write should normalize the value                        | Write-time migration (`fromVersion === toVersion`) | Keeps writes canonical                                        |
+| Existing shape is fine, but defaults or policy should refresh | `reconcile(...)`                                   | Conditional read-time rewrite without inventing a new version |
+| Invalid or stale data should be discarded                     | Recovery or reset flow                             | Safer than forcing a questionable transform                   |
+
+## Should This State Persist?
+
+| State shape                                   | Persist?    | Why                                          |
+| --------------------------------------------- | ----------- | -------------------------------------------- |
+| Theme, density, durable layout preference     | Yes         | Users expect it after reload                 |
+| Saved filters users intentionally restore     | Yes         | This is durable preference state             |
+| User-authored draft content                   | Usually yes | Lost work is expensive                       |
+| Hover, focus, drag, loading, optimistic flags | No          | Rehydrating runtime-only UI feels wrong      |
+| Temporary dirtiness and validation errors     | No          | These describe a session, not durable intent |
+| Server response cache timestamps              | Usually no  | Prefer cache logic over UI persistence       |
+
+## SSR Mode Choice
+
+| Need                                     | Config                                                |
+| ---------------------------------------- | ----------------------------------------------------- |
+| Default SSR behavior                     | No SSR config                                         |
+| Deterministic server placeholder         | `ssr.serverValue`                                     |
+| Delay persisted read until after mount   | `ssr.hydration: "client-only"`                        |
+| Make every key inherit delayed hydration | `MnemonicProvider ssr={{ hydration: "client-only" }}` |
+
+## Storage Adapter Choice
+
+| Need                                                | Recommended path                          |
+| --------------------------------------------------- | ----------------------------------------- |
+| Standard browser persistence                        | Default provider storage (`localStorage`) |
+| Per-tab persistence                                 | `storage={window.sessionStorage}`         |
+| Custom backend with synchronous facade              | Provide a `StorageLike` wrapper           |
+| Cross-tab sync on a custom backend                  | Implement `storage.onExternalChange(...)` |
+| Direct async reads or writes from the hook contract | Not supported in beta 1                   |
+
+## Recipes
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes
+
+# Recipes
+
+These recipes are intentionally compact and focus on durable state choices that
+agents often get wrong under time pressure.
+
+## 1. Theme Preference With Cross-Tab Sync
+
+```tsx
+import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+
+export const themeKey = defineMnemonicKey("theme", {
+    defaultValue: "light" as "light" | "dark",
+    listenCrossTab: true,
+});
+
+export function ThemeToggle() {
+    const { value: theme, set } = useMnemonicKey(themeKey);
+
+    return <button onClick={() => set(theme === "light" ? "dark" : "light")}>Theme: {theme}</button>;
+}
+```
+
+Use when:
+
+- the value should survive reload
+- multiple components should share one contract
+- other tabs should stay in sync
+
+## 2. Saved Filters With Durable Clear Intent
+
+```tsx
+import { useMnemonicKey } from "react-mnemonic";
+
+type Filters = {
+    status: "all" | "open" | "closed";
+    assignee: string | null;
+};
+
+export function FilterBar() {
+    const {
+        value: filters,
+        set,
+        reset,
+        remove,
+    } = useMnemonicKey<Filters>("issue-filters", {
+        defaultValue: {
+            status: "all",
+            assignee: null,
+        },
+    });
+
+    return (
+        <>
+            <button onClick={() => set((prev) => ({ ...prev, status: "open" }))}>Open only</button>
+            <button onClick={() => set((prev) => ({ ...prev, assignee: null }))}>Clear assignee</button>
+            <button onClick={() => reset()}>Restore default filters</button>
+            <button onClick={() => remove()}>Forget filter history</button>
+            <pre>{JSON.stringify(filters, null, 2)}</pre>
+        </>
+    );
+}
+```
+
+Use `null` inside the persisted object when "cleared" should survive reload.
+
+## 3. Dismissible Announcement UI
+
+```tsx
+import { useMnemonicKey } from "react-mnemonic";
+
+export function ReleaseBanner() {
+    const {
+        value: dismissed,
+        set,
+        remove,
+    } = useMnemonicKey("release-banner-dismissed", {
+        defaultValue: false,
+    });
+
+    if (dismissed) {
+        return <button onClick={() => remove()}>Show banner again</button>;
+    }
+
+    return (
+        <div>
+            <p>We shipped a new migration helper.</p>
+            <button onClick={() => set(true)}>Dismiss</button>
+        </div>
+    );
+}
+```
+
+Use `set(true)` when the dismissal itself is the durable user preference. Use
+`remove()` only when you want to forget that dismissal and return to first-load
+defaults.
+
+## 4. Durable Draft Content With Ephemeral Form Metadata
+
+```tsx
+import { useState } from "react";
+import { useMnemonicKey } from "react-mnemonic";
+
+export function DraftEditor() {
+    const {
+        value: body,
+        set,
+        remove,
+    } = useMnemonicKey("compose-draft", {
+        defaultValue: "",
+    });
+    const [isDirty, setIsDirty] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
+
+    return (
+        <>
+            <textarea
+                value={body}
+                onChange={(event) => {
+                    const next = event.target.value;
+                    set(next);
+                    setIsDirty(true);
+                    setValidationError(next.length > 500 ? "Draft is too long" : null);
+                }}
+            />
+            <button onClick={() => remove()}>Discard draft</button>
+            <p>Dirty: {String(isDirty)}</p>
+            <p>Error: {validationError ?? "none"}</p>
+        </>
+    );
+}
+```
+
+Persist the authored draft. Keep runtime metadata like `isDirty` and
+`validationError` in plain React state.
+
+## 5. Schema Upgrade With Migration Plus Reconciliation
+
+```tsx
+import {
+    MnemonicProvider,
+    createSchemaRegistry,
+    defineKeySchema,
+    defineMigration,
+    mnemonicSchema,
+    useMnemonicKey,
+} from "react-mnemonic";
+
+const profileV1 = defineKeySchema(
+    "profile",
+    1,
+    mnemonicSchema.object({
+        name: mnemonicSchema.string(),
+    }),
+);
+
+const profileV2 = defineKeySchema(
+    "profile",
+    2,
+    mnemonicSchema.object({
+        name: mnemonicSchema.string(),
+        email: mnemonicSchema.string(),
+        marketingOptIn: mnemonicSchema.boolean(),
+    }),
+);
+
+const registry = createSchemaRegistry({
+    schemas: [profileV1, profileV2],
+    migrations: [
+        defineMigration(profileV1, profileV2, (value) => ({
+            ...(value as { name: string }),
+            email: "",
+            marketingOptIn: false,
+        })),
+    ],
+});
+
+function ProfileEditor() {
+    const { value, set } = useMnemonicKey("profile", {
+        defaultValue: {
+            name: "",
+            email: "",
+            marketingOptIn: true,
+        },
+        reconcile: (persisted, { persistedVersion, latestVersion }) => ({
+            ...persisted,
+            marketingOptIn: persistedVersion < (latestVersion ?? persistedVersion) ? true : persisted.marketingOptIn,
+        }),
+    });
+
+    return <button onClick={() => set({ ...value, email: "hello@example.com" })}>Save</button>;
+}
+
+export function App() {
+    return (
+        <MnemonicProvider namespace="app" schemaMode="default" schemaRegistry={registry}>
+            <ProfileEditor />
+        </MnemonicProvider>
+    );
+}
+```
+
+Migration handles the structural version change. `reconcile(...)` handles the
+conditional policy decision.
+
+## 6. SSR Placeholder For Theme
+
+```tsx
+import { useMnemonicKey } from "react-mnemonic";
+
+export function ThemeLabel({ serverTheme }: { serverTheme: "light" | "dark" | "system" }) {
+    const { value } = useMnemonicKey("theme", {
+        defaultValue: "light" as "light" | "dark" | "system",
+        ssr: {
+            serverValue: serverTheme,
+            hydration: "client-only",
+        },
+    });
+
+    return <span>{value}</span>;
+}
+```
+
+Use this when:
+
+- the server already knows a placeholder value
+- you want the server markup and hydration markup to match
+- local persisted storage should not win until after mount
+
+## Anti-Patterns
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns
+
+# Anti-Patterns
+
+These patterns often "work" at runtime but still encode the wrong persistence
+contract.
+
+## Persisting Runtime-Only UI State
+
+Avoid persisting values when rehydration would be surprising or incorrect:
+
+- hover, focus, drag, selection, or expansion state
+- loading flags, optimistic mutation state, and retry counters
+- validation errors, dirty flags, and submit-in-progress markers
+- transient search text that should disappear on reload
+- server cache metadata unless the app explicitly wants to restore it
+
+Prefer splitting state into:
+
+- a persisted durable slice handled by `useMnemonicKey(...)`
+- an ephemeral runtime slice handled by `useState(...)`
+
+## Using `remove()` To Mean "Cleared"
+
+If "cleared" is a durable state, do not delete the key.
+
+Wrong:
+
+- `remove()` for a nullable preference, optional form field, or saved filter that should remain explicitly cleared after reload
+
+Prefer:
+
+- `set(null)` or a nullable field inside the persisted object
+
+## Using `reconcile(...)` For Structural Version Jumps
+
+Do not use `reconcile(...)` to paper over a real schema upgrade.
+
+Wrong:
+
+- adding or renaming persistent fields in place with `reconcile(...)`
+
+Prefer:
+
+- a versioned schema plus migration for structural compatibility
+- `reconcile(...)` only for conditional policy refresh inside an already valid shape
+
+## Returning Promises From `StorageLike`
+
+`StorageLike` is synchronous in beta 1.
+
+Wrong:
+
+- `getItem: async (...) => ...`
+- direct IndexedDB calls from `getItem`, `setItem`, or `removeItem`
+
+Prefer:
+
+- a synchronous facade backed by an in-memory cache
+- `onExternalChange(...)` when the real backend can notify out-of-band updates
+
+## Inventing Local Package Shims
+
+Do not "fix" missing type information by shadowing the package.
+
+Wrong:
+
+- `react-mnemonic.d.ts`
+- `declare module "react-mnemonic"`
+- importing from unpublished internal paths
+
+Prefer:
+
+- `import` and `import type` from `react-mnemonic`
+- checking `src/index.ts`, `package.json`, and the API docs before assuming a surface is missing
+
+## Reintroducing Raw `localStorage` In Examples
+
+If `react-mnemonic` is the intended abstraction, do not bypass it in templates,
+scaffolds, or user-facing examples.
+
+Wrong:
+
+- direct `localStorage.getItem(...)` or `localStorage.setItem(...)` in example app code that should model durable UI state through the hook
+
+Prefer:
+
+- `useMnemonicKey(...)` for durable app or UI state
+- raw storage only in storage adapter implementations, tests, or low-level library internals
+
+## Treating The Provider As Optional
+
+`useMnemonicKey(...)` is not a global singleton hook.
+
+Wrong:
+
+- calling it outside a `MnemonicProvider`
+- treating the namespace as irrelevant
+
+Prefer:
+
+- one explicit provider per persisted storage scope
+- intentional namespace selection so keys cannot collide silently
+
+## AI Assistant Setup
+Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup
+
+# AI Assistant Setup
+
+This page explains how users and agent builders should expose `react-mnemonic`
+to coding assistants.
+
+## Canonical Source
+
+The canonical AI-oriented source is this docs section:
+
+- `/docs/ai`
+- `/docs/ai/invariants`
+- `/docs/ai/decision-matrix`
+- `/docs/ai/recipes`
+- `/docs/ai/anti-patterns`
+
+Everything else is a companion surface:
+
+- [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) for compact retrieval
+- [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) for long-form export
+- [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) for machine-readable summaries
+- [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
+
+## Lowest-Friction Retrieval
+
+When an assistant has only HTTP or search access, give it these URLs first:
+
+1. [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt)
+2. [`/docs/ai`](https://thirtytwobits.github.io/react-mnemonic/docs/ai)
+3. [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt)
+4. [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json)
+
+That ordering keeps the first context window compact while still leaving a
+long-form export available when the task is more complex.
+
+## DeepWiki
+
+The repo ships [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json)
+to steer DeepWiki toward the files that matter most for correct persistence
+behavior:
+
+- canonical AI docs
+- `README.md`
+- the public export surface in `src/index.ts`
+- the hook, provider, and type definitions that define runtime semantics
+- the deeper guides for migrations, SSR, clearable values, and custom storage
+
+If you re-index the repository, keep that file up to date with any future
+source-of-truth moves.
+
+## Validated MCP-Friendly Path
+
+The lowest-friction MCP setup is exposing this repository through a
+filesystem-capable MCP server or any equivalent local-docs MCP layer.
+
+Mount these paths:
+
+- `website/docs/ai/index.md`
+- `website/docs/ai/invariants.md`
+- `website/docs/ai/decision-matrix.md`
+- `website/docs/ai/recipes.md`
+- `website/docs/ai/anti-patterns.md`
+- `website/static/llms.txt`
+- `website/static/llms-full.txt`
+- `website/static/ai-contract.json`
+- `src/Mnemonic/use.ts`
+- `src/Mnemonic/provider.tsx`
+- `src/Mnemonic/types.ts`
+
+Why this path is validated:
+
+- the website build regenerates `llms.txt`, `llms-full.txt`, and `ai-contract.json` before Docusaurus runs
+- the generation step fails fast if any canonical AI source file is missing
+- the docs build already fails on broken links, so the published AI entry points stay connected to the site navigation
+
+This gives an MCP client both the compact docs surfaces and the source files
+that define the contract underneath them.
+
+## Hosted Retrieval Path
+
+If your assistant can fetch remote files, use the published GitHub Pages URLs:
+
+- `https://thirtytwobits.github.io/react-mnemonic/llms.txt`
+- `https://thirtytwobits.github.io/react-mnemonic/llms-full.txt`
+- `https://thirtytwobits.github.io/react-mnemonic/ai-contract.json`
+- `https://thirtytwobits.github.io/react-mnemonic/docs/ai`
+
+Use the hosted path when you want versioned, read-only retrieval without
+mounting the repository locally.
+
+## Maintenance
+
+Keep the surfaces aligned this way:
+
+- edit the canonical prose in `website/docs/ai/*`
+- regenerate companion assets via `website/scripts/generate-ai-assets.mjs`
+- keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
+
+The goal is simple: agents should load one canonical contract and then choose
+the right persistence behavior without inventing missing semantics.

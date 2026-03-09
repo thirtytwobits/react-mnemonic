@@ -32,6 +32,7 @@
         "lint": "tsc -p tsconfig.json --noEmit",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "docs:ai": "node ./website/scripts/generate-ai-assets.mjs",
         "docs": "typedoc",
         "docs:watch": "typedoc --watch",
         "docs:site": "npm --prefix website run build",

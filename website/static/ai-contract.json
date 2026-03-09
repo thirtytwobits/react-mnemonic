@@ -1,10 +1,25 @@
 {
-    "version": 1,
-    "title": "react-mnemonic AI Contract Guide",
+    "version": 2,
+    "title": "react-mnemonic AI Contract",
+    "canonicalDocs": {
+        "index": "https://thirtytwobits.github.io/react-mnemonic/docs/ai",
+        "invariants": "https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants",
+        "decision-matrix": "https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix",
+        "recipes": "https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes",
+        "anti-patterns": "https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns",
+        "assistant-setup": "https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup"
+    },
+    "retrievalSurfaces": {
+        "llms": "https://thirtytwobits.github.io/react-mnemonic/llms.txt",
+        "llmsFull": "https://thirtytwobits.github.io/react-mnemonic/llms-full.txt",
+        "machineReadable": "https://thirtytwobits.github.io/react-mnemonic/ai-contract.json",
+        "deepWikiConfig": "https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json"
+    },
     "storageContract": {
         "type": "synchronous",
         "namespacePattern": "${namespace}.${key}",
         "requiredProvider": true,
+        "customExternalSync": "storage.onExternalChange(callback)",
         "actions": {
             "set": "persist next value",
             "reset": "persist defaultValue",
@@ -16,7 +31,7 @@
         "importPath": "react-mnemonic",
         "allowLocalAmbientShims": false,
         "forbiddenPatterns": ["react-mnemonic.d.ts", "declare module \"react-mnemonic\""],
-        "fallbackOrder": ["src/index.ts", "package.json", "api-docs", "ai-contract-guide"]
+        "fallbackOrder": ["src/index.ts", "package.json", "api-docs", "docs/ai"]
     },
     "readLifecycle": [
         "load raw snapshot",
@@ -24,7 +39,7 @@
         "validate and migrate when schemas exist",
         "run reconcile if provided",
         "fall back to defaultValue when absent or invalid",
-        "persist read-time rewrite when migration/autoschema/reconcile changed storage shape"
+        "persist read-time rewrite when migration, autoschema, or reconcile changed storage shape"
     ],
     "writeLifecycle": [
         "resolve updater against current decoded value",
@@ -46,6 +61,17 @@
         "optionalServerValue": "ssr.serverValue",
         "hydrationModes": ["immediate", "client-only"]
     },
+    "quickRules": [
+        "`useMnemonicKey(...)` must run inside a `MnemonicProvider`.",
+        "Persisted keys are stored as `${namespace}.${key}`.",
+        "`defaultValue` is required and is the fallback for absent or invalid values.",
+        "`set(next)` persists a value, `reset()` persists `defaultValue`, and `remove()` deletes the key.",
+        "Use `set(null)` when a cleared state must survive reload.",
+        "SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.",
+        "Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.",
+        "`StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.",
+        "Import published values and types from `react-mnemonic`; do not invent local ambient shims."
+    ],
     "recipes": [
         "theme-preference",
         "saved-filters",

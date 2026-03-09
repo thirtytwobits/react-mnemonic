@@ -52,7 +52,7 @@ see [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas
 
 If you want a deterministic implementation guide with invariants, decision
 tables, and copy-pastable recipes, see
-[AI Contract Guide](/docs/guides/ai-contract-guide).
+[AI Overview](/docs/ai).
 
 If you are comparing persistence libraries, see
 [Comparisons and Benchmarks](/docs/guides/comparisons-and-benchmarks) for
@@ -93,7 +93,8 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 
 - [Schema Modes](/docs/guides/schema-modes) — add validation and versioning
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
-- [AI Contract Guide](/docs/guides/ai-contract-guide) — invariants, lifecycle order, decision tables, and canonical recipes
+- [AI Overview](/docs/ai) — the canonical AI-oriented entry point for invariants, decision tables, recipes, and setup
+- [AI Assistant Setup](/docs/ai/assistant-setup) — expose the docs through `llms.txt`, DeepWiki, and MCP-friendly retrieval
 - [Comparisons and Benchmarks](/docs/guides/comparisons-and-benchmarks) — reproducible bundle measurements and tradeoff notes against common alternatives
 - [Canonical Key Definitions](/docs/guides/canonical-key-definitions) — define reusable key contracts once
 - [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas) — keep runtime schemas and TS types aligned

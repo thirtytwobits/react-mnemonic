@@ -95,6 +95,14 @@ function isObjectLike(value: unknown): value is object {
     return value !== null && (typeof value === "object" || typeof value === "function");
 }
 
+function objectHasOwn(value: object, property: PropertyKey): boolean {
+    const hasOwn = (Object as typeof Object & { hasOwn?: (target: object, key: PropertyKey) => boolean }).hasOwn;
+    if (typeof hasOwn === "function") {
+        return hasOwn(value, property);
+    }
+    return Object.getOwnPropertyDescriptor(value, property) !== undefined;
+}
+
 function getDiagnosticObjectId(value: object): number {
     const existing = diagnosticObjectIds.get(value);
     if (existing !== undefined) return existing;
@@ -279,7 +287,7 @@ export function useMnemonicKey<T>(
                     parsed == null ||
                     !Number.isInteger(parsed.version) ||
                     parsed.version < 0 ||
-                    !Object.prototype.hasOwnProperty.call(parsed, "payload")
+                    !objectHasOwn(parsed, "payload")
                 ) {
                     return {
                         ok: false,
