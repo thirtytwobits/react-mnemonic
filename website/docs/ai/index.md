@@ -2,7 +2,6 @@
 sidebar_position: 1
 title: AI Overview
 description: Canonical entry point for coding assistants and advanced users working with react-mnemonic.
-slug: /ai
 ---
 
 # AI Overview
