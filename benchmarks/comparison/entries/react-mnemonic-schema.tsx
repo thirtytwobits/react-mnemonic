@@ -1,4 +1,4 @@
-import { MnemonicProvider, createSchemaRegistry, useMnemonicKey } from "../../../dist/index.js";
+import { MnemonicProvider, createSchemaRegistry, useMnemonicKey } from "../../../dist/schema.js";
 
 const registry = createSchemaRegistry({
     schemas: [

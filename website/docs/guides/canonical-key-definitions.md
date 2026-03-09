@@ -94,7 +94,7 @@ the semantic differences between `set(null)`, `remove()`, and `reset()`.
 Descriptors work with the full schema/migration stack:
 
 ```tsx
-import { createSchemaRegistry, defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+import { createSchemaRegistry, defineMnemonicKey, useMnemonicKey } from "react-mnemonic/schema";
 
 const registry = createSchemaRegistry({
     schemas: [

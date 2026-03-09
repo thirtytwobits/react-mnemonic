@@ -159,7 +159,9 @@ run across the full library shortlist.
 - `usehooks-ts/useLocalStorage`
 
 The common-task bundle comparison uses the same user-facing example for every
-library: a persisted light/dark theme toggle.
+library: a persisted light/dark theme toggle. For `react-mnemonic`, that
+benchmark now targets `react-mnemonic/core`, while the schema-aware benchmark
+targets `react-mnemonic/schema`.
 
 ## Methodology
 
@@ -221,9 +223,12 @@ the same "persisted theme toggle" task.
 
 - `use-local-storage-state` and `zustand/persist` are the lightest options in
   this common-task bundle comparison.
+- `react-mnemonic/core` is the minimal persisted-state entrypoint. Import
+  `react-mnemonic/schema` or the root `react-mnemonic` entrypoint when you
+  want schema validation, autoschema, and migrations.
 - `react-mnemonic` is not aiming to be the smallest persisted-value hook. Its
-  bigger footprint buys explicit schemas, recovery flows, namespace isolation,
-  and more first-class SSR controls.
+  optional schema-aware footprint buys explicit schemas, recovery flows,
+  namespace isolation, and more first-class SSR controls.
 - `jotai/atomWithStorage` sits in the middle here because you get the atom
   model plus storage utilities, not just a single-purpose localStorage hook.
 
@@ -254,10 +259,10 @@ incremental cost of opting into versioned schemas and migrations in
     </tbody>
 </table>
 
-The jump from the common `react-mnemonic` entry to the schema-aware entry is
-small relative to the base library size. That is useful if your app genuinely
-needs migrations and read-time reconciliation, but it is still added surface
-area you should choose deliberately.
+The jump from the common `react-mnemonic/core` entry to the schema-aware entry
+shows the incremental cost of opting into validation and migrations. That is
+useful if your app genuinely needs those workflows, but it is still added
+surface area you should choose deliberately.
 
 ## SSR and Hydration Behavior
 

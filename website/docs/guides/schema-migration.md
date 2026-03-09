@@ -27,7 +27,7 @@ import {
     type KeySchema,
     type MigrationRule,
     type StructuralTreeHelpers,
-} from "react-mnemonic";
+} from "react-mnemonic/schema";
 ```
 
 ## Registering schemas

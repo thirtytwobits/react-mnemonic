@@ -76,7 +76,7 @@ React 18 and React 19.
 Wrap your app in a `MnemonicProvider`, then call `useMnemonicKey` anywhere inside it.
 
 ```tsx
-import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
 function Counter() {
     const { value: count, set } = useMnemonicKey("count", {
@@ -102,6 +102,11 @@ export default function App() {
 
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
+
+Use `react-mnemonic/core` for the lean persisted-state path. If you need JSON
+Schema validation, autoschema, or migrations, import from
+`react-mnemonic/schema` or the backward-compatible root `react-mnemonic`
+entrypoint instead.
 
 In server-rendered apps, `useMnemonicKey(...)` renders `defaultValue` on the
 server by default and then hydrates to persisted storage on the client. When
@@ -157,7 +162,7 @@ When the same persisted key appears in more than one component, define it once
 and reuse it:
 
 ```tsx
-import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic/core";
 
 export const themeKey = defineMnemonicKey("theme", {
     defaultValue: "light" as "light" | "dark",
@@ -203,7 +208,7 @@ import {
     defineMigration,
     mnemonicSchema,
     useMnemonicKey,
-} from "react-mnemonic";
+} from "react-mnemonic/schema";
 
 const profileV1 = defineKeySchema(
     "profile",
@@ -431,7 +436,7 @@ Validate an arbitrary value against a JSON Schema (the same subset used by the
 hook). Returns an array of validation errors, empty when the value is valid.
 
 ```ts
-import { validateJsonSchema } from "react-mnemonic";
+import { validateJsonSchema } from "react-mnemonic/schema";
 
 const errors = validateJsonSchema(
     { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
@@ -447,8 +452,8 @@ validator is cached by schema reference (via `WeakMap`), so calling
 `compileSchema` twice with the same object returns the identical function.
 
 ```ts
-import { compileSchema } from "react-mnemonic";
-import type { CompiledValidator } from "react-mnemonic";
+import { compileSchema } from "react-mnemonic/schema";
+import type { CompiledValidator } from "react-mnemonic/schema";
 
 const validate: CompiledValidator = compileSchema({
     type: "object",

@@ -26,7 +26,7 @@ import {
     defineMigration,
     mnemonicSchema,
     useMnemonicKey,
-} from "react-mnemonic";
+} from "react-mnemonic/schema";
 
 const settingsV1 = defineKeySchema(
     "settings",

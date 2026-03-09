@@ -1090,6 +1090,49 @@ describe("schema mode behavior", () => {
         expect(getMigrationPathSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("resets per-key schema caches when the hook key changes across renders", () => {
+        const storage = createMockStorage();
+        const registry = createRegistry([
+            { key: "first", version: 1, schema: { type: "number" } },
+            { key: "second", version: 2, schema: { type: "number" } },
+        ]);
+        const resultRef: { current: ReturnType<typeof useMnemonicKey<number>> } = {
+            current: undefined as unknown as ReturnType<typeof useMnemonicKey<number>>,
+        };
+        let currentKey = "first";
+
+        function TestComponent() {
+            resultRef.current = useMnemonicKey(currentKey, {
+                defaultValue: 0,
+            });
+            return null;
+        }
+
+        const { rerender } = render(
+            <MnemonicProvider namespace="ns" storage={storage} schemaMode="default" schemaRegistry={registry}>
+                <TestComponent />
+            </MnemonicProvider>,
+        );
+
+        act(() => {
+            resultRef.current.set(1);
+        });
+
+        currentKey = "second";
+        rerender(
+            <MnemonicProvider namespace="ns" storage={storage} schemaMode="default" schemaRegistry={registry}>
+                <TestComponent />
+            </MnemonicProvider>,
+        );
+
+        act(() => {
+            resultRef.current.set(2);
+        });
+
+        expect(storage.store.get("ns.first")).toBe(schemaEnv(1, 1));
+        expect(storage.store.get("ns.second")).toBe(schemaEnv(2, 2));
+    });
+
     it("can reconcile legacy seeded JSON into the latest schema when no schema matches the stored version", async () => {
         const storage = createMockStorage();
         const registry = createRegistry([

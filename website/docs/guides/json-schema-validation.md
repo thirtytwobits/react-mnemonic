@@ -34,7 +34,7 @@ small and fully serializable (no `$ref` resolution, no remote fetching).
 Schemas are plain JSON objects — fully serializable, no functions.
 
 ```ts
-import type { KeySchema } from "react-mnemonic";
+import type { KeySchema } from "react-mnemonic/schema";
 
 const profileSchema: KeySchema = {
     key: "profile",
@@ -57,7 +57,7 @@ Use `validateJsonSchema` to validate any value against a schema outside of
 the hook:
 
 ```ts
-import { validateJsonSchema } from "react-mnemonic";
+import { validateJsonSchema } from "react-mnemonic/schema";
 
 const errors = validateJsonSchema(
     { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
@@ -74,8 +74,8 @@ schema reference (`WeakMap`), so repeated calls with the same object return
 the identical function.
 
 ```ts
-import { compileSchema } from "react-mnemonic";
-import type { CompiledValidator } from "react-mnemonic";
+import { compileSchema } from "react-mnemonic/schema";
+import type { CompiledValidator } from "react-mnemonic/schema";
 
 const validate: CompiledValidator = compileSchema({
     type: "object",
