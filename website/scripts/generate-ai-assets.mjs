@@ -262,12 +262,26 @@ ${sectionBlocks}`.trimEnd() + "\n"
     );
 }
 
+function readTextFileIfExists(filePath) {
+    try {
+        return readFileSync(filePath, "utf8");
+    } catch (error) {
+        if (error?.code === "ENOENT") {
+            return null;
+        }
+        throw error;
+    }
+}
+
 function writeOutputFile(fileName, content) {
     const outputPath = path.join(staticDir, fileName);
-    const currentContent = existsSync(outputPath) ? readFileSync(outputPath, "utf8") : null;
+    const currentContent = readTextFileIfExists(outputPath);
 
     if (checkMode) {
         if (currentContent !== content) {
+            if (currentContent === null) {
+                throw new Error(`Generated AI asset is missing: ${outputPath}. Run npm run docs:ai.`);
+            }
             throw new Error(`Generated AI asset is out of date: ${outputPath}. Run npm run docs:ai.`);
         }
         return;

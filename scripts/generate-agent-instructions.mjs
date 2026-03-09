@@ -37,7 +37,7 @@ function readCanonicalDoc(fileName) {
 
 function extractSection(markdown, heading) {
     const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`^## ${escapedHeading}\\n\\n([\\s\\S]*?)(?=^## |\\Z)`, "m");
+    const pattern = new RegExp(`^## ${escapedHeading}\\n\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m");
     const match = markdown.match(pattern);
     if (!match) {
         throw new Error(`Could not find section "## ${heading}" in canonical AI docs.`);
@@ -76,10 +76,24 @@ function ensureParentDir(filePath) {
     mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
+function readTextFileIfExists(filePath) {
+    try {
+        return normalizeNewlines(readFileSync(filePath, "utf8"));
+    } catch (error) {
+        if (error?.code === "ENOENT") {
+            return null;
+        }
+        throw error;
+    }
+}
+
 function writeTextFile(filePath, content) {
-    const current = existsSync(filePath) ? normalizeNewlines(readFileSync(filePath, "utf8")) : null;
+    const current = readTextFileIfExists(filePath);
     if (checkMode) {
         if (current !== content) {
+            if (current === null) {
+                throw new Error(`Generated agent instruction file is missing: ${filePath}. Run npm run docs:ai.`);
+            }
             throw new Error(`Generated agent instruction file is out of date: ${filePath}. Run npm run docs:ai.`);
         }
         return;
@@ -128,35 +142,40 @@ const checklistMarkdown = durableChecklist.map((item, index) => `${index + 1}. $
 const recipeListMarkdown = recipeTitles.map((title) => `- ${title}`).join("\n");
 const canonicalDocsMarkdown = canonicalDocs.map((doc) => `- [${doc.label}](${doc.url})`).join("\n");
 
-const sharedInstructionBody = `## Quick Rules
+function buildSharedInstructionBody(headingLevel = "##") {
+    return `${headingLevel} Quick Rules
 
 ${quickRulesMarkdown}
 
-## Durable State Checklist
+${headingLevel} Durable State Checklist
 
 ${checklistMarkdown}
 
-## Canonical Recipes
+${headingLevel} Canonical Recipes
 
 ${recipeListMarkdown}
 
-## Canonical Docs
+${headingLevel} Canonical Docs
 
 ${canonicalDocsMarkdown}
 
-## Maintenance
+${headingLevel} Maintenance
 
 - Treat \`website/docs/ai/*\` as the canonical source.
 - Run \`npm run docs:ai\` after changing canonical AI docs.
 - Run \`npm run ai:check\` to verify generated instruction packs and retrieval artifacts are in sync.
 `;
+}
+
+const sharedInstructionBody = buildSharedInstructionBody();
+const agentsSharedInstructionBody = buildSharedInstructionBody("###");
 
 const agentsGeneratedSection = await formatMarkdown(`
 ## react-mnemonic Persistence Guardrails
 
 ${generatedNotice}
 
-${sharedInstructionBody}
+${agentsSharedInstructionBody}
 `);
 
 const claudeFile = await formatMarkdown(`
