@@ -1,5 +1,5 @@
 {
-    "generatedAt": "2026-03-08T18:26:55.027Z",
+    "generatedAt": "2026-03-09T16:54:46.976Z",
     "methodology": {
         "bundler": "esbuild",
         "bundlerVersion": "0.27.3",
@@ -12,7 +12,7 @@
     "versions": {
         "react": "18.3.1",
         "react-dom": "18.3.1",
-        "react-mnemonic": "1.0.0-beta.0",
+        "react-mnemonic": "1.1.0-beta0",
         "zustand": "5.0.11",
         "jotai": "2.18.0",
         "use-local-storage-state": "19.5.0",
@@ -31,11 +31,11 @@
             "category": "common-task",
             "scenario": "Persisted theme toggle",
             "packageName": "react-mnemonic",
-            "packageVersion": "1.0.0-beta.0",
-            "bundleBytes": 22335,
-            "bundleKiB": 21.81,
-            "gzipBytes": 7906,
-            "gzipKiB": 7.72,
+            "packageVersion": "1.1.0-beta0",
+            "bundleBytes": 15726,
+            "bundleKiB": 15.36,
+            "gzipBytes": 5953,
+            "gzipKiB": 5.81,
             "entry": "benchmarks/comparison/entries/react-mnemonic-theme.tsx"
         },
         {
@@ -96,11 +96,11 @@
             "category": "advanced-task",
             "scenario": "Schema-aware profile persistence with migration",
             "packageName": "react-mnemonic",
-            "packageVersion": "1.0.0-beta.0",
-            "bundleBytes": 24532,
-            "bundleKiB": 23.96,
-            "gzipBytes": 8567,
-            "gzipKiB": 8.37,
+            "packageVersion": "1.1.0-beta0",
+            "bundleBytes": 26204,
+            "bundleKiB": 25.59,
+            "gzipBytes": 9081,
+            "gzipKiB": 8.87,
             "entry": "benchmarks/comparison/entries/react-mnemonic-schema.tsx"
         }
     ]

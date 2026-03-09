@@ -4,7 +4,7 @@ import { hydrateRoot } from "react-dom/client";
 import { act as domAct } from "react-dom/test-utils";
 import { renderToString } from "react-dom/server";
 import { JSDOM } from "jsdom";
-import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
 type StorageLike = {
     getItem: (key: string) => string | null;

@@ -1,4 +1,4 @@
-import { MnemonicProvider, useMnemonicKey } from "../../../dist/index.js";
+import { MnemonicProvider, useMnemonicKey } from "../../../dist/core.js";
 
 type Theme = "light" | "dark";
 

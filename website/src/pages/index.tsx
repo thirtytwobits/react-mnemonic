@@ -7,7 +7,7 @@ import CodeBlock from "@theme/CodeBlock";
 
 import styles from "./index.module.css";
 
-const quickExample = `import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+const quickExample = `import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
 function Counter() {
   const { value: count, set } = useMnemonicKey("count", {

@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
 function App() {
     const theme = useMnemonicKey("theme", {

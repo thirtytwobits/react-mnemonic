@@ -10,7 +10,7 @@ Wrap your app in a `MnemonicProvider`, then call `useMnemonicKey` anywhere
 inside it.
 
 ```tsx title="App.tsx"
-import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
 function Counter() {
     const { value: count, set } = useMnemonicKey("count", {
@@ -36,6 +36,11 @@ export default function App() {
 
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
+
+Use `react-mnemonic/core` for the lean persisted-state path. If you need JSON
+Schema validation, autoschema, or migrations, import from
+`react-mnemonic/schema` or the backward-compatible root `react-mnemonic`
+entrypoint instead.
 
 In server-rendered apps, the default contract is: render `defaultValue` on the
 server, then hydrate to persisted storage on the client. When you need a

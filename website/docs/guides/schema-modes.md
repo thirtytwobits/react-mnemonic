@@ -7,7 +7,12 @@ description: Choose how react-mnemonic validates and versions stored data.
 # Schema Modes
 
 Mnemonic supports optional schema versioning through the `schemaMode` prop on
-`MnemonicProvider` and an optional `schemaRegistry`.
+`MnemonicProvider` and an optional `schemaRegistry`. These features live on the
+schema-aware entrypoint:
+
+```tsx
+import { MnemonicProvider } from "react-mnemonic/schema";
+```
 
 ```tsx
 <MnemonicProvider namespace="app" schemaMode="default" schemaRegistry={registry}>
