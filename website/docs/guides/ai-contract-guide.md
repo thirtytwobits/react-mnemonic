@@ -1,11 +1,11 @@
 ---
 title: AI Contract Guide
-description: Legacy entry point that now forwards readers to the canonical AI docs section.
+description: Legacy entry point that forwards readers to the canonical AI docs section.
 ---
 
 # AI Contract Guide
 
-The canonical AI-oriented docs now live under [AI Overview](/docs/ai).
+The canonical AI-oriented docs live under [AI Overview](/docs/ai).
 
 Use these pages:
 

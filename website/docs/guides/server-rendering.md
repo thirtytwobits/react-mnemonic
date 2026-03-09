@@ -6,7 +6,7 @@ description: Control server placeholders and hydration timing in Next.js, Remix,
 
 # Server Rendering
 
-`react-mnemonic` is SSR-safe by default, and now exposes explicit controls for
+`react-mnemonic` is SSR-safe by default, and exposes explicit controls for
 the server value and hydration timing.
 
 ## Default contract

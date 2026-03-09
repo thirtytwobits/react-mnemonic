@@ -5,7 +5,7 @@ description: Reuse one schema object for runtime validation, key descriptors, an
 
 # Single Source of Truth Schemas
 
-react-mnemonic now has a first-class path for keeping runtime schema validation
+react-mnemonic has a first-class path for keeping runtime schema validation
 and TypeScript types aligned.
 
 The goal is simple: define one schema object, then reuse it for:

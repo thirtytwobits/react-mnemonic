@@ -133,7 +133,7 @@ npm run test:watch
 
 ### Test layers
 
-`react-mnemonic` now relies on several complementary test layers, each aimed at
+`react-mnemonic` relies on several complementary test layers, each aimed at
 catching a different class of persistence failure:
 
 - **Unit and integration tests** exercise the everyday hook, provider, SSR,
@@ -245,7 +245,7 @@ Runs on every push and pull request:
 
 ### SonarQube Cloud
 
-This repository now relies on SonarQube Cloud automatic analysis instead of a
+This repository relies on SonarQube Cloud automatic analysis instead of a
 GitHub Actions scanner workflow.
 
 Maintainer setup:
@@ -262,7 +262,7 @@ Maintainer setup:
 Important tradeoff:
 
 - Automatic analysis does not consume this repository's LCOV coverage output, so
-  SonarQube coverage metrics will no longer be populated from `npm run test:coverage`.
+  SonarQube coverage metrics are not populated from `npm run test:coverage`.
 - Automatic analysis uses `.sonarcloud.properties`, not `sonar-project.properties`.
 - Some automatic-analysis settings can also be changed in the SonarQube Cloud UI,
   but the repository should treat `.sonarcloud.properties` as the source of truth

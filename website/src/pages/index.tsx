@@ -43,7 +43,7 @@ const features: FeatureItem[] = [
     {
         title: "AI-First Persistence",
         description:
-            "The docs now include an AI-friendliness benchmark centered on one-shot persistence correctness, not just bundle size.",
+            "The docs include an AI-friendliness benchmark centered on one-shot persistence correctness, not just bundle size.",
     },
     {
         title: "SSR-safe by default",
