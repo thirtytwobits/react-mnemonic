@@ -13,6 +13,7 @@ const packageJsonPath = path.join(repoDir, "package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
 const siteBaseUrl = new URL(packageJson.homepage).toString().replace(/\/$/, "");
 const prettierConfig = (await resolveConfig(packageJsonPath)) ?? {};
+const checkMode = process.argv.includes("--check");
 
 const canonicalDocs = [
     {
@@ -261,9 +262,33 @@ ${sectionBlocks}`.trimEnd() + "\n"
     );
 }
 
+function readTextFileIfExists(filePath) {
+    try {
+        return readFileSync(filePath, "utf8");
+    } catch (error) {
+        if (error?.code === "ENOENT") {
+            return null;
+        }
+        throw error;
+    }
+}
+
 function writeOutputFile(fileName, content) {
+    const outputPath = path.join(staticDir, fileName);
+    const currentContent = readTextFileIfExists(outputPath);
+
+    if (checkMode) {
+        if (currentContent !== content) {
+            if (currentContent === null) {
+                throw new Error(`Generated AI asset is missing: ${outputPath}. Run npm run docs:ai.`);
+            }
+            throw new Error(`Generated AI asset is out of date: ${outputPath}. Run npm run docs:ai.`);
+        }
+        return;
+    }
+
     mkdirSync(staticDir, { recursive: true });
-    writeFileSync(path.join(staticDir, fileName), content, "utf8");
+    writeFileSync(outputPath, content, "utf8");
 }
 
 const docs = loadCanonicalDocs();
