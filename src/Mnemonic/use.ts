@@ -847,7 +847,8 @@ export function useMnemonicKey<T>(
      */
     useEffect(() => {
         if (!listenCrossTab) return;
-        if (globalThis.window === undefined) return;
+        const globalWindow = globalThis.window;
+        if (globalWindow === undefined) return;
 
         const storageKey = api.prefix + key;
 
@@ -866,8 +867,8 @@ export function useMnemonicKey<T>(
             api.setRaw(key, e.newValue);
         };
 
-        globalThis.addEventListener("storage", handler);
-        return () => globalThis.removeEventListener("storage", handler);
+        globalWindow.addEventListener("storage", handler);
+        return () => globalWindow.removeEventListener("storage", handler);
     }, [listenCrossTab, api, key]);
 
     /**
