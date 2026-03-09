@@ -847,7 +847,7 @@ export function useMnemonicKey<T>(
      */
     useEffect(() => {
         if (!listenCrossTab) return;
-        const globalWindow = globalThis.window;
+        const globalWindow = (globalThis as { window?: Window }).window;
         if (globalWindow === undefined) return;
 
         const storageKey = api.prefix + key;

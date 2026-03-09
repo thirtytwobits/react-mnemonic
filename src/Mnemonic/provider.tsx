@@ -82,9 +82,10 @@ export interface MnemonicProviderProps extends Readonly<MnemonicProviderOptions>
  * @internal
  */
 function defaultBrowserStorage(): StorageLike | undefined {
-    if (globalThis.window === undefined) return undefined;
+    const globalWindow = (globalThis as { window?: Window }).window;
+    if (globalWindow === undefined) return undefined;
     try {
-        return globalThis.window.localStorage;
+        return globalWindow.localStorage;
     } catch {
         return undefined;
     }
