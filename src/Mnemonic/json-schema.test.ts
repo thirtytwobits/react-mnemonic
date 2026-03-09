@@ -32,6 +32,15 @@ describe("jsonDeepEqual", () => {
         expect(jsonDeepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
     });
 
+    it("compares null-prototype objects", () => {
+        const left = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1, b: { c: 2 } });
+        const right = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1, b: { c: 2 } });
+        const different = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1, b: { c: 3 } });
+
+        expect(jsonDeepEqual(left, right)).toBe(true);
+        expect(jsonDeepEqual(left, different)).toBe(false);
+    });
+
     it("compares nested structures", () => {
         expect(jsonDeepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
         expect(jsonDeepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 3 }] })).toBe(false);

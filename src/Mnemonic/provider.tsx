@@ -13,15 +13,7 @@
 
 import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
 import { getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
-import type {
-    Mnemonic,
-    MnemonicProviderOptions,
-    StorageLike,
-    Listener,
-    Unsubscribe,
-    SchemaMode,
-    SchemaRegistry,
-} from "./types";
+import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
 
 /**
  * React Context for the Mnemonic store.
@@ -72,11 +64,11 @@ export function useMnemonic(): Mnemonic {
  * @see {@link MnemonicProviderOptions} - Configuration options
  * @see {@link MnemonicProvider} - Provider component
  */
-export interface MnemonicProviderProps extends MnemonicProviderOptions {
+export interface MnemonicProviderProps extends Readonly<MnemonicProviderOptions> {
     /**
      * React children to render within the provider.
      */
-    children: ReactNode;
+    readonly children: ReactNode;
 }
 
 /**
@@ -90,9 +82,9 @@ export interface MnemonicProviderProps extends MnemonicProviderOptions {
  * @internal
  */
 function defaultBrowserStorage(): StorageLike | undefined {
-    if (typeof window === "undefined") return undefined;
+    if (globalThis.window === undefined) return undefined;
     try {
-        return window.localStorage;
+        return globalThis.window.localStorage;
     } catch {
         return undefined;
     }
@@ -291,9 +283,7 @@ function ensureDevToolsRoot(enableDevTools: boolean): DevToolsRegistryRoot | nul
                 return live;
             }
 
-            if (entry.staleSince === null) {
-                entry.staleSince = Date.now();
-            }
+            entry.staleSince ??= Date.now();
             return null;
         };
     }
@@ -307,8 +297,8 @@ function ensureDevToolsRoot(enableDevTools: boolean): DevToolsRegistryRoot | nul
                     if (available) {
                         entry.lastSeenAt = Date.now();
                         entry.staleSince = null;
-                    } else if (entry.staleSince === null) {
-                        entry.staleSince = Date.now();
+                    } else {
+                        entry.staleSince ??= Date.now();
                     }
                     return {
                         namespace,
@@ -540,6 +530,129 @@ function createDevToolsProviderApi({
         },
         keys,
     };
+}
+
+function createReloadFromStorage({
+    storage,
+    hasAsyncContractViolation,
+    prefix,
+    listeners,
+    cache,
+    emit,
+    callbacks,
+    devToolsRoot,
+    namespace,
+}: {
+    storage: StorageLike | undefined;
+    hasAsyncContractViolation: () => boolean;
+    prefix: string;
+    listeners: Map<string, Set<Listener>>;
+    cache: Map<string, string | null>;
+    emit: (key: string) => void;
+    callbacks: StorageAccessCallbacks;
+    devToolsRoot: DevToolsRegistryRoot | null;
+    namespace: string;
+}): (changedKeys?: string[]) => void {
+    return (changedKeys?: string[]) => {
+        if (!storage || hasAsyncContractViolation()) return;
+        if (changedKeys?.length === 0) return;
+
+        const changed =
+            changedKeys !== undefined
+                ? reloadNamedKeysFromStorage({
+                      changedKeys,
+                      prefix,
+                      storage,
+                      listeners,
+                      cache,
+                      emit,
+                      callbacks,
+                  })
+                : reloadSubscribedKeysFromStorage({
+                      prefix,
+                      storage,
+                      listeners,
+                      cache,
+                      emit,
+                      callbacks,
+                  });
+
+        if (changed) {
+            bumpDevToolsVersion(devToolsRoot, namespace, changedKeys !== undefined ? "reload:granular" : "reload:full");
+        }
+    };
+}
+
+function registerDevToolsProvider({
+    devToolsRoot,
+    namespace,
+    store,
+    dump,
+    keys,
+    readThrough,
+    writeRaw,
+    removeRaw,
+}: {
+    devToolsRoot: DevToolsRegistryRoot;
+    namespace: string;
+    store: MnemonicInternalWithDevToolsHold;
+    dump: () => Record<string, string>;
+    keys: () => string[];
+    readThrough: (key: string) => string | null;
+    writeRaw: (key: string, raw: string) => void;
+    removeRaw: (key: string) => void;
+}): void {
+    let infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+
+    if (!devToolsRoot.capabilities.weakRef) {
+        console.info(
+            `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`,
+        );
+        return;
+    }
+
+    const existingLive = devToolsRoot.resolve(namespace);
+    if (existingLive) {
+        const duplicateMessage = `[Mnemonic DevTools] Duplicate provider namespace "${namespace}" detected. Each window must have at most one live MnemonicProvider per namespace.`;
+        if (!isProductionRuntime()) {
+            throw new Error(duplicateMessage);
+        }
+        console.warn(`${duplicateMessage} Keeping the first provider and ignoring the duplicate.`);
+        console.info(
+            `[Mnemonic DevTools] Namespace "${namespace}" already registered. Keeping existing provider reference.`,
+        );
+        return;
+    }
+
+    const providerApi = createDevToolsProviderApi({
+        store,
+        dump,
+        keys,
+        readThrough,
+        writeRaw,
+        removeRaw,
+    });
+    const WeakRefCtor = weakRefConstructor();
+    if (!WeakRefCtor) {
+        console.info(`[Mnemonic DevTools] WeakRef became unavailable while registering "${namespace}".`);
+        return;
+    }
+
+    // Keep a strong reference for the mounted provider lifetime.
+    // The global registry still only exposes a WeakRef, but this
+    // prevents premature collection while the provider is active.
+    store.__devToolsProviderApiHold = providerApi;
+
+    const now = Date.now();
+    devToolsRoot.providers[namespace] = {
+        namespace,
+        weakRef: new WeakRefCtor(providerApi),
+        registeredAt: now,
+        lastSeenAt: now,
+        staleSince: null,
+    };
+    bumpDevToolsVersion(devToolsRoot, namespace, "registry:namespace-registered");
+    console.info(infoMessage);
 }
 
 /**
@@ -914,48 +1027,23 @@ export function MnemonicProvider({
          * Called by the onExternalChange subscription when the storage adapter
          * signals that data has changed externally (e.g., from another tab).
          */
-        const reloadFromStorage = (changedKeys?: string[]) => {
-            if (!st || asyncContractViolationDetected) return;
-
-            // Empty array → explicit no-op
-            if (changedKeys !== undefined && changedKeys.length === 0) return;
-
-            if (changedKeys !== undefined) {
-                if (
-                    reloadNamedKeysFromStorage({
-                        changedKeys,
-                        prefix,
-                        storage: st,
-                        listeners,
-                        cache,
-                        emit,
-                        callbacks: storageAccessCallbacks,
-                    })
-                ) {
-                    bumpDevToolsVersion(devToolsRoot, namespace, "reload:granular");
-                }
-                return;
-            }
-
-            if (
-                reloadSubscribedKeysFromStorage({
-                    prefix,
-                    storage: st,
-                    listeners,
-                    cache,
-                    emit,
-                    callbacks: storageAccessCallbacks,
-                })
-            ) {
-                bumpDevToolsVersion(devToolsRoot, namespace, "reload:full");
-            }
-        };
+        const reloadFromStorage = createReloadFromStorage({
+            storage: st,
+            hasAsyncContractViolation: () => asyncContractViolationDetected,
+            prefix,
+            listeners,
+            cache,
+            emit,
+            callbacks: storageAccessCallbacks,
+            devToolsRoot,
+            namespace,
+        });
 
         /**
          * The Mnemonic store API object.
          * Implements the contract expected by useSyncExternalStore.
          */
-        const store = {
+        const store: MnemonicInternalWithDevToolsHold = {
             prefix,
             canEnumerateKeys,
             subscribeRaw,
@@ -965,10 +1053,10 @@ export function MnemonicProvider({
             keys,
             dump,
             reloadFromStorage,
-            schemaMode: schemaMode as SchemaMode,
+            schemaMode,
             ssrHydration,
             crossTabSyncMode,
-            ...(schemaRegistry ? { schemaRegistry: schemaRegistry as SchemaRegistry } : {}),
+            ...(schemaRegistry ? { schemaRegistry } : {}),
         };
 
         /**
@@ -976,48 +1064,16 @@ export function MnemonicProvider({
          * Exposes a weak-provider registry on the window object when enabled.
          */
         if (devToolsRoot) {
-            let infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
-            if (devToolsRoot.capabilities.weakRef) {
-                const existingLive = devToolsRoot.resolve(namespace);
-                if (existingLive) {
-                    const duplicateMessage = `[Mnemonic DevTools] Duplicate provider namespace "${namespace}" detected. Each window must have at most one live MnemonicProvider per namespace.`;
-                    if (!isProductionRuntime()) {
-                        throw new Error(duplicateMessage);
-                    }
-                    console.warn(`${duplicateMessage} Keeping the first provider and ignoring the duplicate.`);
-                    infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" already registered. Keeping existing provider reference.`;
-                } else {
-                    const providerApi = createDevToolsProviderApi({
-                        store,
-                        dump,
-                        keys,
-                        readThrough,
-                        writeRaw,
-                        removeRaw,
-                    });
-                    const WeakRefCtor = weakRefConstructor();
-                    if (!WeakRefCtor) {
-                        infoMessage = `[Mnemonic DevTools] WeakRef became unavailable while registering "${namespace}".`;
-                    } else {
-                        // Keep a strong reference for the mounted provider lifetime.
-                        // The global registry still only exposes a WeakRef, but this
-                        // prevents premature collection while the provider is active.
-                        (store as MnemonicInternalWithDevToolsHold).__devToolsProviderApiHold = providerApi;
-
-                        devToolsRoot.providers[namespace] = {
-                            namespace,
-                            weakRef: new WeakRefCtor(providerApi),
-                            registeredAt: Date.now(),
-                            lastSeenAt: Date.now(),
-                            staleSince: null,
-                        };
-                        bumpDevToolsVersion(devToolsRoot, namespace, "registry:namespace-registered");
-                    }
-                }
-            } else {
-                infoMessage = `[Mnemonic DevTools] WeakRef is not available; registry provider "${namespace}" was not registered.`;
-            }
-            console.info(infoMessage);
+            registerDevToolsProvider({
+                devToolsRoot,
+                namespace,
+                store,
+                dump,
+                keys,
+                readThrough,
+                writeRaw,
+                removeRaw,
+            });
         }
 
         return store;
