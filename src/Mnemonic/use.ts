@@ -53,7 +53,7 @@ function useSchemaMnemonicKey<T>(descriptor: MnemonicKeyDescriptor<T, string>): 
             schemaByVersion: new Map<number, KeySchema | undefined>(),
             migrationPaths: new Map<string, MigrationPath | null>(),
         };
-    }, [schemaRegistry, schemaMode]);
+    }, [schemaRegistry, schemaMode, key]);
 
     const getSchemaForVersion = useCallback(
         (version: number): KeySchema | undefined => {

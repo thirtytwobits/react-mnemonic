@@ -27,7 +27,7 @@ export interface MnemonicProviderProps extends Readonly<CoreMnemonicProviderOpti
     readonly children: ReactNode;
 }
 
-export function MnemonicProvider(props: MnemonicProviderProps): ReactNode {
+export function MnemonicProvider(props: Readonly<MnemonicProviderProps>): ReactNode {
     assertNoSchemaProps(props as MnemonicProviderProps & { schemaMode?: SchemaMode; schemaRegistry?: SchemaRegistry });
     return <SchemaMnemonicProvider {...props} />;
 }

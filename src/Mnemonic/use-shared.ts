@@ -89,10 +89,10 @@ export function withReadMetadata<T, Extra extends object = {}>(
     rewriteRaw?: string,
     extra?: Extra,
 ): ReadResult<T, Extra> {
-    const result = {
-        value,
-        ...(extra ?? {}),
-    } as ReadResult<T, Extra>;
+    const result = { value } as ReadResult<T, Extra>;
+    if (extra !== undefined) {
+        Object.assign(result, extra);
+    }
     if (rewriteRaw !== undefined) result.rewriteRaw = rewriteRaw;
     return result;
 }
