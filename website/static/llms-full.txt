@@ -46,11 +46,11 @@ Use it when you need:
 
 Read these pages in order when context is tight:
 
-1. [Invariants](/docs/ai/invariants)
-2. [Decision Matrix](/docs/ai/decision-matrix)
-3. [Recipes](/docs/ai/recipes)
-4. [Anti-Patterns](/docs/ai/anti-patterns)
-5. [AI Assistant Setup](/docs/ai/assistant-setup)
+1. [Invariants](https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants)
+2. [Decision Matrix](https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix)
+3. [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes)
+4. [Anti-Patterns](https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns)
+5. [AI Assistant Setup](https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup)
 
 ## Quick Rules
 
@@ -71,9 +71,9 @@ Read these pages in order when context is tight:
 These AI-oriented surfaces are intentionally layered:
 
 - `/docs/ai/*` is the canonical prose source.
-- [`/llms.txt`](/llms.txt) is the compact retrieval index.
-- [`/llms-full.txt`](/llms-full.txt) is the long-form export for indexing or prompt stuffing.
-- [`/ai-contract.json`](/ai-contract.json) is the compact machine-readable contract.
+- [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) is the compact retrieval index.
+- [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) is the long-form export for indexing or prompt stuffing.
+- [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) is the compact machine-readable contract.
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) steers DeepWiki toward the highest-signal files.
 
 ## What To Read In Code
@@ -599,19 +599,19 @@ The canonical AI-oriented source is this docs section:
 
 Everything else is a companion surface:
 
-- [`/llms.txt`](/llms.txt) for compact retrieval
-- [`/llms-full.txt`](/llms-full.txt) for long-form export
-- [`/ai-contract.json`](/ai-contract.json) for machine-readable summaries
+- [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) for compact retrieval
+- [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) for long-form export
+- [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) for machine-readable summaries
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
 
 ## Lowest-Friction Retrieval
 
 When an assistant has only HTTP or search access, give it these URLs first:
 
-1. [`/llms.txt`](/llms.txt)
-2. [`/docs/ai`](/docs/ai)
-3. [`/llms-full.txt`](/llms-full.txt)
-4. [`/ai-contract.json`](/ai-contract.json)
+1. [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt)
+2. [`/docs/ai`](https://thirtytwobits.github.io/react-mnemonic/docs/ai)
+3. [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt)
+4. [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json)
 
 That ordering keeps the first context window compact while still leaving a
 long-form export available when the task is more complex.

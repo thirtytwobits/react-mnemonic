@@ -186,10 +186,16 @@ function normalizeNewlines(text) {
     return text.replace(/\r\n/g, "\n");
 }
 
+function normalizeInternalLinks(markdown) {
+    return markdown.replace(/(!?\[[^\]]*]\()\/(?!\/)/g, `$1${siteBaseUrl}/`);
+}
+
 function loadCanonicalDocs() {
     return canonicalDocs.map((doc) => {
         assertFileExists(doc.sourcePath);
-        const content = stripFrontmatter(normalizeNewlines(readFileSync(doc.sourcePath, "utf8")));
+        const content = normalizeInternalLinks(
+            stripFrontmatter(normalizeNewlines(readFileSync(doc.sourcePath, "utf8"))),
+        );
         return {
             ...doc,
             content,
