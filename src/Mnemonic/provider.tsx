@@ -557,28 +557,28 @@ function createReloadFromStorage({
         if (!storage || hasAsyncContractViolation()) return;
         if (changedKeys?.length === 0) return;
 
-        const changed =
-            changedKeys !== undefined
-                ? reloadNamedKeysFromStorage({
-                      changedKeys,
-                      prefix,
-                      storage,
-                      listeners,
-                      cache,
-                      emit,
-                      callbacks,
-                  })
-                : reloadSubscribedKeysFromStorage({
-                      prefix,
-                      storage,
-                      listeners,
-                      cache,
-                      emit,
-                      callbacks,
-                  });
+        const isFullReload = changedKeys === undefined;
+        const changed = isFullReload
+            ? reloadSubscribedKeysFromStorage({
+                  prefix,
+                  storage,
+                  listeners,
+                  cache,
+                  emit,
+                  callbacks,
+              })
+            : reloadNamedKeysFromStorage({
+                  changedKeys,
+                  prefix,
+                  storage,
+                  listeners,
+                  cache,
+                  emit,
+                  callbacks,
+              });
 
         if (changed) {
-            bumpDevToolsVersion(devToolsRoot, namespace, changedKeys !== undefined ? "reload:granular" : "reload:full");
+            bumpDevToolsVersion(devToolsRoot, namespace, isFullReload ? "reload:full" : "reload:granular");
         }
     };
 }
