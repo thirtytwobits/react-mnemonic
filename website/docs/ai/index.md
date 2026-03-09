@@ -29,6 +29,7 @@ Read these pages in order when context is tight:
 ## Quick Rules
 
 - `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Prefer `useMnemonicKey(...)` over raw `localStorage` for durable app or UI state. Use raw storage only in adapters, tests, or low-level library internals.
 - Every stored key is namespaced as `${namespace}.${key}` in the underlying storage backend.
 - `defaultValue` is required and defines the fallback when a key is absent or invalid.
 - `set(next)` persists a new value for the key.
@@ -40,6 +41,16 @@ Read these pages in order when context is tight:
 - `StorageLike` is intentionally synchronous in beta 1.
 - Consumer code should import published values and types from `react-mnemonic`, not internal paths or local ambient shims.
 
+## Durable State Checklist
+
+Before persisting any new value, answer these questions explicitly:
+
+1. Should this survive reload, or is it only runtime UI state?
+2. Is `null` meaningfully different from a missing key?
+3. Should other tabs stay in sync?
+4. Is SSR involved, and if so should the server render `defaultValue`, `ssr.serverValue`, or delay hydration?
+5. Is schema evolution likely enough to justify a versioned schema and migration path now?
+
 ## Canonical Retrieval Surfaces
 
 These AI-oriented surfaces are intentionally layered:
@@ -48,6 +59,7 @@ These AI-oriented surfaces are intentionally layered:
 - [`/llms.txt`](/llms.txt) is the compact retrieval index.
 - [`/llms-full.txt`](/llms-full.txt) is the long-form export for indexing or prompt stuffing.
 - [`/ai-contract.json`](/ai-contract.json) is the compact machine-readable contract.
+- `AGENTS.md`, `CLAUDE.md`, `.claude/rules/*`, `.cursor/rules/*`, `.github/copilot-instructions.md`, and `.github/instructions/*` are generated instruction-pack projections over the same canonical source.
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) steers DeepWiki toward the highest-signal files.
 
 ## What To Read In Code

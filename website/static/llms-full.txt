@@ -55,6 +55,7 @@ Read these pages in order when context is tight:
 ## Quick Rules
 
 - `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Prefer `useMnemonicKey(...)` over raw `localStorage` for durable app or UI state. Use raw storage only in adapters, tests, or low-level library internals.
 - Every stored key is namespaced as `${namespace}.${key}` in the underlying storage backend.
 - `defaultValue` is required and defines the fallback when a key is absent or invalid.
 - `set(next)` persists a new value for the key.
@@ -66,6 +67,16 @@ Read these pages in order when context is tight:
 - `StorageLike` is intentionally synchronous in beta 1.
 - Consumer code should import published values and types from `react-mnemonic`, not internal paths or local ambient shims.
 
+## Durable State Checklist
+
+Before persisting any new value, answer these questions explicitly:
+
+1. Should this survive reload, or is it only runtime UI state?
+2. Is `null` meaningfully different from a missing key?
+3. Should other tabs stay in sync?
+4. Is SSR involved, and if so should the server render `defaultValue`, `ssr.serverValue`, or delay hydration?
+5. Is schema evolution likely enough to justify a versioned schema and migration path now?
+
 ## Canonical Retrieval Surfaces
 
 These AI-oriented surfaces are intentionally layered:
@@ -74,6 +85,7 @@ These AI-oriented surfaces are intentionally layered:
 - [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) is the compact retrieval index.
 - [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) is the long-form export for indexing or prompt stuffing.
 - [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) is the compact machine-readable contract.
+- `AGENTS.md`, `CLAUDE.md`, `.claude/rules/*`, `.cursor/rules/*`, `.github/copilot-instructions.md`, and `.github/instructions/*` are generated instruction-pack projections over the same canonical source.
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) steers DeepWiki toward the highest-signal files.
 
 ## What To Read In Code
@@ -602,7 +614,26 @@ Everything else is a companion surface:
 - [`/llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt) for compact retrieval
 - [`/llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt) for long-form export
 - [`/ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json) for machine-readable summaries
+- repository instruction packs for Codex, Claude Code, Cursor, and Copilot
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
+
+## Generated Instruction Packs
+
+The repo also ships first-party instruction packs generated from the canonical
+AI docs:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.claude/rules/react-mnemonic-persistence.md`
+- `.claude/rules/durable-state-checklist.md`
+- `.cursor/rules/react-mnemonic-persistence.mdc`
+- `.cursor/rules/react-mnemonic-docs.mdc`
+- `.github/copilot-instructions.md`
+- `.github/instructions/react-mnemonic-persistence.instructions.md`
+- `.github/instructions/react-mnemonic-docs.instructions.md`
+
+Those files are projections over the same persistence contract rather than
+independent sources of truth.
 
 ## Lowest-Friction Retrieval
 
@@ -676,7 +707,8 @@ mounting the repository locally.
 Keep the surfaces aligned this way:
 
 - edit the canonical prose in `website/docs/ai/*`
-- regenerate companion assets via `website/scripts/generate-ai-assets.mjs`
+- regenerate companion assets and instruction packs via `npm run docs:ai`
+- use `npm run ai:check` in CI or before commits to catch drift in generated AI artifacts and instruction packs
 - keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
 
 The goal is simple: agents should load one canonical contract and then choose

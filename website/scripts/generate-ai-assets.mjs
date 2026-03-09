@@ -13,6 +13,7 @@ const packageJsonPath = path.join(repoDir, "package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
 const siteBaseUrl = new URL(packageJson.homepage).toString().replace(/\/$/, "");
 const prettierConfig = (await resolveConfig(packageJsonPath)) ?? {};
+const checkMode = process.argv.includes("--check");
 
 const canonicalDocs = [
     {
@@ -262,8 +263,18 @@ ${sectionBlocks}`.trimEnd() + "\n"
 }
 
 function writeOutputFile(fileName, content) {
+    const outputPath = path.join(staticDir, fileName);
+    const currentContent = existsSync(outputPath) ? readFileSync(outputPath, "utf8") : null;
+
+    if (checkMode) {
+        if (currentContent !== content) {
+            throw new Error(`Generated AI asset is out of date: ${outputPath}. Run npm run docs:ai.`);
+        }
+        return;
+    }
+
     mkdirSync(staticDir, { recursive: true });
-    writeFileSync(path.join(staticDir, fileName), content, "utf8");
+    writeFileSync(outputPath, content, "utf8");
 }
 
 const docs = loadCanonicalDocs();

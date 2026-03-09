@@ -24,7 +24,26 @@ Everything else is a companion surface:
 - [`/llms.txt`](/llms.txt) for compact retrieval
 - [`/llms-full.txt`](/llms-full.txt) for long-form export
 - [`/ai-contract.json`](/ai-contract.json) for machine-readable summaries
+- repository instruction packs for Codex, Claude Code, Cursor, and Copilot
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
+
+## Generated Instruction Packs
+
+The repo also ships first-party instruction packs generated from the canonical
+AI docs:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.claude/rules/react-mnemonic-persistence.md`
+- `.claude/rules/durable-state-checklist.md`
+- `.cursor/rules/react-mnemonic-persistence.mdc`
+- `.cursor/rules/react-mnemonic-docs.mdc`
+- `.github/copilot-instructions.md`
+- `.github/instructions/react-mnemonic-persistence.instructions.md`
+- `.github/instructions/react-mnemonic-docs.instructions.md`
+
+Those files are projections over the same persistence contract rather than
+independent sources of truth.
 
 ## Lowest-Friction Retrieval
 
@@ -98,7 +117,8 @@ mounting the repository locally.
 Keep the surfaces aligned this way:
 
 - edit the canonical prose in `website/docs/ai/*`
-- regenerate companion assets via `website/scripts/generate-ai-assets.mjs`
+- regenerate companion assets and instruction packs via `npm run docs:ai`
+- use `npm run ai:check` in CI or before commits to catch drift in generated AI artifacts and instruction packs
 - keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
 
 The goal is simple: agents should load one canonical contract and then choose
