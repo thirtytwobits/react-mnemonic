@@ -1,0 +1,38 @@
+{
+    "pages": [
+        {
+            "title": "AI Docs Overview",
+            "description": "Start here for the compact persistence contract, retrieval surfaces, and links to the highest-signal AI docs.",
+            "files": [
+                "website/docs/ai/index.md",
+                "website/docs/ai/invariants.md",
+                "website/docs/ai/decision-matrix.md",
+                "website/docs/ai/recipes.md",
+                "website/docs/ai/anti-patterns.md",
+                "website/docs/ai/assistant-setup.md"
+            ]
+        },
+        {
+            "title": "Public API And README",
+            "description": "Published entry points and human-facing overview for the package surface that assistants should import from.",
+            "files": ["README.md", "src/index.ts", "website/docs/getting-started/quick-start.md"]
+        },
+        {
+            "title": "Hook And Provider Semantics",
+            "description": "Source files that define namespaces, read and write lifecycle order, SSR behavior, cross-tab sync, and storage boundaries.",
+            "files": ["src/Mnemonic/use.ts", "src/Mnemonic/provider.tsx", "src/Mnemonic/types.ts"]
+        },
+        {
+            "title": "High-Risk Guides",
+            "description": "Detailed guidance for the semantics that are easiest for agents to get subtly wrong.",
+            "files": [
+                "website/docs/guides/clearable-persisted-values.mdx",
+                "website/docs/guides/persisted-vs-ephemeral-state.mdx",
+                "website/docs/guides/server-rendering.md",
+                "website/docs/guides/schema-migration.md",
+                "website/docs/guides/custom-storage.md",
+                "website/docs/guides/canonical-key-definitions.md"
+            ]
+        }
+    ]
+}

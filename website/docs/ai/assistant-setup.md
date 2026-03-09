@@ -1,0 +1,105 @@
+---
+sidebar_position: 6
+title: AI Assistant Setup
+description: How to expose react-mnemonic's canonical docs to coding assistants, DeepWiki, and MCP-based tooling.
+---
+
+# AI Assistant Setup
+
+This page explains how users and agent builders should expose `react-mnemonic`
+to coding assistants.
+
+## Canonical Source
+
+The canonical AI-oriented source is this docs section:
+
+- `/docs/ai`
+- `/docs/ai/invariants`
+- `/docs/ai/decision-matrix`
+- `/docs/ai/recipes`
+- `/docs/ai/anti-patterns`
+
+Everything else is a companion surface:
+
+- [`/llms.txt`](/llms.txt) for compact retrieval
+- [`/llms-full.txt`](/llms-full.txt) for long-form export
+- [`/ai-contract.json`](/ai-contract.json) for machine-readable summaries
+- [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
+
+## Lowest-Friction Retrieval
+
+When an assistant has only HTTP or search access, give it these URLs first:
+
+1. [`/llms.txt`](/llms.txt)
+2. [`/docs/ai`](/docs/ai)
+3. [`/llms-full.txt`](/llms-full.txt)
+4. [`/ai-contract.json`](/ai-contract.json)
+
+That ordering keeps the first context window compact while still leaving a
+long-form export available when the task is more complex.
+
+## DeepWiki
+
+The repo ships [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json)
+to steer DeepWiki toward the files that matter most for correct persistence
+behavior:
+
+- canonical AI docs
+- `README.md`
+- the public export surface in `src/index.ts`
+- the hook, provider, and type definitions that define runtime semantics
+- the deeper guides for migrations, SSR, clearable values, and custom storage
+
+If you re-index the repository, keep that file up to date with any future
+source-of-truth moves.
+
+## Validated MCP-Friendly Path
+
+The lowest-friction MCP setup is exposing this repository through a
+filesystem-capable MCP server or any equivalent local-docs MCP layer.
+
+Mount these paths:
+
+- `website/docs/ai/index.md`
+- `website/docs/ai/invariants.md`
+- `website/docs/ai/decision-matrix.md`
+- `website/docs/ai/recipes.md`
+- `website/docs/ai/anti-patterns.md`
+- `website/static/llms.txt`
+- `website/static/llms-full.txt`
+- `website/static/ai-contract.json`
+- `src/Mnemonic/use.ts`
+- `src/Mnemonic/provider.tsx`
+- `src/Mnemonic/types.ts`
+
+Why this path is validated:
+
+- the website build regenerates `llms.txt`, `llms-full.txt`, and `ai-contract.json` before Docusaurus runs
+- the generation step fails fast if any canonical AI source file is missing
+- the docs build already fails on broken links, so the published AI entry points stay connected to the site navigation
+
+This gives an MCP client both the compact docs surfaces and the source files
+that define the contract underneath them.
+
+## Hosted Retrieval Path
+
+If your assistant can fetch remote files, use the published GitHub Pages URLs:
+
+- `https://thirtytwobits.github.io/react-mnemonic/llms.txt`
+- `https://thirtytwobits.github.io/react-mnemonic/llms-full.txt`
+- `https://thirtytwobits.github.io/react-mnemonic/ai-contract.json`
+- `https://thirtytwobits.github.io/react-mnemonic/docs/ai`
+
+Use the hosted path when you want versioned, read-only retrieval without
+mounting the repository locally.
+
+## Maintenance
+
+Keep the surfaces aligned this way:
+
+- edit the canonical prose in `website/docs/ai/*`
+- regenerate companion assets via `website/scripts/generate-ai-assets.mjs`
+- keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
+
+The goal is simple: agents should load one canonical contract and then choose
+the right persistence behavior without inventing missing semantics.

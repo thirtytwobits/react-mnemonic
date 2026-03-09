@@ -115,10 +115,16 @@ contract importable and explicit for both humans and AI-assisted tooling.
 
 For a deterministic implementation reference aimed at AI agents and advanced
 users, see the
-[AI Contract Guide](https://thirtytwobits.github.io/react-mnemonic/docs/guides/ai-contract-guide).
-For compact agent retrieval surfaces, use `docs/ai/quick-rules.md`,
-`llms.txt`, and `llms-full.txt`. Agents should import published types from
-`react-mnemonic` and must not invent local `.d.ts` shims for the package.
+[AI docs overview](https://thirtytwobits.github.io/react-mnemonic/docs/ai).
+The canonical agent-facing prose lives under
+[`website/docs/ai/`](https://github.com/thirtytwobits/react-mnemonic/tree/main/website/docs/ai),
+with compact retrieval surfaces published as
+[`llms.txt`](https://thirtytwobits.github.io/react-mnemonic/llms.txt),
+[`llms-full.txt`](https://thirtytwobits.github.io/react-mnemonic/llms-full.txt),
+and
+[`ai-contract.json`](https://thirtytwobits.github.io/react-mnemonic/ai-contract.json).
+Agents should import published types from `react-mnemonic` and must not invent
+local `.d.ts` shims for the package.
 
 If you need evidence for where `react-mnemonic` is heavier, more explicit, or
 better suited to SSR-sensitive persistence than lighter hooks, see the

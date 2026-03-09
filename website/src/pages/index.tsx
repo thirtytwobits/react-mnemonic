@@ -87,10 +87,10 @@ function HomepageHeader() {
                     </Link>
                     <Link
                         className={clsx("button button--outline button--lg", styles.heroOutlineButton)}
-                        to="/docs/guides/ai-contract-guide"
+                        to="/docs/ai"
                         style={{ marginLeft: "1rem" }}
                     >
-                        AI Contract Guide
+                        AI Docs
                     </Link>
                 </div>
                 <div className={styles.installSnippet}>
@@ -141,8 +141,7 @@ function HomepageExample() {
                             survives full page reloads.
                         </p>
                         <p style={{ textAlign: "center", marginTop: "0.75rem" }}>
-                            Need the deterministic implementation contract?{" "}
-                            <Link to="/docs/guides/ai-contract-guide">Read the AI Contract Guide</Link>.
+                            Need the deterministic implementation contract? <Link to="/docs/ai">Read the AI docs</Link>.
                         </p>
                         <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
                             <p style={{ marginBottom: "0.75rem" }}>

@@ -10,13 +10,25 @@ const sidebars: SidebarsConfig = {
         },
         {
             type: "category",
+            label: "AI",
+            collapsed: false,
+            items: [
+                "ai/index",
+                "ai/invariants",
+                "ai/decision-matrix",
+                "ai/recipes",
+                "ai/anti-patterns",
+                "ai/assistant-setup",
+            ],
+        },
+        {
+            type: "category",
             label: "Guides",
             collapsed: false,
             items: [
                 "guides/schema-modes",
                 "guides/json-schema-validation",
                 "guides/schema-migration",
-                "guides/ai-contract-guide",
                 "guides/comparisons-and-benchmarks",
                 "guides/canonical-key-definitions",
                 "guides/single-source-of-truth-schemas",

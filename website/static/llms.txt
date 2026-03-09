@@ -1,0 +1,37 @@
+# react-mnemonic
+> Persistent, type-safe state management for React with explicit persistence semantics for humans and coding assistants.
+
+Use this file as the compact retrieval index. The canonical AI-oriented prose
+lives under `/docs/ai`, with `/llms-full.txt` as the long-form export and
+`/ai-contract.json` as the machine-readable companion.
+
+## Recommended reading
+
+- [AI Overview](https://thirtytwobits.github.io/react-mnemonic/docs/ai) - Canonical entry point for the persistence contract, retrieval surfaces, and high-risk rules.
+- [Invariants](https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants) - Deterministic guarantees for provider scope, reads, writes, SSR, type sourcing, and storage adapters.
+- [Decision Matrix](https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix) - Decision tables for null vs remove, migration vs reconcile, persistence boundaries, and SSR mode choice.
+- [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes) - Copy-pastable durable state patterns for themes, filters, dismissals, drafts, migrations, and SSR placeholders.
+- [Anti-Patterns](https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns) - Common mistakes that produce the wrong persistence semantics even when the UI appears to work.
+- [AI Assistant Setup](https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup) - How to expose the canonical docs through llms files, DeepWiki, and MCP-friendly retrieval paths.
+
+## Key guides
+
+- [Quick Start](https://thirtytwobits.github.io/react-mnemonic/docs/getting-started/quick-start)
+- [Schema Migration](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)
+- [Server Rendering](https://thirtytwobits.github.io/react-mnemonic/docs/guides/server-rendering)
+- [Clearable Persisted Values](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values)
+- [Persisted vs Ephemeral State](https://thirtytwobits.github.io/react-mnemonic/docs/guides/persisted-vs-ephemeral-state)
+- [Custom Storage](https://thirtytwobits.github.io/react-mnemonic/docs/guides/custom-storage)
+- [API Reference](https://thirtytwobits.github.io/react-mnemonic/docs/api)
+
+## Quick rules
+
+- `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Persisted keys are stored as `${namespace}.${key}`.
+- `defaultValue` is required and is the fallback for absent or invalid values.
+- `set(next)` persists a value, `reset()` persists `defaultValue`, and `remove()` deletes the key.
+- Use `set(null)` when a cleared state must survive reload.
+- SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.
+- Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.
+- `StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.
+- Import published values and types from `react-mnemonic`; do not invent local ambient shims.
