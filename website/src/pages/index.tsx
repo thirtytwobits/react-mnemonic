@@ -34,21 +34,65 @@ type FeatureItem = {
     description: string;
 };
 
+type ResourceItem = {
+    title: string;
+    href: string;
+    description: string;
+    external?: boolean;
+};
+
 const features: FeatureItem[] = [
+    {
+        title: "AI-friendly by design",
+        description:
+            "The project is designed so coding assistants can choose durable state, SSR behavior, nullability, and migrations correctly without inventing storage semantics.",
+    },
     {
         title: "useState-like API",
         description:
             "useMnemonicKey returns { value, set, reset, remove } — the same mental model as useState, with persistence built in.",
     },
     {
-        title: "AI-First Persistence",
-        description:
-            "The docs include an AI-friendliness benchmark centered on one-shot persistence correctness, not just bundle size.",
-    },
-    {
         title: "SSR-safe by default",
         description:
             "Server renders use defaultValue by default, with opt-in serverValue and client-only hydration controls when you need them.",
+    },
+];
+
+const aiResources: ResourceItem[] = [
+    {
+        title: "AI Docs",
+        href: "/docs/ai",
+        description: "Canonical invariants, decision matrix, recipes, anti-patterns, and setup guidance.",
+    },
+    {
+        title: "llms.txt",
+        href: "https://thirtytwobits.github.io/react-mnemonic/llms.txt",
+        description: "Compact retrieval index for tight context windows and first-pass tool loading.",
+        external: true,
+    },
+    {
+        title: "llms-full.txt",
+        href: "https://thirtytwobits.github.io/react-mnemonic/llms-full.txt",
+        description: "Long-form export for indexing, retrieval, and larger prompt contexts.",
+        external: true,
+    },
+    {
+        title: "ai-contract.json",
+        href: "https://thirtytwobits.github.io/react-mnemonic/ai-contract.json",
+        description: "Machine-readable persistence contract for tooling and agent integrations.",
+        external: true,
+    },
+    {
+        title: "DeepWiki Priorities",
+        href: "https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json",
+        description: "DeepWiki steering file that points retrieval toward the highest-signal sources.",
+        external: true,
+    },
+    {
+        title: "Assistant Setup",
+        href: "/docs/ai/assistant-setup",
+        description: "Generated instruction packs plus the documented MCP-friendly retrieval path.",
     },
 ];
 
@@ -74,6 +118,10 @@ function HomepageHeader() {
             <div className={clsx("container", styles.heroContent)}>
                 <h1 className="hero__title">{siteConfig.title}</h1>
                 <p className="hero__subtitle">{siteConfig.tagline}</p>
+                <p className={styles.heroLead}>
+                    Built for humans and coding assistants alike, with first-party AI docs and retrieval surfaces that
+                    help agents use persistence correctly instead of falling back to raw storage hacks.
+                </p>
                 <div className={styles.buttons}>
                     <Link className="button button--secondary button--lg" to="/docs/getting-started/installation">
                         Get Started
@@ -162,6 +210,35 @@ function HomepageExample() {
     );
 }
 
+function HomepageAiResources() {
+    return (
+        <section className={styles.resources}>
+            <div className="container">
+                <h2 style={{ textAlign: "center", marginBottom: "0.75rem" }}>AI Resources</h2>
+                <p className={styles.resourcesLead}>
+                    <code>react-mnemonic</code> ships dedicated retrieval surfaces for coding assistants, benchmarking,
+                    DeepWiki, and local MCP-style documentation setups.
+                </p>
+                <div className="row">
+                    {aiResources.map((resource) => (
+                        <div key={resource.title} className="col col--4">
+                            <div className="feature-card" style={{ height: "100%", marginBottom: "1rem" }}>
+                                <h3>{resource.title}</h3>
+                                <p>{resource.description}</p>
+                                {resource.external ? (
+                                    <a href={resource.href}>Open resource</a>
+                                ) : (
+                                    <Link to={resource.href}>Open resource</Link>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
 function HomepageAttribution() {
     return (
         <section className={styles.attribution}>
@@ -185,6 +262,7 @@ export default function Home(): React.JSX.Element {
             <main>
                 <HomepageFeatures />
                 <HomepageExample />
+                <HomepageAiResources />
                 <HomepageAttribution />
             </main>
         </Layout>
