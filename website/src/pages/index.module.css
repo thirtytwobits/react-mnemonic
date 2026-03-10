@@ -30,6 +30,13 @@
     z-index: 1;
 }
 
+.heroLead {
+    max-width: 48rem;
+    margin: 1rem auto 0;
+    font-size: 1.05rem;
+    line-height: 1.6;
+}
+
 .buttons {
     display: flex;
     align-items: center;
@@ -89,6 +96,21 @@
 .example {
     padding: 3rem 0;
     background: var(--ifm-background-surface-color);
+}
+
+.resources {
+    padding: 3rem 0;
+}
+
+.resources :global(.row) {
+    row-gap: 1.5rem;
+}
+
+.resourcesLead {
+    max-width: 52rem;
+    margin: 0 auto 2rem;
+    text-align: center;
+    color: var(--ifm-color-emphasis-700);
 }
 
 .attribution {

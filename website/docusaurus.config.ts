@@ -4,7 +4,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
     title: "react-mnemonic",
-    tagline: "Persistent, type-safe state management for React",
+    tagline: "AI-friendly, persistent, type-safe state management for React",
     favicon: "img/favicon.svg",
 
     url: "https://thirtytwobits.github.io",
