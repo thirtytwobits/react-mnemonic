@@ -488,3 +488,142 @@ Keep `activeStepId`, `stepErrors`, and `isSubmitting` ephemeral by default.
 Persist a resume position only when reopening on the same step after reload is a
 real product requirement. For the full pattern, see
 [Multi-Step Form Wizards](/docs/guides/multi-step-form-wizards).
+
+## 9. Shopping Cart With Canonical Line Items And Derived Totals
+
+```tsx
+import { JSONCodec, MnemonicProvider, defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+
+type Product = {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
+};
+
+type CartLine = {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
+    quantity: number;
+};
+
+type CartState = {
+    currencyCode: "USD";
+    items: CartLine[];
+};
+
+const cartKey = defineMnemonicKey("shopping-cart", {
+    defaultValue: {
+        currencyCode: "USD" as const,
+        items: [],
+    },
+    codec: JSONCodec,
+    listenCrossTab: true,
+});
+
+function normalizeQuantity(quantity: number): number {
+    return Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 0;
+}
+
+function addProduct(cart: CartState, product: Product): CartState {
+    const existing = cart.items.find((item) => item.sku === product.sku);
+    if (!existing) {
+        return {
+            ...cart,
+            items: [
+                ...cart.items,
+                {
+                    sku: product.sku,
+                    title: product.title,
+                    unitPriceCents: product.unitPriceCents,
+                    quantity: 1,
+                },
+            ],
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) =>
+            item.sku === product.sku
+                ? {
+                      ...item,
+                      title: product.title,
+                      unitPriceCents: product.unitPriceCents,
+                      quantity: item.quantity + 1,
+                  }
+                : item,
+        ),
+    };
+}
+
+function updateProductQuantity(cart: CartState, sku: string, quantity: number): CartState {
+    const nextQuantity = normalizeQuantity(quantity);
+    if (nextQuantity === 0) {
+        return {
+            ...cart,
+            items: cart.items.filter((item) => item.sku !== sku),
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) => (item.sku === sku ? { ...item, quantity: nextQuantity } : item)),
+    };
+}
+
+function Storefront() {
+    const { value: cart, set, remove } = useMnemonicKey(cartKey);
+
+    const subtotalCents = cart.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+    const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+
+    return (
+        <>
+            <button
+                onClick={() =>
+                    set((current) =>
+                        addProduct(current, {
+                            sku: "widget",
+                            title: "Widget",
+                            unitPriceCents: 999,
+                        }),
+                    )
+                }
+            >
+                Add widget
+            </button>
+
+            <button onClick={() => set((current) => updateProductQuantity(current, "widget", 3))}>
+                Set widget qty to 3
+            </button>
+
+            <button onClick={() => set({ currencyCode: "USD", items: [] })}>Empty cart</button>
+            <button onClick={() => remove()}>Forget cart</button>
+
+            <p>Items: {itemCount}</p>
+            <p>Subtotal: ${(subtotalCents / 100).toFixed(2)}</p>
+        </>
+    );
+}
+
+export function App() {
+    return (
+        <MnemonicProvider namespace="storefront.cart">
+            <Storefront />
+        </MnemonicProvider>
+    );
+}
+```
+
+Use when:
+
+- the cart should survive reload or cross-tab browsing
+- duplicate adds should merge into one line item
+- subtotal and item count can be derived from canonical stored lines
+- an empty active cart is different from forgetting cart persistence entirely
+
+Persist the canonical line items. Derive totals and counts. Use `items: []` for
+an active empty cart, and reserve `remove()` for flows like checkout success,
+logout, or recovery. For fuller setup and edge cases, see
+[Shopping Cart Persistence](/docs/guides/shopping-cart-persistence).

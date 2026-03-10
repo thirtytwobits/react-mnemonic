@@ -15,6 +15,7 @@ Use it when you need:
 - a reliable rule for `set(...)`, `set(null)`, `remove()`, and `reset()`
 - the shortest correct explanation of SSR, migrations, `reconcile(...)`, and storage adapters
 - wizard navigation and validation boundaries without persisting the wrong UI state
+- shopping cart line-item modeling without inventing the wrong clear semantics
 - copy-pastable patterns that stay aligned with the public API
 
 ## Start Here
@@ -40,6 +41,7 @@ Read these pages in order when context is tight:
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
 - For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
+- For shopping carts, persist canonical line items and quantities; derive subtotal and item count instead of storing them, and treat empty-cart semantics separately from `remove()`.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.
@@ -83,6 +85,7 @@ still shipping incorrect persistence behavior:
 - treating `remove()` as if it means "clear but remember the cleared state"
 - persisting runtime-only UI state such as loading flags, hover state, or validation errors
 - persisting wizard navigation, step errors, or submit-in-flight flags as part of the durable draft
+- persisting cart subtotals or item counts as stored fields instead of deriving them from line items
 - persisting credential material or keeping one global namespace across authenticated user changes
 - clearing the current namespace after auth already switched away from the user who owned the data
 - using `reconcile(...)` to paper over a real versioned schema change

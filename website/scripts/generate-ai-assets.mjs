@@ -43,7 +43,7 @@ const canonicalDocs = [
         id: "recipes",
         title: "Recipes",
         summary:
-            "Copy-pastable durable state patterns for themes, filters, drafts, wizards, migrations, and SSR placeholders.",
+            "Copy-pastable durable state patterns for themes, filters, shopping carts, drafts, wizards, migrations, and SSR placeholders.",
         sourcePath: path.join(docsDir, "recipes.md"),
         url: `${siteBaseUrl}/docs/ai/recipes`,
     },
@@ -85,6 +85,10 @@ const keyGuideLinks = [
         url: `${siteBaseUrl}/docs/guides/persisted-vs-ephemeral-state`,
     },
     {
+        title: "Shopping Cart Persistence",
+        url: `${siteBaseUrl}/docs/guides/shopping-cart-persistence`,
+    },
+    {
         title: "Multi-Step Form Wizards",
         url: `${siteBaseUrl}/docs/guides/multi-step-form-wizards`,
     },
@@ -106,6 +110,7 @@ const quickRules = [
     "Use `set(null)` when a cleared state must survive reload.",
     "SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.",
     "For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.",
+    "For shopping carts, persist canonical line items and quantities; derive subtotal and item count instead of storing them, and treat empty-cart semantics separately from `remove()`.",
     "Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.",
     "`StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.",
     "Import published values and types from `react-mnemonic`; do not invent local ambient shims.",
@@ -174,6 +179,7 @@ const aiContract = {
         "dismissible-ui",
         "durable-draft",
         "multi-step-wizard",
+        "shopping-cart",
         "schema-upgrade",
         "ssr-placeholder",
     ],

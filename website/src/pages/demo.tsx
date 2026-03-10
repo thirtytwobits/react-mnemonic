@@ -57,7 +57,10 @@ function DemoContent() {
                 <h2>Shopping Cart</h2>
                 <p>
                     Uses a custom <code>StorageLike</code> adapter backed by IndexedDB via <code>idb-keyval</code>, with
-                    a synchronous in-memory facade in its own <code>MnemonicProvider</code>.
+                    a synchronous in-memory facade in its own <code>MnemonicProvider</code>. The demo persists canonical
+                    cart lines, derives totals, and distinguishes emptying the cart from forgetting persisted state.
+                    This same implementation is also used in the{" "}
+                    <a href="/docs/guides/shopping-cart-persistence">Shopping Cart Persistence guide</a>.
                 </p>
                 <ShoppingCart />
             </section>

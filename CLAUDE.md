@@ -18,6 +18,7 @@ state with `react-mnemonic`.
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
 - For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
+- For shopping carts, persist canonical line items and quantities; derive subtotal and item count instead of storing them, and treat empty-cart semantics separately from `remove()`.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.
@@ -41,6 +42,7 @@ state with `react-mnemonic`.
 - SSR Placeholder For Theme
 - Auth-Aware Durable State With Automatic Cleanup
 - Multi-Step Wizard With Durable Draft And Ephemeral Navigation
+- Shopping Cart With Canonical Line Items And Derived Totals
 
 ## Canonical Docs
 
