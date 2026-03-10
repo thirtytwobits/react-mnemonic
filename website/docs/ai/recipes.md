@@ -326,6 +326,18 @@ function validateStep(stepId: StepId, draft: WizardDraft): string[] {
     }
 }
 
+async function saveWizard(draft: WizardDraft) {
+    const response = await fetch("/api/signup-wizard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(draft),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Wizard save failed: ${response.status} ${response.statusText}`);
+    }
+}
+
 export function SignupWizard() {
     const {
         value: draft,
@@ -343,7 +355,7 @@ export function SignupWizard() {
         if (!steps.includes(activeStepId)) {
             setActiveStepId("account");
         }
-    }, [activeStepId, steps]);
+    }, [activeStepId, draft.accountType]);
 
     const activeIndex = steps.indexOf(activeStepId);
 

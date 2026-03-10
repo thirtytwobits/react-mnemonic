@@ -118,11 +118,15 @@ function validateAll(steps: StepId[], draft: OnboardingDraft): Partial<Record<St
 }
 
 async function submitOnboarding(draft: OnboardingDraft) {
-    await fetch("/api/onboarding", {
+    const response = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(draft),
     });
+
+    if (!response.ok) {
+        throw new Error(`Onboarding submission failed: ${response.status} ${response.statusText}`);
+    }
 }
 
 function OnboardingWizard() {
@@ -137,7 +141,7 @@ function OnboardingWizard() {
         if (!steps.includes(activeStepId)) {
             setActiveStepId("account");
         }
-    }, [activeStepId, steps]);
+    }, [activeStepId, draft.accountType]);
 
     const activeIndex = steps.indexOf(activeStepId);
     const currentErrors = stepErrors[activeStepId] ?? [];
@@ -270,7 +274,13 @@ function OnboardingWizard() {
                             type="number"
                             min={1}
                             value={draft.teamSize}
-                            onChange={(event) => updateDraft("teamSize", Number(event.target.value))}
+                            onChange={(event) => {
+                                const parsed = Number(event.target.value);
+                                updateDraft(
+                                    "teamSize",
+                                    Number.isFinite(parsed) && parsed >= 1 ? parsed : draft.teamSize,
+                                );
+                            }}
                         />
                     </label>
                     <label>
