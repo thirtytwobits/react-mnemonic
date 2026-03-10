@@ -50,6 +50,7 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "docs:ai": "node ./website/scripts/generate-ai-assets.mjs && node ./scripts/generate-agent-instructions.mjs",
+        "docs:version": "npm --prefix website run typedoc && npm run docs:ai && npm --prefix website run docusaurus -- docs:version",
         "docs": "typedoc",
         "docs:watch": "typedoc --watch",
         "docs:site": "npm --prefix website run build",

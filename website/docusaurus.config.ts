@@ -69,6 +69,16 @@ const config: Config = {
                 docs: {
                     sidebarPath: "./sidebars.ts",
                     editUrl: "https://github.com/thirtytwobits/react-mnemonic/tree/main/website/",
+                    lastVersion: "1.2.0-beta1",
+                    versions: {
+                        current: {
+                            label: "Next",
+                            path: "next",
+                        },
+                        "1.2.0-beta1": {
+                            label: "1.2.0-beta1",
+                        },
+                    },
                 },
                 blog: false,
                 theme: {
@@ -94,6 +104,11 @@ const config: Config = {
                     sidebarId: "docsSidebar",
                     position: "left",
                     label: "Docs",
+                },
+                {
+                    type: "docsVersionDropdown",
+                    position: "left",
+                    dropdownActiveClassDisabled: true,
                 },
                 {
                     to: "docs/api",

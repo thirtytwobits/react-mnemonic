@@ -1246,12 +1246,35 @@ If your assistant can fetch remote files, use the published GitHub Pages URLs:
 Use the hosted path when you want versioned, read-only retrieval without
 mounting the repository locally.
 
+## Versioned Docs Behavior
+
+The site now uses Docusaurus versioned docs:
+
+- the latest released docs live at `/docs`
+- unreleased work from `main` lives at `/docs/next`
+- released snapshots live at `/docs/<version>`
+
+Example released path:
+
+- `https://thirtytwobits.github.io/react-mnemonic/docs/1.2.0-beta1`
+
+Current AI retrieval surfaces remain latest-only:
+
+- `/llms.txt`
+- `/llms-full.txt`
+- `/ai-contract.json`
+
+That means version-specific AI retrieval should currently use the versioned docs
+pages themselves rather than the root `llms` exports. Version-specific `llms`
+surfaces can be added later if they become necessary.
+
 ## Maintenance
 
 Keep the surfaces aligned this way:
 
 - edit the canonical prose in `website/docs/ai/*`
 - regenerate companion assets and instruction packs via `npm run docs:ai`
+- cut new released doc snapshots via `npm run docs:version -- <version>` when needed
 - use `npm run ai:check` in CI or before commits to catch drift in generated AI artifacts and instruction packs
 - keep `context7.json` aligned with the same high-signal docs and public API entry points
 - keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
