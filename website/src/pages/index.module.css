@@ -102,6 +102,10 @@
     padding: 3rem 0;
 }
 
+.resources :global(.row) {
+    row-gap: 1.5rem;
+}
+
 .resourcesLead {
     max-width: 52rem;
     margin: 0 auto 2rem;
