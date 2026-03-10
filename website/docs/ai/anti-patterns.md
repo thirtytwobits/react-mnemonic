@@ -92,6 +92,53 @@ Prefer:
 - `useMnemonicKey(...)` for durable app or UI state
 - raw storage only in storage adapter implementations, tests, or low-level library internals
 
+## Persisting Credentials Or Session Secrets
+
+Do not use `react-mnemonic` as a credential store.
+
+Wrong:
+
+- access tokens in persisted keys
+- refresh tokens in persisted keys
+- raw session IDs, OTP material, or recovery codes in durable storage
+
+Prefer:
+
+- your auth provider's storage model
+- httpOnly cookies or another dedicated credential boundary
+- persisting only safe user-owned state such as drafts or filters
+
+## Reusing One Namespace Across Authenticated Users
+
+Authenticated durable state should not live under one anonymous global prefix.
+
+Wrong:
+
+- `namespace="my-app"` for every signed-in user on a shared browser profile
+- keeping user A's saved draft under the same keys that user B will read next
+
+Prefer:
+
+- a namespace that includes the authenticated user identity
+- clearing auth-scoped keys on logout, expiry, or invalidation
+- `reconcile(...)` as a backstop when auth policy changes between reads
+
+## Clearing The Wrong Namespace After Logout
+
+`useMnemonicRecovery()` clears the current provider namespace, not whichever
+namespace used to be active one render ago.
+
+Wrong:
+
+- switching from `app.user.123` to `app.anonymous`
+- then calling `useMnemonicRecovery().clearKeys([...])` from the anonymous provider
+
+Prefer:
+
+- clearing the authenticated namespace before swapping auth state
+- or mounting a temporary recovery boundary for the last authenticated namespace
+- keeping `reconcile(...)` as a read-time backstop, not the only cleanup mechanism
+
 ## Treating The Provider As Optional
 
 `useMnemonicKey(...)` is not a global singleton hook.

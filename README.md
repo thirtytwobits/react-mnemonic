@@ -83,6 +83,7 @@ survives a full page reload.
 - [Canonical Key Definitions](https://thirtytwobits.github.io/react-mnemonic/docs/guides/canonical-key-definitions)
 - [Single Source of Truth Schemas](https://thirtytwobits.github.io/react-mnemonic/docs/guides/single-source-of-truth-schemas)
 - [Schema Migration](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)
+- [Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence)
 - [Context7 Rankings](https://thirtytwobits.github.io/react-mnemonic/docs/guides/context7-rankings)
 - [API Reference](https://thirtytwobits.github.io/react-mnemonic/docs/api)
 - [AI Overview](https://thirtytwobits.github.io/react-mnemonic/docs/ai)

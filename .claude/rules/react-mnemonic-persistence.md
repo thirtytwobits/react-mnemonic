@@ -12,6 +12,8 @@ Apply these rules whenever a task could introduce or modify durable UI state.
 - `reset()` persists `defaultValue` again.
 - `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
 - Use `set(null)` when "cleared" is a durable state that must survive reload.
+- Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
+- Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.
