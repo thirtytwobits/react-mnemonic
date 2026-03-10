@@ -26,8 +26,6 @@ jobs:
             - run: npm run test
             - if: matrix.node-version == 20
               run: npm run test:consumers
-            - if: matrix.node-version == 20
-              run: npm run benchmarks:ai
 
     docs-build:
         runs-on: ubuntu-latest
