@@ -60,10 +60,10 @@ the hook:
 import { validateJsonSchema } from "react-mnemonic/schema";
 
 const errors = validateJsonSchema(
-    { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     { name: 42 },
+    { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
 );
-// [{ path: ".name", message: 'Expected type "string"' }]
+// [{ path: "/name", message: 'Expected type "string", got "number"' }]
 ```
 
 ## Compiled validators
@@ -87,7 +87,7 @@ const validate: CompiledValidator = compileSchema({
 });
 
 validate({ name: "Alice", age: 30 }); // []
-validate({ age: -1 }); // [{ path: "", … }, { path: ".age", … }]
+validate({ age: -1 }); // [{ path: "", … }, { path: "/age", … }]
 ```
 
 This is useful when you validate the same schema frequently outside of the hook

@@ -4,8 +4,6 @@ title: Shopping Cart Persistence
 description: Persist canonical cart line items while deriving totals and keeping cart semantics explicit.
 ---
 
-import { ShoppingCart } from "@site/src/components/demo/ShoppingCart";
-
 # Shopping Cart Persistence
 
 Shopping carts usually need durable state, but they also need a clearer data
@@ -59,9 +57,15 @@ The shared example shows:
 - derived subtotal and item count
 - fallback behavior when persisted cart data is malformed
 
-## Interactive example
+## Release snapshot note
 
-<ShoppingCart />
+The current docs site and playground share one live `ShoppingCart` component,
+but this frozen `1.2.0-beta1` snapshot intentionally does not import
+`@site/src` demo code.
+
+That keeps this release snapshot self-contained even if the current playground
+component evolves later. For the matching implementation shape, use the shared
+cart source linked above and the guidance in this document.
 
 ## Derived totals should stay derived
 

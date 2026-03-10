@@ -5,13 +5,13 @@ description: Legacy entry point that forwards readers to the canonical AI docs s
 
 # AI Contract Guide
 
-The canonical AI-oriented docs live under [AI Overview](/docs/ai).
+The canonical AI-oriented docs live under [AI Overview](../ai).
 
 Use these pages:
 
-- [AI Overview](/docs/ai)
-- [Invariants](/docs/ai/invariants)
-- [Decision Matrix](/docs/ai/decision-matrix)
-- [Recipes](/docs/ai/recipes)
-- [Anti-Patterns](/docs/ai/anti-patterns)
-- [AI Assistant Setup](/docs/ai/assistant-setup)
+- [AI Overview](../ai)
+- [Invariants](../ai/invariants)
+- [Decision Matrix](../ai/decision-matrix)
+- [Recipes](../ai/recipes)
+- [Anti-Patterns](../ai/anti-patterns)
+- [AI Assistant Setup](../ai/assistant-setup)

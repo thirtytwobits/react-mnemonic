@@ -148,6 +148,6 @@ const themeKey = defineMnemonicKey("theme", {
 
 ## Related guides
 
-- [Schema Migration](/docs/guides/schema-migration)
-- [Canonical Key Definitions](/docs/guides/canonical-key-definitions)
-- [TypeScript](/docs/guides/typescript)
+- [Schema Migration](./schema-migration)
+- [Canonical Key Definitions](./canonical-key-definitions)
+- [TypeScript](./typescript)

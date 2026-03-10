@@ -86,7 +86,7 @@ function ProfileName() {
 }
 ```
 
-See [Clearable Persisted Values](/docs/guides/clearable-persisted-values) for
+See [Clearable Persisted Values](./clearable-persisted-values) for
 the semantic differences between `set(null)`, `remove()`, and `reset()`.
 
 ## Descriptors with schema-managed keys

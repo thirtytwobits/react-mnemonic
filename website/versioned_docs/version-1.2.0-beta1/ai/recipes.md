@@ -276,11 +276,11 @@ Use when:
 Because `useMnemonicRecovery()` is namespace-scoped, run cleanup before
 switching to an anonymous namespace. If auth has already flipped, clear the last
 authenticated namespace from a temporary recovery boundary instead. See
-[Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+[Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 pattern.
 
 Do not store tokens, refresh tokens, or raw session secrets this way. See
-[Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+[Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 pattern.
 
 ## 8. Multi-Step Wizard With Durable Draft And Ephemeral Navigation
@@ -487,7 +487,7 @@ Use when:
 Keep `activeStepId`, `stepErrors`, and `isSubmitting` ephemeral by default.
 Persist a resume position only when reopening on the same step after reload is a
 real product requirement. For the full pattern, see
-[Multi-Step Form Wizards](/docs/guides/multi-step-form-wizards).
+[Multi-Step Form Wizards](../guides/multi-step-form-wizards).
 
 ## 9. Shopping Cart With Canonical Line Items And Derived Totals
 
@@ -626,4 +626,4 @@ Use when:
 Persist the canonical line items. Derive totals and counts. Use `items: []` for
 an active empty cart, and reserve `remove()` for flows like checkout success,
 logout, or recovery. For fuller setup and edge cases, see
-[Shopping Cart Persistence](/docs/guides/shopping-cart-persistence).
+[Shopping Cart Persistence](../guides/shopping-cart-persistence).

@@ -84,5 +84,5 @@ Rule of thumb:
 | Prevent user A data from appearing for user B                  | user-aware namespace such as `app.user.${userId}`                                                               |
 | Enforce auth policy when stale data is read back               | `reconcile(...)` plus event-based cleanup                                                                       |
 
-See [Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+See [Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 logout, expiry, and cross-tab cleanup pattern.

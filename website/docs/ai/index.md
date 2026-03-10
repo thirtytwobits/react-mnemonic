@@ -22,11 +22,11 @@ Use it when you need:
 
 Read these pages in order when context is tight:
 
-1. [Invariants](/docs/ai/invariants)
-2. [Decision Matrix](/docs/ai/decision-matrix)
-3. [Recipes](/docs/ai/recipes)
-4. [Anti-Patterns](/docs/ai/anti-patterns)
-5. [AI Assistant Setup](/docs/ai/assistant-setup)
+1. [Invariants](./ai/invariants)
+2. [Decision Matrix](./ai/decision-matrix)
+3. [Recipes](./ai/recipes)
+4. [Anti-Patterns](./ai/anti-patterns)
+5. [AI Assistant Setup](./ai/assistant-setup)
 
 ## Quick Rules
 
