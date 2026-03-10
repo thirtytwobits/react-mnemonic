@@ -293,7 +293,7 @@ Runs on push to `main`:
 
 ### Releases (`release.yml`)
 
-Triggered by tagged releases matching `v*` (for example `v1.1.0-beta0` or
+Triggered by tagged releases matching `v*` (for example `v1.2.0-beta1` or
 `v1.1.0`):
 
 - Type-checks and format-checks the code
