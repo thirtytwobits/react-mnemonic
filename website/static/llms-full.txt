@@ -50,11 +50,11 @@ Use it when you need:
 
 Read these pages in order when context is tight:
 
-1. [Invariants](https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants)
-2. [Decision Matrix](https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix)
-3. [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes)
-4. [Anti-Patterns](https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns)
-5. [AI Assistant Setup](https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup)
+1. [Invariants](./ai/invariants)
+2. [Decision Matrix](./ai/decision-matrix)
+3. [Recipes](./ai/recipes)
+4. [Anti-Patterns](./ai/anti-patterns)
+5. [AI Assistant Setup](./ai/assistant-setup)
 
 ## Quick Rules
 
@@ -289,7 +289,7 @@ Rule of thumb:
 | Prevent user A data from appearing for user B                  | user-aware namespace such as `app.user.${userId}`                                                               |
 | Enforce auth policy when stale data is read back               | `reconcile(...)` plus event-based cleanup                                                                       |
 
-See [Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+See [Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 logout, expiry, and cross-tab cleanup pattern.
 
 ## Recipes
@@ -567,11 +567,11 @@ Use when:
 Because `useMnemonicRecovery()` is namespace-scoped, run cleanup before
 switching to an anonymous namespace. If auth has already flipped, clear the last
 authenticated namespace from a temporary recovery boundary instead. See
-[Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+[Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 pattern.
 
 Do not store tokens, refresh tokens, or raw session secrets this way. See
-[Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+[Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 pattern.
 
 ## 8. Multi-Step Wizard With Durable Draft And Ephemeral Navigation
@@ -778,7 +778,7 @@ Use when:
 Keep `activeStepId`, `stepErrors`, and `isSubmitting` ephemeral by default.
 Persist a resume position only when reopening on the same step after reload is a
 real product requirement. For the full pattern, see
-[Multi-Step Form Wizards](https://thirtytwobits.github.io/react-mnemonic/docs/guides/multi-step-form-wizards).
+[Multi-Step Form Wizards](../guides/multi-step-form-wizards).
 
 ## 9. Shopping Cart With Canonical Line Items And Derived Totals
 
@@ -917,7 +917,7 @@ Use when:
 Persist the canonical line items. Derive totals and counts. Use `items: []` for
 an active empty cart, and reserve `remove()` for flows like checkout success,
 logout, or recovery. For fuller setup and edge cases, see
-[Shopping Cart Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/shopping-cart-persistence).
+[Shopping Cart Persistence](../guides/shopping-cart-persistence).
 
 ## Anti-Patterns
 Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns
@@ -1246,12 +1246,35 @@ If your assistant can fetch remote files, use the published GitHub Pages URLs:
 Use the hosted path when you want versioned, read-only retrieval without
 mounting the repository locally.
 
+## Versioned Docs Behavior
+
+The site now uses Docusaurus versioned docs:
+
+- the latest released docs live at `/docs`
+- unreleased work from `main` lives at `/docs/next`
+- released snapshots live at `/docs/<version>`
+
+Example released path:
+
+- `https://thirtytwobits.github.io/react-mnemonic/docs/1.2.0-beta1`
+
+Current AI retrieval surfaces remain latest-only:
+
+- `/llms.txt`
+- `/llms-full.txt`
+- `/ai-contract.json`
+
+That means version-specific AI retrieval should currently use the versioned docs
+pages themselves rather than the root `llms` exports. Version-specific `llms`
+surfaces can be added later if they become necessary.
+
 ## Maintenance
 
 Keep the surfaces aligned this way:
 
 - edit the canonical prose in `website/docs/ai/*`
 - regenerate companion assets and instruction packs via `npm run docs:ai`
+- cut new released doc snapshots via `npm run docs:version -- <version>` when needed
 - use `npm run ai:check` in CI or before commits to catch drift in generated AI artifacts and instruction packs
 - keep `context7.json` aligned with the same high-signal docs and public API entry points
 - keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources

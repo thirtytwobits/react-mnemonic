@@ -86,12 +86,13 @@ The documentation is built with [Docusaurus](https://docusaurus.io/) and lives
 in the `website/` directory. API reference pages are auto-generated from source
 via [TypeDoc](https://typedoc.org/) + `docusaurus-plugin-typedoc`.
 
-| Command                   | Description                                       |
-| ------------------------- | ------------------------------------------------- |
-| `npm run docs`            | Generate standalone TypeDoc API docs into `docs/` |
-| `npm run docs:watch`      | TypeDoc in watch mode for live editing            |
-| `npm run docs:site`       | Build the full Docusaurus site (`website/build/`) |
-| `npm run docs:site:start` | Start the Docusaurus dev server with hot reload   |
+| Command                             | Description                                                |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `npm run docs`                      | Generate standalone TypeDoc API docs into `docs/`          |
+| `npm run docs:watch`                | TypeDoc in watch mode for live editing                     |
+| `npm run docs:version -- <version>` | Snapshot the current docs as a released Docusaurus version |
+| `npm run docs:site`                 | Build the full Docusaurus site (`website/build/`)          |
+| `npm run docs:site:start`           | Start the Docusaurus dev server with hot reload            |
 
 **Important:** The Docusaurus site depends on the built library. Always run
 `npm run build` at the root before building or starting the site.
@@ -109,6 +110,38 @@ npm run docs:site:start
 The dev server runs at `http://localhost:3000/react-mnemonic/` by default and
 hot-reloads on changes to `website/docs/`, `website/src/`, and
 `website/static/`.
+
+#### Cutting a docs version
+
+The docs site now uses Docusaurus versioning:
+
+- the latest released docs live at `/docs`
+- unreleased work in `main` lives at `/docs/next`
+- frozen snapshots live under `/docs/<version>`
+
+To cut a new released docs snapshot:
+
+```bash
+npm run docs:version -- 1.2.0-beta1
+```
+
+That command:
+
+1. regenerates the current API docs
+2. regenerates the AI retrieval assets and instruction packs
+3. snapshots the current docs tree into Docusaurus versioned docs
+
+After running it:
+
+- commit `website/versions.json`
+- commit `website/versioned_docs/`
+- commit `website/versioned_sidebars/`
+- build the site with `npm run docs:site`
+- merge to `main` so the normal docs deployment publishes the new version
+
+Version names should match the package version you intend to release, without
+the leading `v`. Tagging remains `vX.Y.Z`, but the docs version should be
+`X.Y.Z`.
 
 #### Interactive demo
 
