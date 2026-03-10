@@ -2,13 +2,15 @@ import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
+const isLocalDevelopment = process.env.NODE_ENV === "development";
+
 const config: Config = {
     title: "react-mnemonic",
     tagline: "AI-friendly, persistent, type-safe state management for React",
     favicon: "img/favicon.svg",
 
     url: "https://thirtytwobits.github.io",
-    baseUrl: "/react-mnemonic/",
+    baseUrl: isLocalDevelopment ? "/" : "/react-mnemonic/",
 
     organizationName: "thirtytwobits",
     projectName: "react-mnemonic",

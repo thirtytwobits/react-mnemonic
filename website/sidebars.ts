@@ -29,7 +29,7 @@ const sidebars: SidebarsConfig = {
                 "guides/schema-modes",
                 "guides/json-schema-validation",
                 "guides/schema-migration",
-                "guides/comparisons-and-benchmarks",
+                "guides/context7-rankings",
                 "guides/canonical-key-definitions",
                 "guides/single-source-of-truth-schemas",
                 "guides/reset-and-recovery",
