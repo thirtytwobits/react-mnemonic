@@ -91,6 +91,7 @@ via [TypeDoc](https://typedoc.org/) + `docusaurus-plugin-typedoc`.
 | `npm run docs`                      | Generate standalone TypeDoc API docs into `docs/`          |
 | `npm run docs:watch`                | TypeDoc in watch mode for live editing                     |
 | `npm run docs:version -- <version>` | Snapshot the current docs as a released Docusaurus version |
+| `npm run release:prepare -- <arg>`  | Bump the in-repo release version, cut docs, verify, commit |
 | `npm run docs:site`                 | Build the full Docusaurus site (`website/build/`)          |
 | `npm run docs:site:start`           | Start the Docusaurus dev server with hot reload            |
 
@@ -142,6 +143,31 @@ After running it:
 Version names should match the package version you intend to release, without
 the leading `v`. Tagging remains `vX.Y.Z`, but the docs version should be
 `X.Y.Z`.
+
+#### Preparing an in-repo release bump
+
+To automate the local release-prep flow before tag and push:
+
+```bash
+npm run release:prepare -- 1.2.1-beta1
+npm run release:prepare -- prerelease --preid beta
+npm run release:prepare -- patch
+```
+
+This command:
+
+1. requires a clean worktree
+2. creates and switches to a local release branch named `release/v<version>`
+3. bumps the package version and release-facing docs references
+4. cuts the matching Docusaurus docs snapshot
+5. runs the release verification checks
+6. creates a local commit named `Prepare release v<version>`
+
+It does not create a git tag, push to GitHub, publish to npm, or create a
+GitHub release.
+
+Bump-kind behavior follows `npm version`, including prerelease identifier
+handling.
 
 #### Interactive demo
 
@@ -328,6 +354,9 @@ Runs on push to `main`:
 
 Triggered by tagged releases matching `v*` (for example `v1.2.0-beta1` or
 `v1.1.0`):
+
+The repository-local prep flow happens before this via
+`npm run release:prepare -- <version-or-bump-kind>`.
 
 - Type-checks and format-checks the code
 - Builds and tests the library
