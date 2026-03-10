@@ -51,11 +51,12 @@ The litmus test is simple:
 The safest baseline is a namespace that includes the authenticated user ID:
 
 ```tsx
+import type { ReactNode } from "react";
 import { MnemonicProvider } from "react-mnemonic";
 
 type Session = { status: "anonymous" } | { status: "authenticated"; userId: string };
 
-function AppPersistenceBoundary({ session, children }: { session: Session; children: React.ReactNode }) {
+function AppPersistenceBoundary({ session, children }: { session: Session; children: ReactNode }) {
     const namespace = session.status === "authenticated" ? `my-app.user.${session.userId}` : "my-app.anonymous";
 
     return <MnemonicProvider namespace={namespace}>{children}</MnemonicProvider>;
@@ -66,6 +67,10 @@ This gives you two important guarantees:
 
 - user A and user B do not share the same persisted key prefix
 - switching identities naturally points the app at a different persisted scope
+
+Use a stable, opaque account identifier in that namespace. Avoid putting
+emails, usernames, or other directly identifying strings into storage-visible
+keys.
 
 Do not keep authenticated data in one global namespace like `"my-app"` if
 multiple users can sign in on the same browser profile.

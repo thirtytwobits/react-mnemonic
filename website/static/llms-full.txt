@@ -521,19 +521,20 @@ export function AuthScopedScreen({
         onAuthEnded: (callback: () => void) => () => void;
     };
 }) {
+    const { isAuthenticated, onAuthEnded } = auth;
     const recovery = useMnemonicRecovery();
     const draft = useMnemonicKey("private-draft", {
         defaultValue: "",
-        reconcile: (persisted) => (auth.isAuthenticated ? persisted : ""),
+        reconcile: (persisted) => (isAuthenticated ? persisted : ""),
     });
 
     useEffect(() => {
-        if (!auth.isAuthenticated) return;
+        if (!isAuthenticated) return;
 
-        return auth.onAuthEnded(() => {
+        return onAuthEnded(() => {
             recovery.clearKeys([...AUTH_KEYS]);
         });
-    }, [auth, recovery]);
+    }, [isAuthenticated, onAuthEnded, recovery]);
 
     return <textarea value={draft.value} onChange={(event) => draft.set(event.target.value)} />;
 }
