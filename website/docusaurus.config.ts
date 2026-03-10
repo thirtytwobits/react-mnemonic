@@ -29,6 +29,14 @@ const config: Config = {
         locales: ["en"],
     },
 
+    scripts: [
+        {
+            src: "https://context7.com/widget.js",
+            async: true,
+            "data-library": "/thirtytwobits/react-mnemonic",
+        },
+    ],
+
     plugins: [
         [
             "docusaurus-plugin-typedoc",
