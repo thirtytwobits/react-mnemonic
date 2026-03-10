@@ -105,6 +105,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 - [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas) — keep runtime schemas and TS types aligned
 - [Clearable Persisted Values](/docs/guides/clearable-persisted-values) — model durable clear intent with nullable keys
 - [Auth-Aware Persistence](/docs/guides/auth-aware-persistence) — scope safe persisted state to authenticated users and clean it up on logout or expiry
+- [Multi-Step Form Wizards](/docs/guides/multi-step-form-wizards) — persist cross-step drafts without storing transient wizard UI state
 - [Persisted vs Ephemeral State](/docs/guides/persisted-vs-ephemeral-state) — keep durable preferences and runtime-only UI state separate
 - [Reset and Recovery](/docs/guides/reset-and-recovery) — add soft reset and hard reset flows for persisted state
 - [Server Rendering](/docs/guides/server-rendering) — control server placeholders and hydration timing in Next.js or Remix

@@ -24,6 +24,39 @@ Prefer splitting state into:
 - a persisted durable slice handled by `useMnemonicKey(...)`
 - an ephemeral runtime slice handled by `useState(...)`
 
+## Persisting Wizard Navigation And Validation State
+
+Wizard drafts should not become a dumping ground for runtime-only UI state.
+
+Wrong:
+
+- persisting `activeStep`, `stepErrors`, `isSubmitting`, or `submissionError` inside the durable wizard draft
+- persisting "completed steps" as a second source of truth instead of deriving them from the draft and validation rules
+
+Prefer:
+
+- persisting only user-authored cross-step draft values
+- deriving completion from the persisted draft
+- keeping navigation, error UI, and submit lifecycle state in plain React state
+
+Persist a resume position only when resuming on that exact step after reload is
+an explicit feature.
+
+## Hard-Coding Numeric Step Indexes For Conditional Wizards
+
+Conditional steps make stored numeric indexes brittle.
+
+Wrong:
+
+- persisting `currentStepIndex: 2` and assuming the third step still exists after the user changes an earlier answer
+- storing a fixed array of enabled steps separately from the persisted draft
+
+Prefer:
+
+- deriving the step list from the persisted draft on every render
+- storing step ids rather than numeric indexes when resume behavior really matters
+- redirecting to a valid step when a conditional step disappears
+
 ## Using `remove()` To Mean "Cleared"
 
 If "cleared" is a durable state, do not delete the key.

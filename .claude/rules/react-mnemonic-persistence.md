@@ -14,6 +14,7 @@ Apply these rules whenever a task could introduce or modify durable UI state.
 - Use `set(null)` when "cleared" is a durable state that must survive reload.
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
+- For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.

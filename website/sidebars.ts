@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
                 "guides/reset-and-recovery",
                 "guides/clearable-persisted-values",
                 "guides/auth-aware-persistence",
+                "guides/multi-step-form-wizards",
                 "guides/persisted-vs-ephemeral-state",
                 "guides/server-rendering",
                 "guides/custom-codecs",
