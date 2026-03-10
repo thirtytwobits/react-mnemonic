@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
-## [1.1.0-beta0] - Unreleased
+## [1.2.0-beta1] - Unreleased
 
 ### Added
 
