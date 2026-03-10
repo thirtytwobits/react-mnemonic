@@ -1,0 +1,28 @@
+{
+    "$schema": "https://context7.com/schema/context7.json",
+    "projectTitle": "react-mnemonic",
+    "description": "AI-friendly, persistent, type-safe state management for React.",
+    "folders": ["website/docs/ai", "website/docs/getting-started", "website/docs/guides", "website/static", "src"],
+    "excludeFolders": [
+        "node_modules",
+        "website/node_modules",
+        "website/.docusaurus",
+        "website/build",
+        "website/docs/api",
+        "dist",
+        "docs",
+        "coverage",
+        "fixtures",
+        "devtools-extension/dist"
+    ],
+    "excludeFiles": [],
+    "rules": [
+        "Prefer website/docs/ai as the canonical source for persistence semantics, invariants, and decision rules.",
+        "Treat README.md and src/index.ts as the public package surface and prefer published entrypoints over internal paths.",
+        "Use react-mnemonic/core for the lean persisted-state path and react-mnemonic/schema when validation, versioning, or migrations are required.",
+        "Durable app state should use MnemonicProvider and useMnemonicKey rather than raw localStorage in consumer-facing code.",
+        "Treat excluded build outputs as derived artifacts rather than source-of-truth documentation."
+    ],
+    "url": "https://context7.com/thirtytwobits/react-mnemonic",
+    "public_key": "pk_LoqAGzuI6DGtcnxmLnh2v"
+}

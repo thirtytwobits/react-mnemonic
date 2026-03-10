@@ -24,6 +24,7 @@ Everything else is a companion surface:
 - [`/llms.txt`](/llms.txt) for compact retrieval
 - [`/llms-full.txt`](/llms-full.txt) for long-form export
 - [`/ai-contract.json`](/ai-contract.json) for machine-readable summaries
+- [`context7.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/context7.json) for Context7 library-owner indexing
 - repository instruction packs for Codex, Claude Code, Cursor, and Copilot
 - [`.devin/wiki.json`](https://github.com/thirtytwobits/react-mnemonic/blob/main/.devin/wiki.json) for DeepWiki prioritization
 
@@ -119,6 +120,7 @@ Keep the surfaces aligned this way:
 - edit the canonical prose in `website/docs/ai/*`
 - regenerate companion assets and instruction packs via `npm run docs:ai`
 - use `npm run ai:check` in CI or before commits to catch drift in generated AI artifacts and instruction packs
+- keep `context7.json` aligned with the same high-signal docs and public API entry points
 - keep the DeepWiki priorities in `.devin/wiki.json` aligned with the same sources
 
 The goal is simple: agents should load one canonical contract and then choose
