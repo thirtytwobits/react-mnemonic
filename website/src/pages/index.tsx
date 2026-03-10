@@ -193,15 +193,15 @@ function HomepageExample() {
                         </p>
                         <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
                             <p style={{ marginBottom: "0.75rem" }}>
-                                Evaluating alternatives? See the comparison guide for reproducible bundle measurements
-                                and SSR/API tradeoff notes.
+                                Want an external third-party signal? See Context7's rankings for AI coding tools and
+                                documentation sources.
                             </p>
-                            <Link
+                            <a
                                 className="button button--outline button--secondary button--md"
-                                to="/docs/guides/comparisons-and-benchmarks"
+                                href="/docs/guides/context7-rankings"
                             >
-                                Compare Approaches
-                            </Link>
+                                View Context7 Rankings
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -216,8 +216,8 @@ function HomepageAiResources() {
             <div className="container">
                 <h2 style={{ textAlign: "center", marginBottom: "0.75rem" }}>AI Resources</h2>
                 <p className={styles.resourcesLead}>
-                    <code>react-mnemonic</code> ships dedicated retrieval surfaces for coding assistants, benchmarking,
-                    DeepWiki, and local MCP-style documentation setups.
+                    <code>react-mnemonic</code> ships dedicated retrieval surfaces for coding assistants, DeepWiki, and
+                    local MCP-style documentation setups, while relying on Context7 for external ranking signals.
                 </p>
                 <div className="row">
                     {aiResources.map((resource) => (

@@ -59,9 +59,9 @@ If you want a deterministic implementation guide with invariants, decision
 tables, and copy-pastable recipes, see
 [AI Overview](/docs/ai).
 
-If you are comparing persistence libraries, see
-[Comparisons and Benchmarks](/docs/guides/comparisons-and-benchmarks) for
-reproducible bundle measurements and controlled SSR/API tradeoff notes.
+If you want an external third-party signal for AI coding tools and
+documentation sources, see
+[Context7 Rankings](/docs/guides/context7-rankings).
 
 Persist only values you want to restore intentionally. Runtime-only UI state
 like loading flags, open panels, and draft search text should usually stay in
@@ -100,7 +100,7 @@ const { value, set, reset, remove } = useMnemonicKey<T>(key, options);
 - [Schema Migration](/docs/guides/schema-migration) — version data and learn when to use `reconcile`
 - [AI Overview](/docs/ai) — the canonical AI-oriented entry point for invariants, decision tables, recipes, and setup
 - [AI Assistant Setup](/docs/ai/assistant-setup) — expose the docs through `llms.txt`, DeepWiki, and MCP-friendly retrieval
-- [Comparisons and Benchmarks](/docs/guides/comparisons-and-benchmarks) — reproducible bundle measurements and tradeoff notes against common alternatives
+- [Context7 Rankings](/docs/guides/context7-rankings) — external rankings and usage data from Context7
 - [Canonical Key Definitions](/docs/guides/canonical-key-definitions) — define reusable key contracts once
 - [Single Source of Truth Schemas](/docs/guides/single-source-of-truth-schemas) — keep runtime schemas and TS types aligned
 - [Clearable Persisted Values](/docs/guides/clearable-persisted-values) — model durable clear intent with nullable keys
