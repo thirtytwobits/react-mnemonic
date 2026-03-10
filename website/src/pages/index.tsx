@@ -226,9 +226,13 @@ function HomepageAiResources() {
                                 <h3>{resource.title}</h3>
                                 <p>{resource.description}</p>
                                 {resource.external ? (
-                                    <a href={resource.href}>Open resource</a>
+                                    <a href={resource.href} aria-label={`Open ${resource.title}`}>
+                                        Open {resource.title}
+                                    </a>
                                 ) : (
-                                    <Link to={resource.href}>Open resource</Link>
+                                    <Link to={resource.href} aria-label={`Open ${resource.title}`}>
+                                        Open {resource.title}
+                                    </Link>
                                 )}
                             </div>
                         </div>
