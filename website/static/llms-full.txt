@@ -62,6 +62,8 @@ Read these pages in order when context is tight:
 - `reset()` persists `defaultValue` again.
 - `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
 - Use `set(null)` when "cleared" is a durable state that must survive reload.
+- Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
+- Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.
@@ -104,6 +106,8 @@ still shipping incorrect persistence behavior:
 
 - treating `remove()` as if it means "clear but remember the cleared state"
 - persisting runtime-only UI state such as loading flags, hover state, or validation errors
+- persisting credential material or keeping one global namespace across authenticated user changes
+- clearing the current namespace after auth already switched away from the user who owned the data
 - using `reconcile(...)` to paper over a real versioned schema change
 - assuming async storage adapters are supported directly
 - reading browser storage during SSR without an explicit hydration strategy
@@ -227,14 +231,16 @@ Rule of thumb:
 
 ## Should This State Persist?
 
-| State shape                                   | Persist?    | Why                                          |
-| --------------------------------------------- | ----------- | -------------------------------------------- |
-| Theme, density, durable layout preference     | Yes         | Users expect it after reload                 |
-| Saved filters users intentionally restore     | Yes         | This is durable preference state             |
-| User-authored draft content                   | Usually yes | Lost work is expensive                       |
-| Hover, focus, drag, loading, optimistic flags | No          | Rehydrating runtime-only UI feels wrong      |
-| Temporary dirtiness and validation errors     | No          | These describe a session, not durable intent |
-| Server response cache timestamps              | Usually no  | Prefer cache logic over UI persistence       |
+| State shape                                    | Persist?      | Why                                                              |
+| ---------------------------------------------- | ------------- | ---------------------------------------------------------------- |
+| Theme, density, durable layout preference      | Yes           | Users expect it after reload                                     |
+| Saved filters users intentionally restore      | Yes           | This is durable preference state                                 |
+| User-authored draft content                    | Usually yes   | Lost work is expensive                                           |
+| Hover, focus, drag, loading, optimistic flags  | No            | Rehydrating runtime-only UI feels wrong                          |
+| Temporary dirtiness and validation errors      | No            | These describe a session, not durable intent                     |
+| Server response cache timestamps               | Usually no    | Prefer cache logic over UI persistence                           |
+| Access tokens, refresh tokens, session secrets | No            | These are credentials, not durable UI state                      |
+| Safe per-user drafts or saved filters          | Conditionally | Scope them to the authenticated user and clear them on auth loss |
 
 ## SSR Mode Choice
 
@@ -254,6 +260,19 @@ Rule of thumb:
 | Custom backend with synchronous facade              | Provide a `StorageLike` wrapper           |
 | Cross-tab sync on a custom backend                  | Implement `storage.onExternalChange(...)` |
 | Direct async reads or writes from the hook contract | Not supported in beta 1                   |
+
+## Auth Cleanup Choice
+
+| Need                                                           | Recommended path                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Forget auth-scoped private state on logout or expiry           | Clear the authenticated namespace before swap, or use a temporary recovery boundary for the last user namespace |
+| Keep an explicit cleared value for the same authenticated user | `set(null)`                                                                                                     |
+| Restore a known default for the same authenticated user        | `reset()`                                                                                                       |
+| Prevent user A data from appearing for user B                  | user-aware namespace such as `app.user.${userId}`                                                               |
+| Enforce auth policy when stale data is read back               | `reconcile(...)` plus event-based cleanup                                                                       |
+
+See [Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+logout, expiry, and cross-tab cleanup pattern.
 
 ## Recipes
 Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes
@@ -486,6 +505,57 @@ Use this when:
 - you want the server markup and hydration markup to match
 - local persisted storage should not win until after mount
 
+## 7. Auth-Aware Durable State With Automatic Cleanup
+
+```tsx
+import { useEffect } from "react";
+import { useMnemonicKey, useMnemonicRecovery } from "react-mnemonic";
+
+const AUTH_KEYS = ["private-draft", "saved-search"] as const;
+
+export function AuthScopedScreen({
+    auth,
+}: {
+    auth: {
+        isAuthenticated: boolean;
+        onAuthEnded: (callback: () => void) => () => void;
+    };
+}) {
+    const { isAuthenticated, onAuthEnded } = auth;
+    const recovery = useMnemonicRecovery();
+    const draft = useMnemonicKey("private-draft", {
+        defaultValue: "",
+        reconcile: (persisted) => (isAuthenticated ? persisted : ""),
+    });
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        return onAuthEnded(() => {
+            recovery.clearKeys([...AUTH_KEYS]);
+        });
+    }, [isAuthenticated, onAuthEnded, recovery]);
+
+    return <textarea value={draft.value} onChange={(event) => draft.set(event.target.value)} />;
+}
+```
+
+Use when:
+
+- the value is safe to restore for the same authenticated user
+- the namespace is scoped to that user
+- logout or expiry should remove the persisted value automatically
+
+Because `useMnemonicRecovery()` is namespace-scoped, run cleanup before
+switching to an anonymous namespace. If auth has already flipped, clear the last
+authenticated namespace from a temporary recovery boundary instead. See
+[Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+pattern.
+
+Do not store tokens, refresh tokens, or raw session secrets this way. See
+[Auth-Aware Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/auth-aware-persistence) for the full
+pattern.
+
 ## Anti-Patterns
 Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns
 
@@ -576,6 +646,53 @@ Prefer:
 
 - `useMnemonicKey(...)` for durable app or UI state
 - raw storage only in storage adapter implementations, tests, or low-level library internals
+
+## Persisting Credentials Or Session Secrets
+
+Do not use `react-mnemonic` as a credential store.
+
+Wrong:
+
+- access tokens in persisted keys
+- refresh tokens in persisted keys
+- raw session IDs, OTP material, or recovery codes in durable storage
+
+Prefer:
+
+- your auth provider's storage model
+- httpOnly cookies or another dedicated credential boundary
+- persisting only safe user-owned state such as drafts or filters
+
+## Reusing One Namespace Across Authenticated Users
+
+Authenticated durable state should not live under one anonymous global prefix.
+
+Wrong:
+
+- `namespace="my-app"` for every signed-in user on a shared browser profile
+- keeping user A's saved draft under the same keys that user B will read next
+
+Prefer:
+
+- a namespace that includes the authenticated user identity
+- clearing auth-scoped keys on logout, expiry, or invalidation
+- `reconcile(...)` as a backstop when auth policy changes between reads
+
+## Clearing The Wrong Namespace After Logout
+
+`useMnemonicRecovery()` clears the current provider namespace, not whichever
+namespace used to be active one render ago.
+
+Wrong:
+
+- switching from `app.user.123` to `app.anonymous`
+- then calling `useMnemonicRecovery().clearKeys([...])` from the anonymous provider
+
+Prefer:
+
+- clearing the authenticated namespace before swapping auth state
+- or mounting a temporary recovery boundary for the last authenticated namespace
+- keeping `reconcile(...)` as a read-time backstop, not the only cleanup mechanism
 
 ## Treating The Provider As Optional
 

@@ -231,3 +231,54 @@ Use this when:
 - the server already knows a placeholder value
 - you want the server markup and hydration markup to match
 - local persisted storage should not win until after mount
+
+## 7. Auth-Aware Durable State With Automatic Cleanup
+
+```tsx
+import { useEffect } from "react";
+import { useMnemonicKey, useMnemonicRecovery } from "react-mnemonic";
+
+const AUTH_KEYS = ["private-draft", "saved-search"] as const;
+
+export function AuthScopedScreen({
+    auth,
+}: {
+    auth: {
+        isAuthenticated: boolean;
+        onAuthEnded: (callback: () => void) => () => void;
+    };
+}) {
+    const { isAuthenticated, onAuthEnded } = auth;
+    const recovery = useMnemonicRecovery();
+    const draft = useMnemonicKey("private-draft", {
+        defaultValue: "",
+        reconcile: (persisted) => (isAuthenticated ? persisted : ""),
+    });
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        return onAuthEnded(() => {
+            recovery.clearKeys([...AUTH_KEYS]);
+        });
+    }, [isAuthenticated, onAuthEnded, recovery]);
+
+    return <textarea value={draft.value} onChange={(event) => draft.set(event.target.value)} />;
+}
+```
+
+Use when:
+
+- the value is safe to restore for the same authenticated user
+- the namespace is scoped to that user
+- logout or expiry should remove the persisted value automatically
+
+Because `useMnemonicRecovery()` is namespace-scoped, run cleanup before
+switching to an anonymous namespace. If auth has already flipped, clear the last
+authenticated namespace from a temporary recovery boundary instead. See
+[Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+pattern.
+
+Do not store tokens, refresh tokens, or raw session secrets this way. See
+[Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+pattern.

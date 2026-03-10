@@ -34,14 +34,16 @@ Rule of thumb:
 
 ## Should This State Persist?
 
-| State shape                                   | Persist?    | Why                                          |
-| --------------------------------------------- | ----------- | -------------------------------------------- |
-| Theme, density, durable layout preference     | Yes         | Users expect it after reload                 |
-| Saved filters users intentionally restore     | Yes         | This is durable preference state             |
-| User-authored draft content                   | Usually yes | Lost work is expensive                       |
-| Hover, focus, drag, loading, optimistic flags | No          | Rehydrating runtime-only UI feels wrong      |
-| Temporary dirtiness and validation errors     | No          | These describe a session, not durable intent |
-| Server response cache timestamps              | Usually no  | Prefer cache logic over UI persistence       |
+| State shape                                    | Persist?      | Why                                                              |
+| ---------------------------------------------- | ------------- | ---------------------------------------------------------------- |
+| Theme, density, durable layout preference      | Yes           | Users expect it after reload                                     |
+| Saved filters users intentionally restore      | Yes           | This is durable preference state                                 |
+| User-authored draft content                    | Usually yes   | Lost work is expensive                                           |
+| Hover, focus, drag, loading, optimistic flags  | No            | Rehydrating runtime-only UI feels wrong                          |
+| Temporary dirtiness and validation errors      | No            | These describe a session, not durable intent                     |
+| Server response cache timestamps               | Usually no    | Prefer cache logic over UI persistence                           |
+| Access tokens, refresh tokens, session secrets | No            | These are credentials, not durable UI state                      |
+| Safe per-user drafts or saved filters          | Conditionally | Scope them to the authenticated user and clear them on auth loss |
 
 ## SSR Mode Choice
 
@@ -61,3 +63,16 @@ Rule of thumb:
 | Custom backend with synchronous facade              | Provide a `StorageLike` wrapper           |
 | Cross-tab sync on a custom backend                  | Implement `storage.onExternalChange(...)` |
 | Direct async reads or writes from the hook contract | Not supported in beta 1                   |
+
+## Auth Cleanup Choice
+
+| Need                                                           | Recommended path                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Forget auth-scoped private state on logout or expiry           | Clear the authenticated namespace before swap, or use a temporary recovery boundary for the last user namespace |
+| Keep an explicit cleared value for the same authenticated user | `set(null)`                                                                                                     |
+| Restore a known default for the same authenticated user        | `reset()`                                                                                                       |
+| Prevent user A data from appearing for user B                  | user-aware namespace such as `app.user.${userId}`                                                               |
+| Enforce auth policy when stale data is read back               | `reconcile(...)` plus event-based cleanup                                                                       |
+
+See [Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
+logout, expiry, and cross-tab cleanup pattern.
