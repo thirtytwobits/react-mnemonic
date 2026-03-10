@@ -196,12 +196,12 @@ function HomepageExample() {
                                 Want an external third-party signal? See Context7's rankings for AI coding tools and
                                 documentation sources.
                             </p>
-                            <a
+                            <Link
                                 className="button button--outline button--secondary button--md"
-                                href="/docs/guides/context7-rankings"
+                                to="/docs/guides/context7-rankings"
                             >
                                 View Context7 Rankings
-                            </a>
+                            </Link>
                         </div>
                     </div>
                 </div>
