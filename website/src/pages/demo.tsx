@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+import Link from "@docusaurus/Link";
 import Layout from "@theme/Layout";
 import BrowserOnly from "@docusaurus/BrowserOnly";
 import { MnemonicProvider } from "react-mnemonic";
@@ -60,7 +61,7 @@ function DemoContent() {
                     a synchronous in-memory facade in its own <code>MnemonicProvider</code>. The demo persists canonical
                     cart lines, derives totals, and distinguishes emptying the cart from forgetting persisted state.
                     This same implementation is also used in the{" "}
-                    <a href="/docs/guides/shopping-cart-persistence">Shopping Cart Persistence guide</a>.
+                    <Link to="/docs/guides/shopping-cart-persistence">Shopping Cart Persistence guide</Link>.
                 </p>
                 <ShoppingCart />
             </section>

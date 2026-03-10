@@ -177,7 +177,8 @@ function CartContents() {
 
             {cart.items.length === 0 ? (
                 <p className="demo-muted" style={{ textAlign: "center", padding: 24 }}>
-                    Your cart is empty. In this demo, an empty cart is persisted as <code>{`{ items: [] }`}</code>.
+                    Your cart is empty. In this demo, an empty cart is persisted as{" "}
+                    <code>{`{ currencyCode: "USD", items: [] }`}</code>.
                 </p>
             ) : (
                 <>

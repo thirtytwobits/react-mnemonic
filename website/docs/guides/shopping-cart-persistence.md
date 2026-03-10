@@ -23,7 +23,6 @@ type Product = {
     sku: string;
     title: string;
     unitPriceCents: number;
-    currencyCode: "USD";
 };
 
 type CartLine = {
@@ -44,6 +43,7 @@ That gives you:
 
 - stable persisted line items and quantities
 - room for safe cart-owned metadata like `couponCode`
+- one canonical persisted currency for the whole cart
 - derived totals computed from one source of truth instead of being stored separately
 
 ## Canonical example
