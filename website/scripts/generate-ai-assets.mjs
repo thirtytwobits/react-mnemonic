@@ -43,7 +43,7 @@ const canonicalDocs = [
         id: "recipes",
         title: "Recipes",
         summary:
-            "Copy-pastable durable state patterns for themes, filters, dismissals, drafts, migrations, and SSR placeholders.",
+            "Copy-pastable durable state patterns for themes, filters, drafts, wizards, migrations, and SSR placeholders.",
         sourcePath: path.join(docsDir, "recipes.md"),
         url: `${siteBaseUrl}/docs/ai/recipes`,
     },
@@ -85,6 +85,10 @@ const keyGuideLinks = [
         url: `${siteBaseUrl}/docs/guides/persisted-vs-ephemeral-state`,
     },
     {
+        title: "Multi-Step Form Wizards",
+        url: `${siteBaseUrl}/docs/guides/multi-step-form-wizards`,
+    },
+    {
         title: "Custom Storage",
         url: `${siteBaseUrl}/docs/guides/custom-storage`,
     },
@@ -101,6 +105,7 @@ const quickRules = [
     "`set(next)` persists a value, `reset()` persists `defaultValue`, and `remove()` deletes the key.",
     "Use `set(null)` when a cleared state must survive reload.",
     "SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.",
+    "For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.",
     "Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.",
     "`StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.",
     "Import published values and types from `react-mnemonic`; do not invent local ambient shims.",
@@ -168,6 +173,7 @@ const aiContract = {
         "saved-filters",
         "dismissible-ui",
         "durable-draft",
+        "multi-step-wizard",
         "schema-upgrade",
         "ssr-placeholder",
     ],

@@ -282,3 +282,197 @@ pattern.
 Do not store tokens, refresh tokens, or raw session secrets this way. See
 [Auth-Aware Persistence](/docs/guides/auth-aware-persistence) for the full
 pattern.
+
+## 8. Multi-Step Wizard With Durable Draft And Ephemeral Navigation
+
+```tsx
+import { useEffect, useState } from "react";
+import { useMnemonicKey } from "react-mnemonic";
+
+type StepId = "account" | "business" | "profile" | "review";
+
+type WizardDraft = {
+    accountType: "personal" | "business";
+    companyName: string | null;
+    fullName: string;
+    email: string;
+    acceptedTerms: boolean;
+};
+
+const defaultDraft: WizardDraft = {
+    accountType: "personal",
+    companyName: null,
+    fullName: "",
+    email: "",
+    acceptedTerms: false,
+};
+
+function getSteps(draft: WizardDraft): StepId[] {
+    return draft.accountType === "business"
+        ? ["account", "business", "profile", "review"]
+        : ["account", "profile", "review"];
+}
+
+function validateStep(stepId: StepId, draft: WizardDraft): string[] {
+    switch (stepId) {
+        case "account":
+            return [];
+        case "business":
+            return draft.accountType === "business" && !draft.companyName?.trim() ? ["Company name is required."] : [];
+        case "profile":
+            return !draft.fullName.trim() || !draft.email.includes("@") ? ["Complete your profile fields."] : [];
+        case "review":
+            return draft.acceptedTerms ? [] : ["Accept the terms before submitting."];
+    }
+}
+
+export function SignupWizard() {
+    const {
+        value: draft,
+        set: setDraft,
+        remove,
+    } = useMnemonicKey("signup-wizard", {
+        defaultValue: defaultDraft,
+    });
+    const steps = getSteps(draft);
+    const [activeStepId, setActiveStepId] = useState<StepId>("account");
+    const [stepErrors, setStepErrors] = useState<Partial<Record<StepId, string[]>>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (!steps.includes(activeStepId)) {
+            setActiveStepId("account");
+        }
+    }, [activeStepId, steps]);
+
+    const activeIndex = steps.indexOf(activeStepId);
+
+    const goNext = () => {
+        const errors = validateStep(activeStepId, draft);
+        if (errors.length > 0) {
+            setStepErrors((prev) => ({ ...prev, [activeStepId]: errors }));
+            return;
+        }
+
+        const nextStepId = steps[activeIndex + 1];
+        if (nextStepId) {
+            setActiveStepId(nextStepId);
+        }
+    };
+
+    const goBack = () => {
+        const previousStepId = steps[activeIndex - 1];
+        if (previousStepId) {
+            setActiveStepId(previousStepId);
+        }
+    };
+
+    const updateDraft = <K extends keyof WizardDraft>(field: K, value: WizardDraft[K]) => {
+        setDraft((prev) => ({ ...prev, [field]: value }));
+        setStepErrors((prev) => ({ ...prev, [activeStepId]: [] }));
+    };
+
+    const updateAccountType = (accountType: WizardDraft["accountType"]) => {
+        setDraft((prev) => ({
+            ...prev,
+            accountType,
+            companyName: accountType === "business" ? prev.companyName : null,
+        }));
+        setStepErrors((prev) => ({ ...prev, account: [], business: [] }));
+    };
+
+    const handleSubmit = async () => {
+        const invalidStep = steps.find((stepId) => validateStep(stepId, draft).length > 0);
+        if (invalidStep) {
+            setActiveStepId(invalidStep);
+            setStepErrors((prev) => ({ ...prev, [invalidStep]: validateStep(invalidStep, draft) }));
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await saveWizard(draft);
+            remove();
+            setActiveStepId("account");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <>
+            {activeStepId === "account" ? (
+                <fieldset>
+                    <label>
+                        <input
+                            type="radio"
+                            checked={draft.accountType === "personal"}
+                            onChange={() => updateAccountType("personal")}
+                        />
+                        Personal
+                    </label>
+                    <label>
+                        <input
+                            type="radio"
+                            checked={draft.accountType === "business"}
+                            onChange={() => updateAccountType("business")}
+                        />
+                        Business
+                    </label>
+                </fieldset>
+            ) : null}
+
+            {activeStepId === "business" ? (
+                <input
+                    value={draft.companyName ?? ""}
+                    onChange={(event) => updateDraft("companyName", event.target.value || null)}
+                />
+            ) : null}
+
+            {activeStepId === "profile" ? (
+                <>
+                    <input value={draft.fullName} onChange={(event) => updateDraft("fullName", event.target.value)} />
+                    <input value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} />
+                </>
+            ) : null}
+
+            {activeStepId === "review" ? (
+                <label>
+                    <input
+                        type="checkbox"
+                        checked={draft.acceptedTerms}
+                        onChange={(event) => updateDraft("acceptedTerms", event.target.checked)}
+                    />
+                    Accept terms
+                </label>
+            ) : null}
+
+            <button onClick={goBack} disabled={activeIndex <= 0 || isSubmitting}>
+                Back
+            </button>
+
+            {activeStepId === "review" ? (
+                <button onClick={handleSubmit} disabled={isSubmitting}>
+                    Submit
+                </button>
+            ) : (
+                <button onClick={goNext} disabled={isSubmitting}>
+                    Next
+                </button>
+            )}
+        </>
+    );
+}
+```
+
+Use when:
+
+- users expect cross-step draft values to survive reload
+- step navigation should be guarded by step-local validation
+- conditional steps are derived from persisted draft values
+- completion is derived instead of stored separately
+
+Keep `activeStepId`, `stepErrors`, and `isSubmitting` ephemeral by default.
+Persist a resume position only when reopening on the same step after reload is a
+real product requirement. For the full pattern, see
+[Multi-Step Form Wizards](/docs/guides/multi-step-form-wizards).

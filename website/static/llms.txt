@@ -10,7 +10,7 @@ lives under `/docs/ai`, with `/llms-full.txt` as the long-form export and
 - [AI Overview](https://thirtytwobits.github.io/react-mnemonic/docs/ai) - Canonical entry point for the persistence contract, retrieval surfaces, and high-risk rules.
 - [Invariants](https://thirtytwobits.github.io/react-mnemonic/docs/ai/invariants) - Deterministic guarantees for provider scope, reads, writes, SSR, type sourcing, and storage adapters.
 - [Decision Matrix](https://thirtytwobits.github.io/react-mnemonic/docs/ai/decision-matrix) - Decision tables for null vs remove, migration vs reconcile, persistence boundaries, and SSR mode choice.
-- [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes) - Copy-pastable durable state patterns for themes, filters, dismissals, drafts, migrations, and SSR placeholders.
+- [Recipes](https://thirtytwobits.github.io/react-mnemonic/docs/ai/recipes) - Copy-pastable durable state patterns for themes, filters, drafts, wizards, migrations, and SSR placeholders.
 - [Anti-Patterns](https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns) - Common mistakes that produce the wrong persistence semantics even when the UI appears to work.
 - [AI Assistant Setup](https://thirtytwobits.github.io/react-mnemonic/docs/ai/assistant-setup) - How to expose the canonical docs through llms files, DeepWiki, and MCP-friendly retrieval paths.
 
@@ -21,6 +21,7 @@ lives under `/docs/ai`, with `/llms-full.txt` as the long-form export and
 - [Server Rendering](https://thirtytwobits.github.io/react-mnemonic/docs/guides/server-rendering)
 - [Clearable Persisted Values](https://thirtytwobits.github.io/react-mnemonic/docs/guides/clearable-persisted-values)
 - [Persisted vs Ephemeral State](https://thirtytwobits.github.io/react-mnemonic/docs/guides/persisted-vs-ephemeral-state)
+- [Multi-Step Form Wizards](https://thirtytwobits.github.io/react-mnemonic/docs/guides/multi-step-form-wizards)
 - [Custom Storage](https://thirtytwobits.github.io/react-mnemonic/docs/guides/custom-storage)
 - [API Reference](https://thirtytwobits.github.io/react-mnemonic/docs/api)
 
@@ -32,6 +33,7 @@ lives under `/docs/ai`, with `/llms-full.txt` as the long-form export and
 - `set(next)` persists a value, `reset()` persists `defaultValue`, and `remove()` deletes the key.
 - Use `set(null)` when a cleared state must survive reload.
 - SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.
+- For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
 - Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.
 - `StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.
 - Import published values and types from `react-mnemonic`; do not invent local ambient shims.
