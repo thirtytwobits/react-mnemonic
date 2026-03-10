@@ -23,6 +23,16 @@ Rule of thumb:
 - Use `remove()` for absence.
 - Use `reset()` when the default itself should become the new persisted value.
 
+## Shopping Cart Semantics
+
+| Need                                            | Recommended representation or action | Why                                                        |
+| ----------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Active cart with zero items                     | `CartState` with `items: []`         | The cart still exists and can accept new lines immediately |
+| Explicit “no cart” or “cart unavailable” state  | `set(null)` on `CartState \| null`   | Only when `null` has real product meaning                  |
+| Forget cart after checkout, logout, or recovery | `remove()`                           | The next read falls back to `defaultValue`                 |
+| Restore a seeded default cart shape             | `reset()`                            | Re-persists the configured default object                  |
+| Header badge count or subtotal                  | Derive from `cart.items`             | Prevents drift between stored lines and stored summaries   |
+
 ## Migration vs `reconcile(...)`
 
 | Situation                                                     | Use                                                | Why                                                           |

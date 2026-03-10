@@ -2,62 +2,152 @@
 // Copyright Scott Dixon
 
 import { useState, useEffect } from "react";
-import { MnemonicProvider, useMnemonicKey, JSONCodec } from "react-mnemonic";
+import {
+    MnemonicProvider,
+    useMnemonicKey,
+    JSONCodec,
+    CodecError,
+    SchemaError,
+    defineMnemonicKey,
+} from "react-mnemonic";
 import type { StorageLike } from "react-mnemonic";
 import { createIdbStorage } from "./idb-storage";
 import { enableDemoDevTools } from "./devtools";
 
-interface CartItem {
-    id: string;
-    name: string;
-    price: number;
-    qty: number;
+interface CatalogProduct {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
 }
 
-const catalog = [
-    { id: "widget", name: "Widget", price: 9.99 },
-    { id: "gadget", name: "Gadget", price: 24.99 },
-    { id: "doohickey", name: "Doohickey", price: 14.5 },
-    { id: "thingamajig", name: "Thingamajig", price: 39.99 },
+interface CartLine {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
+    quantity: number;
+}
+
+interface CartState {
+    currencyCode: "USD";
+    items: CartLine[];
+}
+
+const catalog: CatalogProduct[] = [
+    { sku: "widget", title: "Widget", unitPriceCents: 999 },
+    { sku: "gadget", title: "Gadget", unitPriceCents: 2499 },
+    { sku: "doohickey", title: "Doohickey", unitPriceCents: 1450 },
+    { sku: "thingamajig", title: "Thingamajig", unitPriceCents: 3999 },
 ];
 
+const emptyCart = (): CartState => ({
+    currencyCode: "USD",
+    items: [],
+});
+
+const cartKey = defineMnemonicKey("cart-state", {
+    defaultValue: (error?: CodecError | SchemaError): CartState => {
+        if (error) {
+            console.warn("[ShoppingCart] Falling back to an empty cart:", error.message);
+        }
+
+        return emptyCart();
+    },
+    codec: JSONCodec,
+    listenCrossTab: true,
+});
+
+function formatMoney(cents: number): string {
+    return `$${(cents / 100).toFixed(2)}`;
+}
+
+function normalizeQuantity(quantity: number): number {
+    return Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 0;
+}
+
+function addProduct(cart: CartState, product: CatalogProduct, quantity: number = 1): CartState {
+    const nextQuantity = normalizeQuantity(quantity);
+    if (nextQuantity === 0) {
+        return cart;
+    }
+
+    const existingLine = cart.items.find((item) => item.sku === product.sku);
+    if (!existingLine) {
+        return {
+            ...cart,
+            items: [
+                ...cart.items,
+                {
+                    sku: product.sku,
+                    title: product.title,
+                    unitPriceCents: product.unitPriceCents,
+                    quantity: nextQuantity,
+                },
+            ],
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) =>
+            item.sku === product.sku
+                ? {
+                      ...item,
+                      title: product.title,
+                      unitPriceCents: product.unitPriceCents,
+                      quantity: item.quantity + nextQuantity,
+                  }
+                : item,
+        ),
+    };
+}
+
+function updateProductQuantity(cart: CartState, sku: string, quantity: number): CartState {
+    const nextQuantity = normalizeQuantity(quantity);
+    if (nextQuantity === 0) {
+        return {
+            ...cart,
+            items: cart.items.filter((item) => item.sku !== sku),
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) => (item.sku === sku ? { ...item, quantity: nextQuantity } : item)),
+    };
+}
+
+function removeProduct(cart: CartState, sku: string): CartState {
+    return {
+        ...cart,
+        items: cart.items.filter((item) => item.sku !== sku),
+    };
+}
+
 function CartContents() {
-    const {
-        value: items,
-        set,
-        remove,
-    } = useMnemonicKey<CartItem[]>("items", {
-        defaultValue: [],
-        codec: JSONCodec,
-    });
+    const { value: cart, set, remove } = useMnemonicKey(cartKey);
 
-    const addItem = (product: (typeof catalog)[number]) => {
-        set((prev) => {
-            const existing = prev.find((i) => i.id === product.id);
-            if (existing) {
-                return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
-            }
-            return [...prev, { ...product, qty: 1 }];
-        });
+    const addItem = (product: CatalogProduct) => {
+        set((prev) => addProduct(prev, product));
     };
 
-    const updateQty = (id: string, delta: number) => {
-        set((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0));
+    const updateQty = (sku: string, quantity: number) => {
+        set((prev) => updateProductQuantity(prev, sku, quantity));
     };
 
-    const removeItem = (id: string) => {
-        set((prev) => prev.filter((i) => i.id !== id));
+    const removeItem = (sku: string) => {
+        set((prev) => removeProduct(prev, sku));
     };
 
-    const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+    const subtotalCents = cart.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
 
     return (
         <div>
             <div className="demo-cart-catalog">
                 {catalog.map((p) => (
-                    <div key={p.id} className="demo-catalog-item">
-                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{p.name}</span>
-                        <span className="demo-muted">${p.price.toFixed(2)}</span>
+                    <div key={p.sku} className="demo-catalog-item">
+                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{p.title}</span>
+                        <span className="demo-muted">{formatMoney(p.unitPriceCents)}</span>
                         <button className="button button--sm button--primary" onClick={() => addItem(p)}>
                             Add to Cart
                         </button>
@@ -65,9 +155,30 @@ function CartContents() {
                 ))}
             </div>
 
-            {items.length === 0 ? (
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    background: "var(--ifm-color-emphasis-100)",
+                    fontSize: "0.95rem",
+                }}
+            >
+                <span>
+                    <strong>{itemCount}</strong> item{itemCount === 1 ? "" : "s"}
+                </span>
+                <span>
+                    Subtotal: <strong>{formatMoney(subtotalCents)}</strong>
+                </span>
+            </div>
+
+            {cart.items.length === 0 ? (
                 <p className="demo-muted" style={{ textAlign: "center", padding: 24 }}>
-                    Your cart is empty.
+                    Your cart is empty. In this demo, an empty cart is persisted as{" "}
+                    <code>{`{ currencyCode: "USD", items: [] }`}</code>.
                 </p>
             ) : (
                 <>
@@ -82,34 +193,34 @@ function CartContents() {
                             </tr>
                         </thead>
                         <tbody>
-                            {items.map((item) => (
-                                <tr key={item.id}>
-                                    <td>{item.name}</td>
-                                    <td>${item.price.toFixed(2)}</td>
+                            {cart.items.map((item) => (
+                                <tr key={item.sku}>
+                                    <td>{item.title}</td>
+                                    <td>{formatMoney(item.unitPriceCents)}</td>
                                     <td>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                             <button
                                                 className="button button--sm button--outline button--secondary"
-                                                onClick={() => updateQty(item.id, -1)}
+                                                onClick={() => updateQty(item.sku, item.quantity - 1)}
                                             >
                                                 &minus;
                                             </button>
                                             <span style={{ minWidth: 24, textAlign: "center", fontWeight: 600 }}>
-                                                {item.qty}
+                                                {item.quantity}
                                             </span>
                                             <button
                                                 className="button button--sm button--outline button--secondary"
-                                                onClick={() => updateQty(item.id, 1)}
+                                                onClick={() => updateQty(item.sku, item.quantity + 1)}
                                             >
                                                 +
                                             </button>
                                         </div>
                                     </td>
-                                    <td>${(item.price * item.qty).toFixed(2)}</td>
+                                    <td>{formatMoney(item.unitPriceCents * item.quantity)}</td>
                                     <td>
                                         <button
                                             className="button button--sm button--danger"
-                                            onClick={() => removeItem(item.id)}
+                                            onClick={() => removeItem(item.sku)}
                                         >
                                             Remove
                                         </button>
@@ -129,11 +240,17 @@ function CartContents() {
                         }}
                     >
                         <span>Total</span>
-                        <span>${total.toFixed(2)}</span>
+                        <span>{formatMoney(subtotalCents)}</span>
                     </div>
-                    <div style={{ marginTop: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                        <button
+                            className="button button--sm button--outline button--secondary"
+                            onClick={() => set(emptyCart())}
+                        >
+                            Empty Cart
+                        </button>
                         <button className="button button--sm button--danger" onClick={() => remove()}>
-                            Clear Cart
+                            Forget Persisted Cart
                         </button>
                     </div>
                 </>

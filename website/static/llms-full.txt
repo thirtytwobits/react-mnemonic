@@ -24,6 +24,7 @@
 - Use `set(null)` when a cleared state must survive reload.
 - SSR renders `defaultValue` on the server unless `ssr.serverValue` overrides it.
 - For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
+- For shopping carts, persist canonical line items and quantities; derive subtotal and item count instead of storing them, and treat empty-cart semantics separately from `remove()`.
 - Use schema migrations for structural version upgrades and `reconcile(...)` for conditional read-time policy rewrites.
 - `StorageLike` is synchronous; async adapters must be hidden behind a synchronous facade.
 - Import published values and types from `react-mnemonic`; do not invent local ambient shims.
@@ -42,6 +43,7 @@ Use it when you need:
 - a reliable rule for `set(...)`, `set(null)`, `remove()`, and `reset()`
 - the shortest correct explanation of SSR, migrations, `reconcile(...)`, and storage adapters
 - wizard navigation and validation boundaries without persisting the wrong UI state
+- shopping cart line-item modeling without inventing the wrong clear semantics
 - copy-pastable patterns that stay aligned with the public API
 
 ## Start Here
@@ -67,6 +69,7 @@ Read these pages in order when context is tight:
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
 - For multi-step wizards, persist user-authored draft values and derive completion from them; keep active step, validation errors, and submit-in-flight state ephemeral unless resume-on-reload is an explicit feature.
+- For shopping carts, persist canonical line items and quantities; derive subtotal and item count instead of storing them, and treat empty-cart semantics separately from `remove()`.
 - SSR is safe by default: the server renders `defaultValue` unless you opt into `ssr.serverValue`.
 - Schema migrations handle structural version upgrades. `reconcile(...)` handles conditional read-time policy rewrites.
 - `StorageLike` is intentionally synchronous in beta 1.
@@ -110,6 +113,7 @@ still shipping incorrect persistence behavior:
 - treating `remove()` as if it means "clear but remember the cleared state"
 - persisting runtime-only UI state such as loading flags, hover state, or validation errors
 - persisting wizard navigation, step errors, or submit-in-flight flags as part of the durable draft
+- persisting cart subtotals or item counts as stored fields instead of deriving them from line items
 - persisting credential material or keeping one global namespace across authenticated user changes
 - clearing the current namespace after auth already switched away from the user who owned the data
 - using `reconcile(...)` to paper over a real versioned schema change
@@ -223,6 +227,16 @@ Rule of thumb:
 - Use `set(null)` for durable clear intent.
 - Use `remove()` for absence.
 - Use `reset()` when the default itself should become the new persisted value.
+
+## Shopping Cart Semantics
+
+| Need                                            | Recommended representation or action | Why                                                        |
+| ----------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Active cart with zero items                     | `CartState` with `items: []`         | The cart still exists and can accept new lines immediately |
+| Explicit “no cart” or “cart unavailable” state  | `set(null)` on `CartState \| null`   | Only when `null` has real product meaning                  |
+| Forget cart after checkout, logout, or recovery | `remove()`                           | The next read falls back to `defaultValue`                 |
+| Restore a seeded default cart shape             | `reset()`                            | Re-persists the configured default object                  |
+| Header badge count or subtotal                  | Derive from `cart.items`             | Prevents drift between stored lines and stored summaries   |
 
 ## Migration vs `reconcile(...)`
 
@@ -766,6 +780,145 @@ Persist a resume position only when reopening on the same step after reload is a
 real product requirement. For the full pattern, see
 [Multi-Step Form Wizards](https://thirtytwobits.github.io/react-mnemonic/docs/guides/multi-step-form-wizards).
 
+## 9. Shopping Cart With Canonical Line Items And Derived Totals
+
+```tsx
+import { JSONCodec, MnemonicProvider, defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+
+type Product = {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
+};
+
+type CartLine = {
+    sku: string;
+    title: string;
+    unitPriceCents: number;
+    quantity: number;
+};
+
+type CartState = {
+    currencyCode: "USD";
+    items: CartLine[];
+};
+
+const cartKey = defineMnemonicKey("shopping-cart", {
+    defaultValue: {
+        currencyCode: "USD" as const,
+        items: [],
+    },
+    codec: JSONCodec,
+    listenCrossTab: true,
+});
+
+function normalizeQuantity(quantity: number): number {
+    return Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 0;
+}
+
+function addProduct(cart: CartState, product: Product): CartState {
+    const existing = cart.items.find((item) => item.sku === product.sku);
+    if (!existing) {
+        return {
+            ...cart,
+            items: [
+                ...cart.items,
+                {
+                    sku: product.sku,
+                    title: product.title,
+                    unitPriceCents: product.unitPriceCents,
+                    quantity: 1,
+                },
+            ],
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) =>
+            item.sku === product.sku
+                ? {
+                      ...item,
+                      title: product.title,
+                      unitPriceCents: product.unitPriceCents,
+                      quantity: item.quantity + 1,
+                  }
+                : item,
+        ),
+    };
+}
+
+function updateProductQuantity(cart: CartState, sku: string, quantity: number): CartState {
+    const nextQuantity = normalizeQuantity(quantity);
+    if (nextQuantity === 0) {
+        return {
+            ...cart,
+            items: cart.items.filter((item) => item.sku !== sku),
+        };
+    }
+
+    return {
+        ...cart,
+        items: cart.items.map((item) => (item.sku === sku ? { ...item, quantity: nextQuantity } : item)),
+    };
+}
+
+function Storefront() {
+    const { value: cart, set, remove } = useMnemonicKey(cartKey);
+
+    const subtotalCents = cart.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+    const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+
+    return (
+        <>
+            <button
+                onClick={() =>
+                    set((current) =>
+                        addProduct(current, {
+                            sku: "widget",
+                            title: "Widget",
+                            unitPriceCents: 999,
+                        }),
+                    )
+                }
+            >
+                Add widget
+            </button>
+
+            <button onClick={() => set((current) => updateProductQuantity(current, "widget", 3))}>
+                Set widget qty to 3
+            </button>
+
+            <button onClick={() => set({ currencyCode: "USD", items: [] })}>Empty cart</button>
+            <button onClick={() => remove()}>Forget cart</button>
+
+            <p>Items: {itemCount}</p>
+            <p>Subtotal: ${(subtotalCents / 100).toFixed(2)}</p>
+        </>
+    );
+}
+
+export function App() {
+    return (
+        <MnemonicProvider namespace="storefront.cart">
+            <Storefront />
+        </MnemonicProvider>
+    );
+}
+```
+
+Use when:
+
+- the cart should survive reload or cross-tab browsing
+- duplicate adds should merge into one line item
+- subtotal and item count can be derived from canonical stored lines
+- an empty active cart is different from forgetting cart persistence entirely
+
+Persist the canonical line items. Derive totals and counts. Use `items: []` for
+an active empty cart, and reserve `remove()` for flows like checkout success,
+logout, or recovery. For fuller setup and edge cases, see
+[Shopping Cart Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/shopping-cart-persistence).
+
 ## Anti-Patterns
 Source: https://thirtytwobits.github.io/react-mnemonic/docs/ai/anti-patterns
 
@@ -821,6 +974,36 @@ Prefer:
 - deriving the step list from the persisted draft on every render
 - storing step ids rather than numeric indexes when resume behavior really matters
 - redirecting to a valid step when a conditional step disappears
+
+## Persisting Derived Cart Totals And Badge Counts
+
+Shopping cart persistence should store canonical lines, not duplicated summary
+fields.
+
+Wrong:
+
+- persisting `subtotalCents`, `itemCount`, or per-line subtotals alongside the stored cart lines
+- storing duplicate lines for the same SKU when the intended behavior is quantity aggregation
+
+Prefer:
+
+- persisting line items and quantities only
+- deriving subtotal, badge count, and line subtotal from the stored lines
+- normalizing duplicate adds into one line unless business rules explicitly require separate entries
+
+## Allowing Invalid Cart Quantities Into Durable State
+
+Cart quantities should not drift into invalid numbers.
+
+Wrong:
+
+- persisting `0`, negative quantities, or `NaN`
+- trusting `Number(event.target.value)` without validation in quantity controls
+
+Prefer:
+
+- clamp or normalize quantities before writing
+- treat non-positive quantities as removal when that matches the UX contract
 
 ## Using `remove()` To Mean "Cleared"
 

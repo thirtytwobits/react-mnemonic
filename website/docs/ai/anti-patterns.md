@@ -57,6 +57,36 @@ Prefer:
 - storing step ids rather than numeric indexes when resume behavior really matters
 - redirecting to a valid step when a conditional step disappears
 
+## Persisting Derived Cart Totals And Badge Counts
+
+Shopping cart persistence should store canonical lines, not duplicated summary
+fields.
+
+Wrong:
+
+- persisting `subtotalCents`, `itemCount`, or per-line subtotals alongside the stored cart lines
+- storing duplicate lines for the same SKU when the intended behavior is quantity aggregation
+
+Prefer:
+
+- persisting line items and quantities only
+- deriving subtotal, badge count, and line subtotal from the stored lines
+- normalizing duplicate adds into one line unless business rules explicitly require separate entries
+
+## Allowing Invalid Cart Quantities Into Durable State
+
+Cart quantities should not drift into invalid numbers.
+
+Wrong:
+
+- persisting `0`, negative quantities, or `NaN`
+- trusting `Number(event.target.value)` without validation in quantity controls
+
+Prefer:
+
+- clamp or normalize quantities before writing
+- treat non-positive quantities as removal when that matches the UX contract
+
 ## Using `remove()` To Mean "Cleared"
 
 If "cleared" is a durable state, do not delete the key.
