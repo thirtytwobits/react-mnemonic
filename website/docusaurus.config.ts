@@ -96,8 +96,7 @@ const config: Config = {
             title: "react-mnemonic",
             logo: {
                 alt: "react-mnemonic logo",
-                src: "img/logo-dark.svg",
-                srcDark: "img/logo.svg",
+                src: "img/logo.svg",
                 height: 32,
                 width: 32,
             },

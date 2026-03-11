@@ -1,5 +1,6 @@
 {
     "cSpell.words": ["autoschema"],
+    "cSpell.language": "en-GB",
     "sonarlint.connectedMode.project": {
         "connectionId": "thirtytwobits-github",
         "projectKey": "thirtytwobits_react-mnemonic"
