@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="./mne_logo-light.png#gh-light-mode-only" alt="react-mnemonic logo" width="220" />
+  <img src="./mne_logo.png#gh-dark-mode-only" alt="react-mnemonic logo" width="220" />
+</p>
+
 # react-mnemonic
 
 AI-friendly, persistent, type-safe state for React.
