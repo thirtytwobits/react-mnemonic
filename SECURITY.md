@@ -35,11 +35,11 @@ untrusted server input. Security concerns most likely to apply include:
 
 ## Supported Versions
 
-Security fixes are provided for the current `1.2.0-beta1` prerelease while the
+Security fixes are provided for the current `1.2.1-beta1.0` prerelease while the
 stable `1.0.0` release is being finalized. Earlier prerelease builds are not
 supported.
 
-| Version       | Supported |
-| ------------- | --------- |
-| 1.2.0-beta1   | Yes       |
-| < 1.2.0-beta1 | No        |
+| Version         | Supported |
+| --------------- | --------- |
+| 1.2.1-beta1.0   | Yes       |
+| < 1.2.1-beta1.0 | No        |
