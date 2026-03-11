@@ -1,6 +1,6 @@
 {
     "name": "react-mnemonic",
-    "version": "1.2.0-beta1",
+    "version": "1.2.1-beta1.0",
     "description": "Persistent, type-safe state management for React",
     "type": "module",
     "main": "./dist/index.cjs",
@@ -51,6 +51,7 @@
         "format:check": "prettier --check .",
         "docs:ai": "node ./website/scripts/generate-ai-assets.mjs && node ./scripts/generate-agent-instructions.mjs",
         "docs:version": "npm --prefix website run typedoc && npm run docs:ai && npm --prefix website run docusaurus -- docs:version",
+        "release:prepare": "node ./scripts/prepare-release.mjs",
         "docs": "typedoc",
         "docs:watch": "typedoc --watch",
         "docs:site": "npm --prefix website run build",
