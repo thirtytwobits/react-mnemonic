@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { useMnemonic } from "./provider";
 import { getRuntimeNodeEnv } from "./runtime";
 import type {
+    Mnemonic,
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,
     MnemonicRecoveryHook,
@@ -48,13 +49,24 @@ function warnRecoveryOnce(api: object, id: string, message: string): void {
  * @throws {Error} If used outside of a MnemonicProvider
  */
 export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): MnemonicRecoveryHook {
-    const api = useMnemonic();
+    return useMnemonicRecoveryFromApi(useMnemonic(), options);
+}
+
+export function useMnemonicRecoveryFromApi(
+    api: Mnemonic,
+    options: UseMnemonicRecoveryOptions = {},
+    active = true,
+): MnemonicRecoveryHook {
     const { onRecover } = options;
 
-    const namespace = useMemo(() => (api.prefix.endsWith(".") ? api.prefix.slice(0, -1) : api.prefix), [api.prefix]);
+    const namespace = useMemo(() => {
+        if (!active) return "";
+        return api.prefix.endsWith(".") ? api.prefix.slice(0, -1) : api.prefix;
+    }, [active, api.prefix]);
 
     const emitRecovery = useCallback(
         (action: MnemonicRecoveryAction, clearedKeys: string[]) => {
+            if (!active) return;
             const event: MnemonicRecoveryEvent = {
                 action,
                 namespace,
@@ -62,13 +74,14 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
             };
             onRecover?.(event);
         },
-        [namespace, onRecover],
+        [active, namespace, onRecover],
     );
 
-    const listKeys = useCallback(() => api.keys(), [api]);
+    const listKeys = useCallback(() => (active ? api.keys() : []), [active, api]);
 
     const clearResolvedKeys = useCallback(
         (action: MnemonicRecoveryAction, keys: readonly string[]) => {
+            if (!active) return [];
             const clearedKeys = uniqueKeys(keys);
             for (const key of clearedKeys) {
                 api.removeRaw(key);
@@ -76,7 +89,7 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
             emitRecovery(action, clearedKeys);
             return clearedKeys;
         },
-        [api, emitRecovery],
+        [active, api, emitRecovery],
     );
 
     const clearKeys = useCallback(
@@ -85,6 +98,7 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
     );
 
     const clearAll = useCallback(() => {
+        if (!active) return [];
         if (!api.canEnumerateKeys) {
             if (isDevelopmentRuntime()) {
                 warnRecoveryOnce(
@@ -98,10 +112,11 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
             );
         }
         return clearResolvedKeys("clear-all", api.keys());
-    }, [api, clearResolvedKeys, namespace]);
+    }, [active, api, clearResolvedKeys, namespace]);
 
     const clearMatching = useCallback(
         (predicate: (key: string) => boolean) => {
+            if (!active) return [];
             if (!api.canEnumerateKeys) {
                 if (isDevelopmentRuntime()) {
                     warnRecoveryOnce(
@@ -119,18 +134,18 @@ export function useMnemonicRecovery(options: UseMnemonicRecoveryOptions = {}): M
                 api.keys().filter((key) => predicate(key)),
             );
         },
-        [api, clearResolvedKeys, namespace],
+        [active, api, clearResolvedKeys, namespace],
     );
 
     return useMemo(
         () => ({
             namespace,
-            canEnumerateKeys: api.canEnumerateKeys,
+            canEnumerateKeys: active ? api.canEnumerateKeys : false,
             listKeys,
             clearAll,
             clearKeys,
             clearMatching,
         }),
-        [namespace, api.canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching],
+        [namespace, active, api.canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching],
     );
 }

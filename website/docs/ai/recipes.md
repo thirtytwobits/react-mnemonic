@@ -139,7 +139,42 @@ export function DraftEditor() {
 Persist the authored draft. Keep runtime metadata like `isDirty` and
 `validationError` in plain React state.
 
-## 5. Schema Upgrade With Migration Plus Reconciliation
+## 5. Optional Persistence For Component Libraries
+
+```tsx
+import { useMnemonicKeyOptional } from "react-mnemonic/optional";
+
+export function SearchBox() {
+    const {
+        value: draft,
+        set,
+        remove,
+    } = useMnemonicKeyOptional("search-draft", {
+        defaultValue: "",
+    });
+
+    return (
+        <div>
+            <input value={draft} onChange={(event) => set(event.target.value)} />
+            <button onClick={remove}>Clear</button>
+        </div>
+    );
+}
+```
+
+Use this when:
+
+- a reusable component may render inside or outside a `MnemonicProvider`
+- the call site should not branch on provider presence
+- persistence is a capability, not a requirement
+
+Inside a provider, the hook persists normally. Outside a provider, it degrades
+to local in-memory state with the same `{ value, set, reset, remove }` shape.
+If the app mounts a schema-capable provider, the same optional component can
+still pass `schema: { version }` metadata through this hook without importing a
+heavier optional package.
+
+## 6. Schema Upgrade With Migration Plus Reconciliation
 
 ```tsx
 import {
@@ -208,7 +243,7 @@ export function App() {
 Migration handles the structural version change. `reconcile(...)` handles the
 conditional policy decision.
 
-## 6. SSR Placeholder For Theme
+## 7. SSR Placeholder For Theme
 
 ```tsx
 import { useMnemonicKey } from "react-mnemonic";
@@ -232,7 +267,7 @@ Use this when:
 - you want the server markup and hydration markup to match
 - local persisted storage should not win until after mount
 
-## 7. Auth-Aware Durable State With Automatic Cleanup
+## 8. Auth-Aware Durable State With Automatic Cleanup
 
 ```tsx
 import { useEffect } from "react";
@@ -283,7 +318,7 @@ Do not store tokens, refresh tokens, or raw session secrets this way. See
 [Auth-Aware Persistence](../guides/auth-aware-persistence) for the full
 pattern.
 
-## 8. Multi-Step Wizard With Durable Draft And Ephemeral Navigation
+## 9. Multi-Step Wizard With Durable Draft And Ephemeral Navigation
 
 ```tsx
 import { useEffect, useState } from "react";
@@ -489,7 +524,7 @@ Persist a resume position only when reopening on the same step after reload is a
 real product requirement. For the full pattern, see
 [Multi-Step Form Wizards](../guides/multi-step-form-wizards).
 
-## 9. Shopping Cart With Canonical Line Items And Derived Totals
+## 10. Shopping Cart With Canonical Line Items And Derived Totals
 
 ```tsx
 import { JSONCodec, MnemonicProvider, defineMnemonicKey, useMnemonicKey } from "react-mnemonic";

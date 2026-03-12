@@ -67,7 +67,43 @@ survives a full page reload.
 
 - `react-mnemonic/core` for the lean persisted-state path
 - `react-mnemonic/schema` when you want schemas, validation, and migrations
+- `react-mnemonic/optional` for component libraries that should persist when a provider exists and silently fall back to in-memory state otherwise
 - `react-mnemonic` if you need the backward-compatible root entrypoint
+
+## Optional persistence for component libraries
+
+If your component may render inside or outside a `MnemonicProvider`, import the
+optional hook instead of branching at the call site.
+
+```tsx
+import { useMnemonicKeyOptional } from "react-mnemonic/optional";
+
+function SearchBox() {
+    const { value, set, remove } = useMnemonicKeyOptional("draft", {
+        defaultValue: "",
+    });
+
+    return (
+        <div>
+            <input value={value} onChange={(event) => set(event.target.value)} />
+            <button onClick={remove}>Clear</button>
+        </div>
+    );
+}
+```
+
+Inside a provider, the draft is persisted. Outside a provider, the same hook
+behaves like local in-memory state without throwing.
+
+The lean optional entrypoint exports only:
+
+- `useMnemonicKeyOptional(...)`
+- `useMnemonicOptional()`
+- `defineMnemonicKey(...)`
+
+Schema metadata such as `schema: { version }` can still be passed through the
+optional hook. Applications pay the schema/runtime cost only when they mount a
+schema-capable `MnemonicProvider`.
 
 ## AI resources
 
@@ -84,6 +120,7 @@ survives a full page reload.
 
 - [Documentation home](https://thirtytwobits.github.io/react-mnemonic/)
 - [Quick Start](https://thirtytwobits.github.io/react-mnemonic/docs/getting-started/quick-start)
+- [Optional Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/optional-persistence)
 - [Server Rendering](https://thirtytwobits.github.io/react-mnemonic/docs/guides/server-rendering)
 - [Canonical Key Definitions](https://thirtytwobits.github.io/react-mnemonic/docs/guides/canonical-key-definitions)
 - [Single Source of Truth Schemas](https://thirtytwobits.github.io/react-mnemonic/docs/guides/single-source-of-truth-schemas)

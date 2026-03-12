@@ -8,6 +8,7 @@ state with `react-mnemonic`.
 ## Quick Rules
 
 - `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Use `useMnemonicKeyOptional(...)` from `react-mnemonic/optional` only when a reusable component may render without a provider and should degrade to local in-memory state instead of crashing.
 - Prefer `useMnemonicKey(...)` over raw `localStorage` for durable app or UI state. Use raw storage only in adapters, tests, or low-level library internals.
 - Every stored key is namespaced as `${namespace}.${key}` in the underlying storage backend.
 - `defaultValue` is required and defines the fallback when a key is absent or invalid.
@@ -38,6 +39,7 @@ state with `react-mnemonic`.
 - Saved Filters With Durable Clear Intent
 - Dismissible Announcement UI
 - Durable Draft Content With Ephemeral Form Metadata
+- Optional Persistence For Component Libraries
 - Schema Upgrade With Migration Plus Reconciliation
 - SSR Placeholder For Theme
 - Auth-Aware Durable State With Automatic Cleanup

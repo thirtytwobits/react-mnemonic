@@ -6,6 +6,7 @@ When adding persisted state to this repository or to example apps built with
 `react-mnemonic`, follow these rules:
 
 - `useMnemonicKey(...)` must run inside a `MnemonicProvider`.
+- Use `useMnemonicKeyOptional(...)` from `react-mnemonic/optional` only when a reusable component may render without a provider and should degrade to local in-memory state instead of crashing.
 - Prefer `useMnemonicKey(...)` over raw `localStorage` for durable app or UI state. Use raw storage only in adapters, tests, or low-level library internals.
 - Every stored key is namespaced as `${namespace}.${key}` in the underlying storage backend.
 - `defaultValue` is required and defines the fallback when a key is absent or invalid.
