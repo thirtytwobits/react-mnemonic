@@ -5,13 +5,11 @@ export { useMnemonicKeyOptional, useMnemonicOptional } from "./Mnemonic/use-key-
 export { defineMnemonicKey } from "./Mnemonic/key-optional";
 export type {
     Codec,
+    MnemonicKeyState,
     MnemonicOptionalBridge,
+    OptionalMnemonicKeyDescriptor as MnemonicKeyDescriptor,
     OptionalMnemonicKeyDescriptor,
+    OptionalMnemonicKeyOptions as UseMnemonicKeyOptions,
     OptionalMnemonicKeyOptions,
     OptionalMnemonicKeySSRConfig,
-} from "./Mnemonic/types";
-export type {
-    MnemonicKeyState,
-    OptionalMnemonicKeyDescriptor as MnemonicKeyDescriptor,
-    OptionalMnemonicKeyOptions as UseMnemonicKeyOptions,
 } from "./Mnemonic/types";
