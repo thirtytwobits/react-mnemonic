@@ -2,8 +2,7 @@
 // Copyright Scott Dixon
 
 import { createContext, useContext } from "react";
-import type { KeySchema } from "./types";
-import type { Listener, MnemonicOptionalBridge, OptionalMnemonicKeyOptions, Unsubscribe } from "./types";
+import type { KeySchema, Listener, MnemonicOptionalBridge, OptionalMnemonicKeyOptions, Unsubscribe } from "./types";
 
 export type OptionalReadResult<T> = {
     value: T;

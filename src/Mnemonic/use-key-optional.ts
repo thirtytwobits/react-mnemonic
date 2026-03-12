@@ -94,13 +94,13 @@ export function useMnemonicKeyOptional<T>(
     }, [bridge, getServerValue, key, raw, resolvedOptions]);
 
     useEffect(() => {
-        if (!bridge || raw === SSR_SNAPSHOT_TOKEN) {
+        if (!bridge || !bridgeSnapshot || raw === SSR_SNAPSHOT_TOKEN) {
             return;
         }
-        bridge.commitSnapshot(key, raw, bridgeSnapshot as NonNullable<typeof bridgeSnapshot>);
+        bridge.commitSnapshot(key, raw, bridgeSnapshot);
     }, [bridge, bridgeSnapshot, key, raw]);
 
-    const value = hasBridge ? (bridgeSnapshot as NonNullable<typeof bridgeSnapshot>).value : memoryValue;
+    const value = hasBridge ? (bridgeSnapshot?.value ?? memoryValue) : memoryValue;
 
     const mountedRef = useRef(false);
     const previousRef = useRef(value);

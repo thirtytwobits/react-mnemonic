@@ -6,8 +6,7 @@ import { inferJsonSchema, validateJsonSchema } from "./json-schema";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { serializeEnvelope } from "./use-shared";
 import type { JsonSchema } from "./json-schema";
-import type { MigrationPath, Mnemonic, OptionalMnemonicKeyOptions, SchemaRegistry } from "./types";
-import type { KeySchema } from "./types";
+import type { KeySchema, MigrationPath, Mnemonic, OptionalMnemonicKeyOptions, SchemaRegistry } from "./types";
 import type { MnemonicOptionalBridgeInternal, OptionalReadResult } from "./optional-bridge";
 
 type OptionalBridgeConfig = {
@@ -19,6 +18,14 @@ function resolveOptionalDefaultValue<T>(defaultValue: OptionalMnemonicKeyOptions
     return typeof defaultValue === "function" ? (defaultValue as () => T)() : defaultValue;
 }
 
+function objectHasOwn(value: object, property: PropertyKey): boolean {
+    const hasOwn = (Object as typeof Object & { hasOwn?: (target: object, key: PropertyKey) => boolean }).hasOwn;
+    if (typeof hasOwn === "function") {
+        return hasOwn(value, property);
+    }
+    return Object.getOwnPropertyDescriptor(value, property) !== undefined;
+}
+
 function parseEnvelope(key: string, rawText: string): MnemonicEnvelope {
     try {
         const parsed = JSON.parse(rawText) as MnemonicEnvelope;
@@ -27,7 +34,7 @@ function parseEnvelope(key: string, rawText: string): MnemonicEnvelope {
             parsed == null ||
             !Number.isInteger(parsed.version) ||
             parsed.version < 0 ||
-            !Object.prototype.hasOwnProperty.call(parsed, "payload")
+            !objectHasOwn(parsed, "payload")
         ) {
             throw new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`);
         }
