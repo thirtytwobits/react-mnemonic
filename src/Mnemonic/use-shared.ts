@@ -50,6 +50,7 @@ type SharedMnemonicKeyContext<T> = {
 type UseMnemonicKeyStateConfig<T, Extra extends object> = {
     decodeForRead: (rawText: string | null) => ReadResult<T, Extra>;
     encodeForWrite: (nextValue: T) => string;
+    active?: boolean;
     additionalDevWarnings?: (args: {
         api: Mnemonic;
         key: string;
@@ -219,10 +220,18 @@ export function useMnemonicKeyShared<T>(
     options: UseMnemonicKeyOptions<T> | undefined,
     schemaVersion?: number,
 ): SharedMnemonicKeyContext<T> {
+    return useMnemonicKeySharedFromApi(useMnemonic(), keyOrDescriptor, options, schemaVersion);
+}
+
+export function useMnemonicKeySharedFromApi<T>(
+    api: Mnemonic,
+    keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
+    options: UseMnemonicKeyOptions<T> | undefined,
+    schemaVersion?: number,
+): SharedMnemonicKeyContext<T> {
     const descriptor = resolveMnemonicKeyArgs(keyOrDescriptor, options);
     const key = descriptor.key;
     const resolvedOptions = descriptor.options;
-    const api = useMnemonic();
 
     const {
         defaultValue,
@@ -436,7 +445,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
         hydrationMode,
         ssrOptions,
     } = shared;
-    const { decodeForRead, encodeForWrite, additionalDevWarnings, onDecodedEffect } = config;
+    const { decodeForRead, encodeForWrite, active = true, additionalDevWarnings, onDecodedEffect } = config;
 
     const getServerRawSnapshot = useCallback(
         (): string | typeof SSR_SNAPSHOT_TOKEN | null =>
@@ -447,17 +456,20 @@ export function useMnemonicKeyState<T, Extra extends object>(
     const deferStorageRead = hydrationMode === "client-only" && !hasMounted;
     const subscribe = useCallback(
         (listener: () => void) => {
+            if (!active) {
+                return () => undefined;
+            }
             if (deferStorageRead) {
                 return () => undefined;
             }
             return api.subscribeRaw(key, listener);
         },
-        [api, deferStorageRead, key],
+        [active, api, deferStorageRead, key],
     );
 
     const raw = useSyncExternalStore(
         subscribe,
-        () => (deferStorageRead ? getServerRawSnapshot() : api.getRawSnapshot(key)),
+        () => (active && !deferStorageRead ? api.getRawSnapshot(key) : getServerRawSnapshot()),
         getServerRawSnapshot,
     );
 
@@ -470,6 +482,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
     const value = decoded.value;
 
     useEffect(() => {
+        if (!active) return;
         if (!developmentRuntime) return;
 
         const globalWindow = (globalThis as { window?: Window }).window;
@@ -515,6 +528,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
             `[Mnemonic] Conflicting useMnemonicKey contracts detected for key "${key}" in namespace "${api.prefix.slice(0, -1)}". Reuse a shared descriptor with defineMnemonicKey(...) or align defaultValue/codec/schema/reconcile options so every consumer describes the same persisted contract.`,
         );
     }, [
+        active,
         additionalDevWarnings,
         api,
         key,
@@ -532,34 +546,39 @@ export function useMnemonicKeyState<T, Extra extends object>(
     }, [hasMounted, setHasMounted]);
 
     useEffect(() => {
+        if (!active) return;
         if (decoded.rewriteRaw && decoded.rewriteRaw !== raw) {
             api.setRaw(key, decoded.rewriteRaw);
         }
-    }, [api, decoded.rewriteRaw, key, raw]);
+    }, [active, api, decoded.rewriteRaw, key, raw]);
 
     useEffect(() => {
+        if (!active) return;
         onDecodedEffect?.(decoded);
-    }, [decoded, onDecodedEffect]);
+    }, [active, decoded, onDecodedEffect]);
 
     const prevRef = useRef<T>(value);
 
     const mounted = useRef(false);
     useEffect(() => {
+        if (!active) return;
         if (mounted.current) return;
         mounted.current = true;
         onMount?.(value);
         prevRef.current = value;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [active]);
 
     useEffect(() => {
+        if (!active) return;
         const prev = prevRef.current;
         if (Object.is(prev, value)) return;
         prevRef.current = value;
         onChange?.(value, prev);
-    }, [value, onChange]);
+    }, [active, value, onChange]);
 
     useEffect(() => {
+        if (!active) return;
         if (!listenCrossTab) return;
         const globalWindow = (globalThis as { window?: Window }).window;
         if (globalWindow === undefined) return;
@@ -581,9 +600,12 @@ export function useMnemonicKeyState<T, Extra extends object>(
 
         globalWindow.addEventListener("storage", handler);
         return () => globalWindow.removeEventListener("storage", handler);
-    }, [listenCrossTab, api, key]);
+    }, [active, listenCrossTab, api, key]);
 
     const set = useMemo(() => {
+        if (!active) {
+            return () => undefined;
+        }
         return (next: T | ((cur: T) => T)) => {
             const nextVal =
                 typeof next === "function" ? (next as (c: T) => T)(decodeForRead(api.getRawSnapshot(key)).value) : next;
@@ -602,9 +624,12 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
             }
         };
-    }, [api, key, decodeForRead, encodeForWrite]);
+    }, [active, api, key, decodeForRead, encodeForWrite]);
 
     const reset = useMemo(() => {
+        if (!active) {
+            return () => undefined;
+        }
         return () => {
             const v = getFallback();
             try {
@@ -621,11 +646,14 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 return;
             }
         };
-    }, [api, key, getFallback, encodeForWrite]);
+    }, [active, api, key, getFallback, encodeForWrite]);
 
     const remove = useMemo(() => {
+        if (!active) {
+            return () => undefined;
+        }
         return () => api.removeRaw(key);
-    }, [api, key]);
+    }, [active, api, key]);
 
     return useMemo<MnemonicKeyState<T>>(
         () => ({

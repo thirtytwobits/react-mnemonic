@@ -3,9 +3,10 @@
 
 import { useCallback } from "react";
 import { CodecError } from "./codecs";
+import { useMnemonic } from "./provider";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
-import { serializeEnvelope, useApplyReconcile, useMnemonicKeyShared, useMnemonicKeyState } from "./use-shared";
-import type { MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
+import { serializeEnvelope, useApplyReconcile, useMnemonicKeySharedFromApi, useMnemonicKeyState } from "./use-shared";
+import type { Mnemonic, MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
 
 function throwCoreSchemaImportError(key: string): never {
     throw new Error(
@@ -13,14 +14,16 @@ function throwCoreSchemaImportError(key: string): never {
     );
 }
 
-function useCoreRuntime<T>(
+export function useCoreRuntimeFromApi<T>(
+    api: Mnemonic,
     keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
     options?: UseMnemonicKeyOptions<T>,
+    active = true,
 ): MnemonicKeyState<T> {
-    const shared = useMnemonicKeyShared(keyOrDescriptor, options);
-    const { api, key, codec, schema, reconcile, parseEnvelope, decodeStringPayload, buildFallbackResult } = shared;
+    const shared = useMnemonicKeySharedFromApi(api, keyOrDescriptor, options);
+    const { key, codec, schema, reconcile, parseEnvelope, decodeStringPayload, buildFallbackResult } = shared;
 
-    if (schema?.version !== undefined || api.schemaMode !== "default") {
+    if (active && (schema?.version !== undefined || api.schemaMode !== "default")) {
         throwCoreSchemaImportError(key);
     }
 
@@ -79,10 +82,18 @@ function useCoreRuntime<T>(
     );
 
     return useMnemonicKeyState(shared, {
+        active,
         decodeForRead,
         encodeForWrite,
         additionalDevWarnings,
     });
+}
+
+function useCoreRuntime<T>(
+    keyOrDescriptor: string | MnemonicKeyDescriptor<T, string>,
+    options?: UseMnemonicKeyOptions<T>,
+): MnemonicKeyState<T> {
+    return useCoreRuntimeFromApi(useMnemonic(), keyOrDescriptor, options);
 }
 
 export function useMnemonicKey<T, K extends string>(descriptor: MnemonicKeyDescriptor<T, K>): MnemonicKeyState<T>;

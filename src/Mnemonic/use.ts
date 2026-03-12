@@ -11,24 +11,36 @@
 
 import { useMemo, useCallback } from "react";
 import { CodecError } from "./codecs";
+import { useMnemonic } from "./provider";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { inferJsonSchema, validateJsonSchema } from "./json-schema";
 import {
     resolveMnemonicKeyArgs,
     serializeEnvelope,
     useApplyReconcile,
-    useMnemonicKeyShared,
+    useMnemonicKeySharedFromApi,
     useMnemonicKeyState,
 } from "./use-shared";
 import type { JsonSchema } from "./json-schema";
-import type { KeySchema, MigrationPath, MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
+import type {
+    KeySchema,
+    MigrationPath,
+    Mnemonic,
+    MnemonicKeyDescriptor,
+    MnemonicKeyState,
+    UseMnemonicKeyOptions,
+} from "./types";
 
 type SchemaReadExtra = {
     pendingSchema?: KeySchema;
 };
 
-function useSchemaMnemonicKey<T>(descriptor: MnemonicKeyDescriptor<T, string>): MnemonicKeyState<T> {
-    const shared = useMnemonicKeyShared(descriptor, undefined, descriptor.options.schema?.version);
+export function useSchemaMnemonicKeyFromApi<T>(
+    store: Mnemonic,
+    descriptor: MnemonicKeyDescriptor<T, string>,
+    active = true,
+): MnemonicKeyState<T> {
+    const shared = useMnemonicKeySharedFromApi(store, descriptor, undefined, descriptor.options.schema?.version);
     const { api, key, codec, codecOpt, schema, reconcile, parseEnvelope, decodeStringPayload, buildFallbackResult } =
         shared;
     const schemaMode = api.schemaMode;
@@ -367,11 +379,16 @@ function useSchemaMnemonicKey<T>(descriptor: MnemonicKeyDescriptor<T, string>): 
     );
 
     return useMnemonicKeyState(shared, {
+        active,
         decodeForRead,
         encodeForWrite,
         additionalDevWarnings,
         onDecodedEffect,
     });
+}
+
+function useSchemaMnemonicKey<T>(descriptor: MnemonicKeyDescriptor<T, string>): MnemonicKeyState<T> {
+    return useSchemaMnemonicKeyFromApi(useMnemonic(), descriptor);
 }
 
 /**

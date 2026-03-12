@@ -33,6 +33,15 @@
             "import": "./dist/schema.js",
             "require": "./dist/schema.cjs",
             "default": "./dist/schema.js"
+        },
+        "./optional": {
+            "types": {
+                "import": "./dist/optional.d.ts",
+                "require": "./dist/optional.d.cts"
+            },
+            "import": "./dist/optional.js",
+            "require": "./dist/optional.cjs",
+            "default": "./dist/optional.js"
         }
     },
     "files": [
@@ -44,6 +53,7 @@
         "test": "vitest run",
         "test:consumers": "node ./scripts/run-consumer-fixtures.mjs",
         "test:coverage": "vitest run --coverage",
+        "test:optional-bundle": "node ./scripts/check-optional-bundle.mjs",
         "test:watch": "vitest",
         "ai:check": "node ./website/scripts/generate-ai-assets.mjs --check && node ./scripts/generate-agent-instructions.mjs --check",
         "lint": "tsc -p tsconfig.json --noEmit",

@@ -1140,6 +1140,104 @@ export interface MnemonicKeyDescriptor<T, K extends string = string> {
 }
 
 /**
+ * Server-rendered seed value for lean optional persistence.
+ *
+ * Unlike the full `MnemonicKeySSRConfig`, the lean optional entrypoint only
+ * supports supplying an initial server value. Hydration policy remains an
+ * application/provider concern so reusable component libraries can stay tiny.
+ */
+export interface OptionalMnemonicKeySSRConfig<T> {
+    /**
+     * Value exposed during SSR and the first hydration snapshot.
+     */
+    serverValue?: T | (() => T);
+}
+
+/**
+ * Reusable, importable contract for a single optionally persistent key.
+ *
+ * This is the descriptor shape consumed by `react-mnemonic/optional`.
+ */
+export interface OptionalMnemonicKeyDescriptor<T, K extends string = string> {
+    /**
+     * Unprefixed storage key name.
+     */
+    readonly key: K;
+
+    /**
+     * Canonical options for the optional hook contract.
+     */
+    readonly options: OptionalMnemonicKeyOptions<T>;
+}
+
+/**
+ * Lean configuration options for `useMnemonicKeyOptional(...)`.
+ *
+ * These options are intentionally smaller than `UseMnemonicKeyOptions<T>` so
+ * component libraries can depend on a tiny fallback-first shim while still
+ * passing persistence metadata through to an application-provided adapter.
+ */
+export type OptionalMnemonicKeyOptions<T> = {
+    /**
+     * Default value used when no persisted value exists or no provider is mounted.
+     */
+    defaultValue: T | (() => T);
+
+    /**
+     * Codec metadata forwarded to a provider-backed adapter when one exists.
+     *
+     * Ignored by the in-memory fallback path.
+     */
+    codec?: Codec<T>;
+
+    /**
+     * Invoked once after the initial value resolves.
+     */
+    onMount?: (value: T) => void;
+
+    /**
+     * Invoked after the visible value changes.
+     */
+    onChange?: (value: T, previous: T) => void;
+
+    /**
+     * Minimal SSR support for the lean optional hook.
+     */
+    ssr?: OptionalMnemonicKeySSRConfig<T>;
+
+    /**
+     * Schema version metadata forwarded to schema-capable providers when present.
+     *
+     * Ignored by the in-memory fallback path and by providers without schema
+     * capabilities.
+     */
+    schema?: {
+        version: number;
+    };
+};
+
+/**
+ * Public metadata exposed by `react-mnemonic/optional`.
+ *
+ * This intentionally avoids exposing the full low-level store API. Applications
+ * that need raw store access should use the required-provider entrypoints.
+ */
+export interface MnemonicOptionalBridge {
+    /**
+     * Active namespace when a provider-backed bridge is mounted.
+     */
+    namespace: string;
+
+    /**
+     * Capabilities supported by the active provider-backed bridge.
+     */
+    capabilities: {
+        persistence: true;
+        schema: boolean;
+    };
+}
+
+/**
  * Key descriptor options inferred from a typed key schema.
  *
  * This mirrors `UseMnemonicKeyOptions<T>` but intentionally omits the `schema`

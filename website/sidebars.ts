@@ -34,6 +34,7 @@ const sidebars: SidebarsConfig = {
                 "guides/single-source-of-truth-schemas",
                 "guides/reset-and-recovery",
                 "guides/clearable-persisted-values",
+                "guides/optional-persistence",
                 "guides/shopping-cart-persistence",
                 "guides/auth-aware-persistence",
                 "guides/multi-step-form-wizards",

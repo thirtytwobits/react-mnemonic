@@ -12,6 +12,8 @@
  */
 
 import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
+import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
+import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
 import { getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
 import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
 
@@ -49,11 +51,21 @@ const MnemonicContext = createContext<Mnemonic | null>(null);
  * @see {@link MnemonicProvider} - Required provider component
  */
 export function useMnemonic(): Mnemonic {
-    const context = useContext(MnemonicContext);
+    const context = useMnemonicOptional();
     if (!context) {
         throw new Error("useMnemonic must be used within a MnemonicProvider");
     }
     return context;
+}
+
+/**
+ * Hook to access the Mnemonic store when one is available.
+ *
+ * Unlike {@link useMnemonic}, this hook never throws. It returns `null`
+ * when no provider is mounted above the caller.
+ */
+export function useMnemonicOptional(): Mnemonic | null {
+    return useContext(MnemonicContext);
 }
 
 /**
@@ -1080,11 +1092,24 @@ export function MnemonicProvider({
         return store;
     }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration]);
 
+    const optionalBridge = useMemo(
+        () =>
+            createMnemonicOptionalBridge({
+                api: store,
+                ...(schemaRegistry ? { schemaRegistry } : {}),
+            }),
+        [schemaRegistry, store],
+    );
+
     // Subscribe to external storage changes (e.g., cross-tab BroadcastChannel)
     useEffect(() => {
         if (!storage?.onExternalChange) return;
         return storage.onExternalChange((changedKeys) => store.reloadFromStorage(changedKeys));
     }, [storage, store]);
 
-    return <MnemonicContext.Provider value={store}>{children}</MnemonicContext.Provider>;
+    return (
+        <MnemonicContext.Provider value={store}>
+            <MnemonicOptionalBridgeProvider bridge={optionalBridge}>{children}</MnemonicOptionalBridgeProvider>
+        </MnemonicContext.Provider>
+    );
 }
