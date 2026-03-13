@@ -54,13 +54,56 @@ function fail(message) {
     throw new Error(message);
 }
 
+function printHelp() {
+    console.log(
+        [
+            "Usage:",
+            "  npm run release:prepare -- <version-or-bump-kind> [--preid <identifier>]",
+            "  npm run release:prepare -- --help",
+            "",
+            "Arguments:",
+            "  <version-or-bump-kind>  Explicit semver version like 1.3.0,",
+            "                          or one of: patch, minor, major, prepatch,",
+            "                          preminor, premajor, prerelease",
+            "",
+            "Options:",
+            "  --preid <identifier>    Prerelease identifier for prepatch/preminor/",
+            "                          premajor/prerelease (for example beta or rc)",
+            "  -h, --help              Show this help message",
+            "",
+            "Examples:",
+            "  npm run release:prepare -- 1.3.0",
+            "  npm run release:prepare -- patch",
+            "  npm run release:prepare -- preminor --preid beta",
+            "  npm run release:prepare -- prerelease --preid rc",
+            "",
+            "What this script does:",
+            "  - requires a clean git worktree",
+            "  - creates a release branch named release/v<resolved-version>",
+            "  - updates package/versioned docs metadata and release-facing docs",
+            "  - regenerates AI assets and cuts a docs snapshot",
+            "  - runs format, ai:check, lint, build, test, and docs:site",
+            '  - commits the result as "Prepare release v<resolved-version>"',
+        ].join("\n"),
+    );
+}
+
 function parseArgs(argv) {
+    if (argv.includes("--help") || argv.includes("-h")) {
+        return {
+            help: true,
+            target: null,
+            preid: null,
+        };
+    }
+
     if (argv.length === 0) {
-        fail("Missing version or bump kind. Example: npm run release:prepare -- 1.2.1-beta1");
+        fail("Missing version or bump kind. Run `npm run release:prepare -- --help` for usage.");
     }
 
     const [target, ...rest] = argv;
     const options = {
+        help: false,
         target,
         preid: null,
     };
@@ -234,13 +277,14 @@ function updateChangelog(version) {
 function updateSecurity(version) {
     let security = readText(securityPath);
 
-    const supportSentencePattern = /Security fixes are provided for the current `[^`]+` prerelease/;
+    const supportSentencePattern =
+        /Security fixes are provided for the current `[^`]+` (?:prerelease|release line)\. Earlier[\s\S]*?supported\./;
     if (!supportSentencePattern.test(security)) {
         fail("Unable to locate the supported prerelease sentence in SECURITY.md");
     }
     security = security.replace(
         supportSentencePattern,
-        `Security fixes are provided for the current \`${version}\` prerelease`,
+        `Security fixes are provided for the current \`${version}\` release line. Earlier release lines are not supported.`,
     );
 
     const currentVersionRowPattern = /^\| [^|]+\s+\| Yes\s+\|$/m;
@@ -392,7 +436,12 @@ function commitChanges(version) {
 }
 
 function main() {
-    const { target, preid } = parseArgs(process.argv.slice(2));
+    const { help, target, preid } = parseArgs(process.argv.slice(2));
+    if (help) {
+        printHelp();
+        return;
+    }
+
     const currentVersion = readJson(rootPackageJsonPath).version;
     const currentVersions = readJson(versionsJsonPath);
 

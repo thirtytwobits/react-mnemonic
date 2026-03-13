@@ -123,7 +123,7 @@ The docs site now uses Docusaurus versioning:
 To cut a new released docs snapshot:
 
 ```bash
-npm run docs:version -- 1.2.1-beta1.0
+npm run docs:version -- 1.3.0
 ```
 
 That command:
@@ -149,7 +149,7 @@ the leading `v`. Tagging remains `vX.Y.Z`, but the docs version should be
 To automate the local release-prep flow before tag and push:
 
 ```bash
-npm run release:prepare -- 1.2.1-beta1.0
+npm run release:prepare -- 1.3.0
 npm run release:prepare -- prerelease --preid beta
 npm run release:prepare -- patch
 ```
@@ -352,7 +352,7 @@ Runs on push to `main`:
 
 ### Releases (`release.yml`)
 
-Triggered by tagged releases matching `v*` (for example `v1.2.1-beta1.0` or
+Triggered by tagged releases matching `v*` (for example `v1.3.0` or
 `v1.1.0`):
 
 The repository-local prep flow happens before this via
