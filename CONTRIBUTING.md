@@ -149,7 +149,7 @@ the leading `v`. Tagging remains `vX.Y.Z`, but the docs version should be
 To automate the local release-prep flow before tag and push:
 
 ```bash
-npm run release:prepare -- 1.2.1-beta1.0
+npm run release:prepare -- 1.3.0
 npm run release:prepare -- prerelease --preid beta
 npm run release:prepare -- patch
 ```

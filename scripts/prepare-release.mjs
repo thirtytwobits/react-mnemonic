@@ -62,7 +62,7 @@ function printHelp() {
             "  npm run release:prepare -- --help",
             "",
             "Arguments:",
-            "  <version-or-bump-kind>  Explicit semver version like 1.2.1-beta1.0,",
+            "  <version-or-bump-kind>  Explicit semver version like 1.3.0,",
             "                          or one of: patch, minor, major, prepatch,",
             "                          preminor, premajor, prerelease",
             "",
@@ -72,7 +72,7 @@ function printHelp() {
             "  -h, --help              Show this help message",
             "",
             "Examples:",
-            "  npm run release:prepare -- 1.2.1-beta1.0",
+            "  npm run release:prepare -- 1.3.0",
             "  npm run release:prepare -- patch",
             "  npm run release:prepare -- preminor --preid beta",
             "  npm run release:prepare -- prerelease --preid rc",
@@ -277,13 +277,14 @@ function updateChangelog(version) {
 function updateSecurity(version) {
     let security = readText(securityPath);
 
-    const supportSentencePattern = /Security fixes are provided for the current `[^`]+` prerelease/;
+    const supportSentencePattern =
+        /Security fixes are provided for the current `[^`]+` (?:prerelease|release line)\. Earlier[\s\S]*?supported\./;
     if (!supportSentencePattern.test(security)) {
         fail("Unable to locate the supported prerelease sentence in SECURITY.md");
     }
     security = security.replace(
         supportSentencePattern,
-        `Security fixes are provided for the current \`${version}\` prerelease`,
+        `Security fixes are provided for the current \`${version}\` release line. Earlier release lines are not supported.`,
     );
 
     const currentVersionRowPattern = /^\| [^|]+\s+\| Yes\s+\|$/m;

@@ -35,9 +35,8 @@ untrusted server input. Security concerns most likely to apply include:
 
 ## Supported Versions
 
-Security fixes are provided for the current `1.3.0` prerelease while the
-stable `1.0.0` release is being finalized. Earlier prerelease builds are not
-supported.
+Security fixes are provided for the current `1.3.0` release line. Earlier
+release lines are not supported.
 
 | Version | Supported |
 | ------- | --------- |
