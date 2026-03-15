@@ -4,6 +4,7 @@ on:
     push:
         tags:
             - "v*"
+    workflow_dispatch:
 
 concurrency:
     group: pages
@@ -14,6 +15,8 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: read
+            pages: write
+            id-token: write
         defaults:
             run:
                 working-directory: website
@@ -45,9 +48,13 @@ jobs:
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
 
+            - name: Configure GitHub Pages
+              uses: actions/configure-pages@v5
+
             - name: Upload Pages artifact
-              uses: actions/upload-pages-artifact@v3
+              uses: actions/upload-pages-artifact@v4
               with:
+                  name: github-pages
                   path: website/build
 
     deploy:
@@ -63,3 +70,5 @@ jobs:
             - name: Deploy to GitHub Pages
               id: deployment
               uses: actions/deploy-pages@v4
+              with:
+                  artifact_name: github-pages
