@@ -38,6 +38,16 @@ function env(payload: string, version = 0): string {
     return JSON.stringify({ version, payload });
 }
 
+function dispatchStorageEvent(init: StorageEventInit = {}) {
+    const event = new Event("storage");
+    Object.defineProperties(event, {
+        key: { value: init.key ?? null },
+        newValue: { value: init.newValue ?? null },
+        oldValue: { value: init.oldValue ?? null },
+    });
+    window.dispatchEvent(event);
+}
+
 /**
  * Renders a hook inside a MnemonicProvider and captures both the hook result
  * and the underlying store API for direct manipulation.
@@ -670,9 +680,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: env(JSON.stringify("dark")) }),
-            );
+            dispatchStorageEvent({ key: "ns.theme", newValue: env(JSON.stringify("dark")) });
         });
 
         expect(onChange).toHaveBeenCalledWith("dark", "light");
@@ -687,7 +695,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(new StorageEvent("storage", { key: "ns.count", newValue: env("42") }));
+            dispatchStorageEvent({ key: "ns.count", newValue: env("42") });
         });
 
         // JSONCodec decodes "42" → 42
@@ -704,7 +712,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(new StorageEvent("storage", { key: "ns.count", newValue: env("not-a-number") }));
+            dispatchStorageEvent({ key: "ns.count", newValue: env("not-a-number") });
         });
 
         // JSONCodec throws for "not-a-number", fallback to default
@@ -720,12 +728,10 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "other-ns.theme",
-                    newValue: env(JSON.stringify("dark")),
-                }),
-            );
+            dispatchStorageEvent({
+                key: "other-ns.theme",
+                newValue: env(JSON.stringify("dark")),
+            });
         });
 
         expect(result.current.value).toBe("light");
@@ -743,12 +749,10 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             for (let i = 1; i <= 10; i++) {
-                window.dispatchEvent(
-                    new StorageEvent("storage", {
-                        key: "ns.count",
-                        newValue: env(String(i)),
-                    }),
-                );
+                dispatchStorageEvent({
+                    key: "ns.count",
+                    newValue: env(String(i)),
+                });
             }
         });
 
@@ -787,7 +791,7 @@ describe("cross-tab sync – data flow integration", () => {
         expect(v2).toBe("a");
 
         act(() => {
-            window.dispatchEvent(new StorageEvent("storage", { key: "ns.shared", newValue: env(JSON.stringify("b")) }));
+            dispatchStorageEvent({ key: "ns.shared", newValue: env(JSON.stringify("b")) });
         });
 
         expect(v1).toBe("b");
@@ -806,9 +810,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         // Should not throw after the component is unmounted
         expect(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", { key: "ns.theme", newValue: env(JSON.stringify("dark")) }),
-            );
+            dispatchStorageEvent({ key: "ns.theme", newValue: env(JSON.stringify("dark")) });
         }).not.toThrow();
     });
 
@@ -827,13 +829,11 @@ describe("cross-tab sync – data flow integration", () => {
         // Tab A: writes "updated" to storage (simulated by direct storage write + event)
         act(() => {
             storage.store.set("ns.data", env(JSON.stringify("updated")));
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "ns.data",
-                    oldValue: null,
-                    newValue: env(JSON.stringify("updated")),
-                }),
-            );
+            dispatchStorageEvent({
+                key: "ns.data",
+                oldValue: null,
+                newValue: env(JSON.stringify("updated")),
+            });
         });
 
         // Tab B: receives the update

@@ -42,6 +42,16 @@ function env(payload: string, version = 0): string {
     return JSON.stringify({ version, payload });
 }
 
+function dispatchStorageEvent(init: StorageEventInit = {}) {
+    const event = new Event("storage");
+    Object.defineProperties(event, {
+        key: { value: init.key ?? null },
+        newValue: { value: init.newValue ?? null },
+        oldValue: { value: init.oldValue ?? null },
+    });
+    window.dispatchEvent(event);
+}
+
 const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
 const originalNodeEnv = originalProcess?.env?.NODE_ENV;
 
@@ -791,12 +801,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("light");
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "ns.theme",
-                    newValue: env(JSON.stringify("dark")),
-                }),
-            );
+            dispatchStorageEvent({
+                key: "ns.theme",
+                newValue: env(JSON.stringify("dark")),
+            });
         });
         expect(result.current.value).toBe("dark");
     });
@@ -812,12 +820,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("dark");
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "ns.theme",
-                    newValue: null,
-                }),
-            );
+            dispatchStorageEvent({
+                key: "ns.theme",
+                newValue: null,
+            });
         });
         expect(result.current.value).toBe("light"); // falls back to default
     });
@@ -833,12 +839,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("dark");
 
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: null,
-                    newValue: null,
-                }),
-            );
+            dispatchStorageEvent({
+                key: null,
+                newValue: null,
+            });
         });
 
         expect(result.current.value).toBe("light");
@@ -852,12 +856,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
             }),
         );
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "ns.other",
-                    newValue: "irrelevant",
-                }),
-            );
+            dispatchStorageEvent({
+                key: "ns.other",
+                newValue: "irrelevant",
+            });
         });
         expect(result.current.value).toBe("light");
     });
@@ -870,12 +872,10 @@ describe("useMnemonicKey – cross-tab sync", () => {
             }),
         );
         act(() => {
-            window.dispatchEvent(
-                new StorageEvent("storage", {
-                    key: "ns.theme",
-                    newValue: env(JSON.stringify("dark")),
-                }),
-            );
+            dispatchStorageEvent({
+                key: "ns.theme",
+                newValue: env(JSON.stringify("dark")),
+            });
         });
         expect(result.current.value).toBe("light"); // unchanged
     });
