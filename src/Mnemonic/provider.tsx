@@ -26,6 +26,7 @@ import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscr
  * @internal
  */
 const MnemonicContext = createContext<Mnemonic | null>(null);
+const warnedNestedProviderStores = new WeakSet<Mnemonic>();
 
 /**
  * Hook to access the Mnemonic store from context.
@@ -793,8 +794,24 @@ export function MnemonicProvider({
         throw new Error("MnemonicProvider autoschema mode requires schemaRegistry.registerSchema");
     }
 
+    const prefix = `${namespace}.`;
+    const parentStore = useMnemonicOptional();
+
+    useEffect(() => {
+        if (isProductionRuntime()) return;
+        if (parentStore?.prefix !== prefix) return;
+        if (warnedNestedProviderStores.has(parentStore)) return;
+
+        warnedNestedProviderStores.add(parentStore);
+        console.warn(
+            `[Mnemonic] Nested MnemonicProvider detected for namespace "${namespace}". ` +
+                "The nearest provider wins, so the inner provider creates a separate store " +
+                "and cache even though the namespace matches. Prefer a single provider per " +
+                "namespace, or use distinct namespaces for intentionally separate scopes.",
+        );
+    }, [namespace, parentStore, prefix]);
+
     const store = useMemo<MnemonicInternal>(() => {
-        const prefix = `${namespace}.`;
         const st = storage ?? defaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
         const devToolsRoot = ensureDevToolsRoot(enableDevTools);

@@ -41,11 +41,33 @@ function StoreConsumer({ onStore }: { onStore: (store: ReturnType<typeof useMnem
     return <div data-testid="consumer">connected</div>;
 }
 
+const originalProcess = (globalThis as any).process;
+
+function setNodeEnv(value: string) {
+    const currentProcess = (globalThis as any).process ?? {};
+    const currentEnv = currentProcess.env ?? {};
+    (globalThis as any).process = {
+        ...currentProcess,
+        env: {
+            ...currentEnv,
+            NODE_ENV: value,
+        },
+    };
+}
+
+function restoreProcess() {
+    (globalThis as any).process = originalProcess;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("MnemonicProvider", () => {
+    afterEach(() => {
+        restoreProcess();
+    });
+
     it("renders children", () => {
         render(
             <MnemonicProvider namespace="test" storage={createMockStorage()}>
@@ -53,6 +75,63 @@ describe("MnemonicProvider", () => {
             </MnemonicProvider>,
         );
         expect(screen.getByTestId("child").textContent).toBe("hello");
+    });
+
+    it("warns once in development for nested providers with the same namespace", () => {
+        setNodeEnv("development");
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const outerStorage = createMockStorage();
+        const innerStorage = createMockStorage();
+
+        const tree = (
+            <MnemonicProvider namespace="nested-dev-warning" storage={outerStorage}>
+                <MnemonicProvider namespace="nested-dev-warning" storage={innerStorage}>
+                    <div data-testid="child">hello</div>
+                </MnemonicProvider>
+            </MnemonicProvider>
+        );
+
+        const { rerender } = render(tree);
+        rerender(tree);
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0]?.[0]).toContain('namespace "nested-dev-warning"');
+
+        warnSpy.mockRestore();
+    });
+
+    it("does not warn in development for nested providers with different namespaces", () => {
+        setNodeEnv("development");
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="outer-scope" storage={createMockStorage()}>
+                <MnemonicProvider namespace="inner-scope" storage={createMockStorage()}>
+                    <div data-testid="child">hello</div>
+                </MnemonicProvider>
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        warnSpy.mockRestore();
+    });
+
+    it("does not warn in production for nested providers with the same namespace", () => {
+        setNodeEnv("production");
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        render(
+            <MnemonicProvider namespace="nested-prod-warning" storage={createMockStorage()}>
+                <MnemonicProvider namespace="nested-prod-warning" storage={createMockStorage()}>
+                    <div data-testid="child">hello</div>
+                </MnemonicProvider>
+            </MnemonicProvider>,
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        warnSpy.mockRestore();
     });
 });
 
@@ -732,7 +811,6 @@ describe("MnemonicProvider – DOMException/SecurityError logging", () => {
 
 describe("MnemonicProvider – DevTools", () => {
     const originalWeakRef = (globalThis as any).WeakRef;
-    const originalProcess = (globalThis as any).process;
     const originalWeakRefDescriptor = Object.getOwnPropertyDescriptor(globalThis, "WeakRef");
     const originalFinalizationRegistryDescriptor = Object.getOwnPropertyDescriptor(globalThis, "FinalizationRegistry");
 
@@ -747,29 +825,17 @@ describe("MnemonicProvider – DevTools", () => {
         delete (globalThis as any)[name];
     };
 
-    const setNodeEnv = (value: string) => {
-        const currentProcess = (globalThis as any).process ?? {};
-        const currentEnv = currentProcess.env ?? {};
-        (globalThis as any).process = {
-            ...currentProcess,
-            env: {
-                ...currentEnv,
-                NODE_ENV: value,
-            },
-        };
-    };
-
     beforeEach(() => {
         delete (window as any).__REACT_MNEMONIC_DEVTOOLS__;
         restoreGlobalConstructor("WeakRef", originalWeakRefDescriptor);
         restoreGlobalConstructor("FinalizationRegistry", originalFinalizationRegistryDescriptor);
-        (globalThis as any).process = originalProcess;
+        restoreProcess();
     });
 
     afterEach(() => {
         restoreGlobalConstructor("WeakRef", originalWeakRefDescriptor);
         restoreGlobalConstructor("FinalizationRegistry", originalFinalizationRegistryDescriptor);
-        (globalThis as any).process = originalProcess;
+        restoreProcess();
     });
 
     function getRegistry() {
