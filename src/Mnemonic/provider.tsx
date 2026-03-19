@@ -26,7 +26,7 @@ import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscr
  * @internal
  */
 const MnemonicContext = createContext<Mnemonic | null>(null);
-const warnedNestedProviderNamespaces = new Set<string>();
+const warnedNestedProviderStores = new WeakSet<Mnemonic>();
 
 /**
  * Hook to access the Mnemonic store from context.
@@ -800,9 +800,9 @@ export function MnemonicProvider({
     useEffect(() => {
         if (isProductionRuntime()) return;
         if (parentStore?.prefix !== prefix) return;
-        if (warnedNestedProviderNamespaces.has(namespace)) return;
+        if (warnedNestedProviderStores.has(parentStore)) return;
 
-        warnedNestedProviderNamespaces.add(namespace);
+        warnedNestedProviderStores.add(parentStore);
         console.warn(
             `[Mnemonic] Nested MnemonicProvider detected for namespace "${namespace}". ` +
                 "The nearest provider wins, so the inner provider creates a separate store " +
