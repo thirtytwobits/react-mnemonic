@@ -39,8 +39,7 @@ survives full page reloads.
 
 Use `react-mnemonic/core` for the lean persisted-state path. If you need JSON
 Schema validation, autoschema, or migrations, import from
-`react-mnemonic/schema` or the backward-compatible root `react-mnemonic`
-entrypoint instead.
+`react-mnemonic/schema` or the top-level `react-mnemonic` entrypoint instead.
 
 In server-rendered apps, the default contract is: render `defaultValue` on the
 server, then hydrate to persisted storage on the client. When you need a

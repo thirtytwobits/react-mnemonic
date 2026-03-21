@@ -68,7 +68,7 @@ survives a full page reload.
 - `react-mnemonic/core` for the lean persisted-state path
 - `react-mnemonic/schema` when you want schemas, validation, and migrations
 - `react-mnemonic/optional` for component libraries that should persist when a provider exists and silently fall back to in-memory state otherwise
-- `react-mnemonic` if you need the backward-compatible root entrypoint
+- `react-mnemonic` for the top-level full entrypoint
 
 ## Optional persistence for component libraries
 
