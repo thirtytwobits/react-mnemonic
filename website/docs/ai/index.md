@@ -18,6 +18,30 @@ Use it when you need:
 - shopping cart line-item modeling without inventing the wrong clear semantics
 - copy-pastable patterns that stay aligned with the public API
 
+## Quick Start
+
+The minimum correct shape is: mount a `MnemonicProvider` above every component
+that calls `useMnemonicKey(...)`.
+
+```tsx
+// main.tsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { MnemonicProvider } from "react-mnemonic";
+import { App } from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+        <MnemonicProvider namespace="app">
+            <App />
+        </MnemonicProvider>
+    </React.StrictMode>,
+);
+```
+
+Any descendant of `App` can now call `useMnemonicKey(...)`. Without the
+provider, the required-provider entrypoints throw.
+
 ## Start Here
 
 Read these pages in order when context is tight:
