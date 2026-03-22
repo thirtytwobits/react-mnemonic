@@ -240,4 +240,62 @@ describe("provider bootstrap seeding", () => {
         expect(screen.getByTestId("recovered-theme").textContent).toBe("dark");
         expect(getItem).toHaveBeenCalledTimes(2);
     });
+
+    it("revalidates bootstrap null seeds before the first hook read", () => {
+        const storage = createMockStorage();
+        const themeKey = defineMnemonicKey("theme", {
+            defaultValue: "light" as "light" | "dark",
+        });
+
+        const snapshot = recallMnemonic({
+            namespace: "app",
+            storage,
+            keys: [themeKey] as const,
+        });
+
+        expect(snapshot.values.theme).toBe("light");
+        expect(snapshot.raw.theme).toBeNull();
+
+        storage.store.set("app.theme", env(JSON.stringify("dark")));
+
+        function Theme() {
+            const { value } = useMnemonicKey(themeKey);
+            return <div data-testid="late-theme">{value}</div>;
+        }
+
+        render(
+            <MnemonicProvider namespace="app" storage={storage} bootstrap={snapshot}>
+                <Theme />
+            </MnemonicProvider>,
+        );
+
+        expect(screen.getByTestId("late-theme").textContent).toBe("dark");
+        expect(storage.getItem).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("bootstrap storage contract violations", () => {
+    it("swallows async getItem rejections and falls back cleanly", async () => {
+        const storage: StorageLike = {
+            getItem: () => Promise.reject(new Error("async getItem is unsupported")) as unknown as string | null,
+            setItem: () => undefined,
+            removeItem: () => undefined,
+        };
+
+        const snapshot = recallMnemonic({
+            namespace: "app",
+            storage,
+            keys: [
+                {
+                    key: "theme",
+                    defaultValue: "light" as "light" | "dark",
+                },
+            ] as const,
+        });
+
+        await Promise.resolve();
+
+        expect(snapshot.values.theme).toBe("light");
+        expect("theme" in snapshot.raw).toBe(false);
+    });
 });

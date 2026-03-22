@@ -466,6 +466,7 @@ function readStorageRaw(
     try {
         const raw = storage.getItem(storageKey);
         if (isPromiseLike(raw)) {
+            void Promise.resolve(raw).catch(() => undefined);
             return {
                 readable: false,
                 raw: null,

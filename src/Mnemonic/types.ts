@@ -289,9 +289,9 @@ export type MnemonicBootstrapSeed<TValues extends Record<string, unknown> = Reco
      * Only keys that were read successfully should appear here.
      *
      * A present `null` entry means the key was confirmed absent when the
-     * bootstrap snapshot was taken, so the provider can safely skip an initial
-     * storage read for that key and fall back to its configured default
-     * instead.
+     * bootstrap snapshot was taken. Providers may still choose to revalidate
+     * that absence on first access, so only non-null string entries are
+     * guaranteed to short-circuit an initial storage read.
      *
      * If storage was unavailable or unreadable during bootstrap, omit the key
      * entirely so the provider can retry a normal read later.
@@ -319,7 +319,8 @@ export type MnemonicBootstrapSnapshot<TValues extends Record<string, unknown> = 
      *
      * Keys are only included when the bootstrap read successfully observed the
      * underlying storage backend. A present `null` still means the key was
-     * confirmed absent at recall time.
+     * confirmed absent at recall time, though providers may revalidate that
+     * absence before the first hook read.
      */
     raw: Record<string, string | null>;
 

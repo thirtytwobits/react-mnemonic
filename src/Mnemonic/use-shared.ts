@@ -4,6 +4,10 @@
 import { useSyncExternalStore, useMemo, useEffect, useRef, useCallback, useState } from "react";
 import { useMnemonic } from "./provider";
 import { JSONCodec, CodecError } from "./codecs";
+import {
+    decodeStringPayload as decodePersistedStringPayload,
+    parseEnvelope as parsePersistedEnvelope,
+} from "./persistence-shared";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { getRuntimeNodeEnv } from "./runtime";
 import type { Mnemonic, MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
@@ -78,12 +82,7 @@ const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
 const diagnosticObjectIds = new WeakMap<object, number>();
 let nextDiagnosticObjectId = 1;
 
-export function serializeEnvelope(version: number, payload: unknown): string {
-    return JSON.stringify({
-        version,
-        payload,
-    } satisfies MnemonicEnvelope);
-}
+export { serializeEnvelope } from "./persistence-shared";
 
 export function withReadMetadata<T, Extra extends object = {}>(
     value: T,
@@ -140,14 +139,6 @@ function stableDiagnosticValue(value: unknown): string {
 
 function isObjectLike(value: unknown): value is object {
     return value !== null && (typeof value === "object" || typeof value === "function");
-}
-
-function objectHasOwn(value: object, property: PropertyKey): boolean {
-    const hasOwn = (Object as typeof Object & { hasOwn?: (target: object, key: PropertyKey) => boolean }).hasOwn;
-    if (typeof hasOwn === "function") {
-        return hasOwn(value, property);
-    }
-    return Object.getOwnPropertyDescriptor(value, property) !== undefined;
 }
 
 function getDiagnosticObjectId(value: object): number {
@@ -295,24 +286,14 @@ export function useMnemonicKeySharedFromApi<T>(
     const parseEnvelope = useCallback(
         (rawText: string): { ok: true; envelope: MnemonicEnvelope } | { ok: false; error: SchemaError } => {
             try {
-                const parsed = JSON.parse(rawText) as MnemonicEnvelope;
-                if (
-                    typeof parsed !== "object" ||
-                    parsed == null ||
-                    !Number.isInteger(parsed.version) ||
-                    parsed.version < 0 ||
-                    !objectHasOwn(parsed, "payload")
-                ) {
-                    return {
-                        ok: false,
-                        error: new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`),
-                    };
-                }
-                return { ok: true, envelope: parsed };
-            } catch (err) {
+                return { ok: true, envelope: parsePersistedEnvelope(key, rawText) };
+            } catch (error) {
                 return {
                     ok: false,
-                    error: new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`, err),
+                    error:
+                        error instanceof SchemaError
+                            ? error
+                            : new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`, error),
                 };
             }
         },
@@ -321,11 +302,7 @@ export function useMnemonicKeySharedFromApi<T>(
 
     const decodeStringPayload = useCallback(
         <V>(payload: string, activeCodec: { decode: (encoded: string) => V }) => {
-            try {
-                return activeCodec.decode(payload);
-            } catch (err) {
-                throw err instanceof CodecError ? err : new CodecError(`Codec decode failed for key "${key}"`, err);
-            }
+            return decodePersistedStringPayload(key, payload, activeCodec);
         },
         [key],
     );

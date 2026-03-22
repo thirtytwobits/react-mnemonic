@@ -807,7 +807,9 @@ export function MnemonicProvider({
         const cache = new Map<string, string | null>();
         if (bootstrap?.raw) {
             for (const [key, raw] of Object.entries(bootstrap.raw)) {
-                cache.set(key, raw);
+                if (raw != null) {
+                    cache.set(key, raw);
+                }
             }
         }
 
