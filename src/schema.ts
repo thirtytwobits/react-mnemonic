@@ -45,6 +45,8 @@ export type {
     MnemonicDevToolsMeta,
     MnemonicDevToolsRegistry,
     MnemonicHydrationMode,
+    MnemonicBootstrapSeed,
+    MnemonicBootstrapSnapshot,
     MnemonicProviderSSRConfig,
     MnemonicKeySSRConfig,
     Unsubscribe,

@@ -17,6 +17,16 @@ export function getRuntimeNodeEnv(): string | undefined {
     return undefined;
 }
 
+export function getDefaultBrowserStorage(): StorageLike | undefined {
+    const globalWindow = (globalThis as { window?: Window }).window;
+    if (globalWindow === undefined) return undefined;
+    try {
+        return globalWindow.localStorage;
+    } catch {
+        return undefined;
+    }
+}
+
 export function getNativeBrowserStorages(): StorageLike[] {
     const globalWindow = (globalThis as { window?: Window }).window;
     if (!globalWindow) return [];

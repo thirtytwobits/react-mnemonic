@@ -12,17 +12,51 @@ agents often get wrong under time pressure.
 ## 1. Theme Preference With Cross-Tab Sync
 
 ```tsx
-import { defineMnemonicKey, useMnemonicKey } from "react-mnemonic";
+// theme-key.ts
+import { defineMnemonicKey } from "react-mnemonic";
 
 export const themeKey = defineMnemonicKey("theme", {
     defaultValue: "light" as "light" | "dark",
     listenCrossTab: true,
 });
+```
+
+```tsx
+// theme-bootstrap.ts
+import { applyMnemonicBootstrap, recallMnemonic } from "react-mnemonic/bootstrap";
+import { themeKey } from "./theme-key";
+
+export const themeBootstrap = recallMnemonic({
+    namespace: "app",
+    keys: [themeKey] as const,
+});
+
+applyMnemonicBootstrap({
+    snapshot: themeBootstrap,
+    apply: ({ theme }) => {
+        document.documentElement.dataset.theme = theme;
+    },
+});
+```
+
+```tsx
+// app.tsx
+import { MnemonicProvider, useMnemonicKey } from "react-mnemonic";
+import { themeBootstrap } from "./theme-bootstrap";
+import { themeKey } from "./theme-key";
 
 export function ThemeToggle() {
     const { value: theme, set } = useMnemonicKey(themeKey);
 
     return <button onClick={() => set(theme === "light" ? "dark" : "light")}>Theme: {theme}</button>;
+}
+
+export function App() {
+    return (
+        <MnemonicProvider namespace="app" bootstrap={themeBootstrap}>
+            <ThemeToggle />
+        </MnemonicProvider>
+    );
 }
 ```
 
@@ -31,6 +65,10 @@ Use when:
 - the value should survive reload
 - multiple components should share one contract
 - other tabs should stay in sync
+- the page should avoid a light/dark flash on first paint
+
+Run the bootstrap module before React first renders, such as in a small entry
+module loaded before `createRoot(...)` or `hydrateRoot(...)`.
 
 ## 2. Saved Filters With Durable Clear Intent
 

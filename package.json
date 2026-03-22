@@ -42,6 +42,15 @@
             "import": "./dist/optional.js",
             "require": "./dist/optional.cjs",
             "default": "./dist/optional.js"
+        },
+        "./bootstrap": {
+            "types": {
+                "import": "./dist/bootstrap.d.ts",
+                "require": "./dist/bootstrap.d.cts"
+            },
+            "import": "./dist/bootstrap.js",
+            "require": "./dist/bootstrap.cjs",
+            "default": "./dist/bootstrap.js"
         }
     },
     "files": [

@@ -14,7 +14,7 @@
 import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
 import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
-import { getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
+import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
 import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
 
 /**
@@ -82,26 +82,6 @@ export interface MnemonicProviderProps extends Readonly<MnemonicProviderOptions>
      * React children to render within the provider.
      */
     readonly children: ReactNode;
-}
-
-/**
- * Helper function to safely access window.localStorage in browser environments.
- *
- * Returns undefined in non-browser environments (SSR) or when localStorage
- * is unavailable (e.g., in private browsing mode with strict settings).
- *
- * @returns localStorage if available, undefined otherwise
- *
- * @internal
- */
-function defaultBrowserStorage(): StorageLike | undefined {
-    const globalWindow = (globalThis as { window?: Window }).window;
-    if (globalWindow === undefined) return undefined;
-    try {
-        return globalWindow.localStorage;
-    } catch {
-        return undefined;
-    }
 }
 
 /** Internal store type with reload capability, not exposed to consumers. */
@@ -786,6 +766,7 @@ export function MnemonicProvider({
     schemaMode = "default",
     schemaRegistry,
     ssr,
+    bootstrap,
 }: MnemonicProviderProps) {
     if (schemaMode === "strict" && !schemaRegistry) {
         throw new Error("MnemonicProvider strict mode requires schemaRegistry");
@@ -812,7 +793,7 @@ export function MnemonicProvider({
     }, [namespace, parentStore, prefix]);
 
     const store = useMemo<MnemonicInternal>(() => {
-        const st = storage ?? defaultBrowserStorage();
+        const st = storage ?? getDefaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
         const devToolsRoot = ensureDevToolsRoot(enableDevTools);
         const canEnumerateKeys = detectEnumerableStorage(st);
@@ -824,6 +805,11 @@ export function MnemonicProvider({
          * Provides fast reads without hitting storage on every access.
          */
         const cache = new Map<string, string | null>();
+        if (bootstrap?.raw) {
+            for (const [key, raw] of Object.entries(bootstrap.raw)) {
+                cache.set(key, raw);
+            }
+        }
 
         /**
          * Per-key listener registry.
@@ -1107,7 +1093,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrap]);
 
     const optionalBridge = useMemo(
         () =>
