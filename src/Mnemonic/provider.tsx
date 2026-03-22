@@ -1093,7 +1093,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrap]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrap?.raw]);
 
     const optionalBridge = useMemo(
         () =>

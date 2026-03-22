@@ -2,10 +2,19 @@
 // Copyright Scott Dixon
 
 import { CodecError, JSONCodec } from "./codecs";
-import { inferJsonSchema, validateJsonSchema } from "./json-schema";
+import { inferJsonSchema } from "./json-schema";
+import {
+    decodeStringPayload,
+    encodePersistedValueForWrite,
+    getLatestSchema,
+    getMigrationPath,
+    getSchemaForVersion,
+    parseEnvelope,
+    serializeEnvelope,
+    validateAgainstSchema,
+} from "./persistence-shared";
 import { getDefaultBrowserStorage } from "./runtime";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
-import type { JsonSchema } from "./json-schema";
 import type {
     KeySchema,
     MnemonicBootstrapSnapshot,
@@ -84,25 +93,10 @@ export interface RecallMnemonicOptions<TKeys extends readonly MnemonicBootstrapK
     keys: TKeys;
 }
 
-function objectHasOwn(value: object, property: PropertyKey): boolean {
-    const hasOwn = (Object as typeof Object & { hasOwn?: (target: object, key: PropertyKey) => boolean }).hasOwn;
-    if (typeof hasOwn === "function") {
-        return hasOwn(value, property);
-    }
-    return Object.getOwnPropertyDescriptor(value, property) !== undefined;
-}
-
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
     if (value == null) return false;
     if (typeof value !== "object" && typeof value !== "function") return false;
     return typeof (value as { then?: unknown }).then === "function";
-}
-
-function serializeEnvelope(version: number, payload: unknown): string {
-    return JSON.stringify({
-        version,
-        payload,
-    } satisfies MnemonicEnvelope);
 }
 
 function resolveBootstrapInput<T>(input: MnemonicBootstrapKeyInput<T, string>): MnemonicKeyDescriptor<T, string> {
@@ -126,86 +120,6 @@ function resolveFallback<T>(
         : defaultValue;
 }
 
-function parseEnvelope(key: string, rawText: string): MnemonicEnvelope {
-    try {
-        const parsed = JSON.parse(rawText) as MnemonicEnvelope;
-        if (
-            typeof parsed !== "object" ||
-            parsed == null ||
-            !Number.isInteger(parsed.version) ||
-            parsed.version < 0 ||
-            !objectHasOwn(parsed, "payload")
-        ) {
-            throw new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`);
-        }
-        return parsed;
-    } catch (error) {
-        if (error instanceof SchemaError) {
-            throw error;
-        }
-        throw new SchemaError("INVALID_ENVELOPE", `Invalid envelope for key "${key}"`, error);
-    }
-}
-
-function decodeStringPayload<T>(key: string, payload: string, options: UseMnemonicKeyOptions<T>): T {
-    const codec = options.codec ?? JSONCodec;
-    try {
-        return codec.decode(payload);
-    } catch (error) {
-        throw error instanceof CodecError ? error : new CodecError(`Codec decode failed for key "${key}"`, error);
-    }
-}
-
-function validateAgainstSchema(key: string, value: unknown, jsonSchema: JsonSchema): void {
-    const errors = validateJsonSchema(value, jsonSchema);
-    if (errors.length === 0) {
-        return;
-    }
-    const message = errors.map((entry) => `${entry.path || "/"}: ${entry.message}`).join("; ");
-    throw new SchemaError("TYPE_MISMATCH", `Schema validation failed for key "${key}": ${message}`);
-}
-
-function getLatestSchema(schemaRegistry: SchemaRegistry | undefined, key: string): KeySchema | undefined {
-    return schemaRegistry?.getLatestSchema(key);
-}
-
-function getSchemaForVersion(
-    schemaRegistry: SchemaRegistry | undefined,
-    key: string,
-    version: number,
-): KeySchema | undefined {
-    return schemaRegistry?.getSchema(key, version);
-}
-
-function getMigrationPath(
-    schemaRegistry: SchemaRegistry | undefined,
-    key: string,
-    fromVersion: number,
-    toVersion: number,
-) {
-    return schemaRegistry?.getMigrationPath(key, fromVersion, toVersion) ?? null;
-}
-
-function resolveTargetWriteSchema<T>(
-    key: string,
-    options: UseMnemonicKeyOptions<T>,
-    schemaMode: SchemaMode,
-    schemaRegistry: SchemaRegistry | undefined,
-): KeySchema | undefined {
-    const explicitVersion = options.schema?.version;
-    const latestSchema = getLatestSchema(schemaRegistry, key);
-    if (explicitVersion === undefined) {
-        return latestSchema;
-    }
-
-    const explicitSchema = getSchemaForVersion(schemaRegistry, key, explicitVersion);
-    if (explicitSchema) {
-        return explicitSchema;
-    }
-
-    return schemaMode === "strict" ? undefined : latestSchema;
-}
-
 function encodeForWrite<T>(
     key: string,
     nextValue: T,
@@ -213,31 +127,14 @@ function encodeForWrite<T>(
     schemaMode: SchemaMode,
     schemaRegistry: SchemaRegistry | undefined,
 ): string {
-    const codec = options.codec ?? JSONCodec;
-    const explicitVersion = options.schema?.version;
-    const targetSchema = resolveTargetWriteSchema(key, options, schemaMode, schemaRegistry);
-
-    if (!targetSchema) {
-        if (explicitVersion !== undefined && schemaMode === "strict") {
-            throw new SchemaError("WRITE_SCHEMA_REQUIRED", `Write requires schema for key "${key}" in strict mode`);
-        }
-        return serializeEnvelope(0, codec.encode(nextValue));
-    }
-
-    let valueToStore: unknown = nextValue;
-    const writeMigration = schemaRegistry?.getWriteMigration?.(key, targetSchema.version);
-    if (writeMigration) {
-        try {
-            valueToStore = writeMigration.migrate(valueToStore);
-        } catch (error) {
-            throw error instanceof SchemaError
-                ? error
-                : new SchemaError("MIGRATION_FAILED", `Write-time migration failed for key "${key}"`, error);
-        }
-    }
-
-    validateAgainstSchema(key, valueToStore, targetSchema.schema);
-    return serializeEnvelope(targetSchema.version, valueToStore);
+    return encodePersistedValueForWrite({
+        key,
+        nextValue,
+        codec: options.codec ?? JSONCodec,
+        explicitVersion: options.schema?.version,
+        schemaMode,
+        schemaRegistry,
+    });
 }
 
 function applyReconcile<T>({
@@ -338,7 +235,7 @@ function decodeCodecManagedEnvelope<T>({
     }
 
     try {
-        const decoded = decodeStringPayload(key, envelope.payload, options);
+        const decoded = decodeStringPayload(key, envelope.payload, options.codec ?? JSONCodec);
         return applyReconcile({
             key,
             value: decoded,
@@ -387,7 +284,7 @@ function decodeAutoschemaEnvelope<T>({
     try {
         const decoded =
             typeof envelope.payload === "string"
-                ? decodeStringPayload(key, envelope.payload, options)
+                ? decodeStringPayload(key, envelope.payload, options.codec ?? JSONCodec)
                 : (envelope.payload as T);
         const inferredVersion = 1;
         inferJsonSchema(decoded);
@@ -552,19 +449,46 @@ function decodeForRead<T>({
     }
 }
 
-function readStorageRaw(storage: StorageLike | undefined, storageKey: string): string | null {
+function readStorageRaw(
+    storage: StorageLike | undefined,
+    storageKey: string,
+): {
+    readable: boolean;
+    raw: string | null;
+} {
     if (!storage) {
-        return null;
+        return {
+            readable: false,
+            raw: null,
+        };
     }
 
     try {
         const raw = storage.getItem(storageKey);
         if (isPromiseLike(raw)) {
-            return null;
+            return {
+                readable: false,
+                raw: null,
+            };
         }
-        return typeof raw === "string" ? raw : null;
+        return {
+            readable: true,
+            raw: typeof raw === "string" ? raw : null,
+        };
     } catch {
-        return null;
+        return {
+            readable: false,
+            raw: null,
+        };
+    }
+}
+
+function assertRecallSchemaConfiguration(schemaMode: SchemaMode, schemaRegistry: SchemaRegistry | undefined): void {
+    if (schemaMode === "strict" && !schemaRegistry) {
+        throw new Error("recallMnemonic strict mode requires schemaRegistry");
+    }
+    if (schemaMode === "autoschema" && typeof schemaRegistry?.registerSchema !== "function") {
+        throw new Error("recallMnemonic autoschema mode requires schemaRegistry.registerSchema");
     }
 }
 
@@ -573,17 +497,20 @@ export function recallMnemonic<TKeys extends readonly MnemonicBootstrapKeyInput<
 ): MnemonicBootstrapSnapshot<MnemonicBootstrapValues<TKeys>> {
     const storage = options.storage ?? getDefaultBrowserStorage();
     const schemaMode = options.schemaMode ?? "default";
+    assertRecallSchemaConfiguration(schemaMode, options.schemaRegistry);
     const prefix = `${options.namespace}.`;
     const values = {} as MnemonicBootstrapValues<TKeys>;
     const raw = {} as Record<string, string | null>;
 
     for (const entry of options.keys) {
         const resolved = resolveBootstrapInput(entry);
-        const rawValue = readStorageRaw(storage, `${prefix}${resolved.key}`);
-        raw[resolved.key] = rawValue;
+        const snapshot = readStorageRaw(storage, `${prefix}${resolved.key}`);
+        if (snapshot.readable) {
+            raw[resolved.key] = snapshot.raw;
+        }
         values[resolved.key as keyof MnemonicBootstrapValues<TKeys>] = decodeForRead({
             key: resolved.key,
-            raw: rawValue,
+            raw: snapshot.raw,
             options: resolved.options,
             schemaMode,
             schemaRegistry: options.schemaRegistry,
