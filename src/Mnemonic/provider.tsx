@@ -11,10 +11,10 @@
  * store contract.
  */
 
-import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, useRef, ReactNode } from "react";
 import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
-import { getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
+import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
 import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
 
 /**
@@ -82,26 +82,6 @@ export interface MnemonicProviderProps extends Readonly<MnemonicProviderOptions>
      * React children to render within the provider.
      */
     readonly children: ReactNode;
-}
-
-/**
- * Helper function to safely access window.localStorage in browser environments.
- *
- * Returns undefined in non-browser environments (SSR) or when localStorage
- * is unavailable (e.g., in private browsing mode with strict settings).
- *
- * @returns localStorage if available, undefined otherwise
- *
- * @internal
- */
-function defaultBrowserStorage(): StorageLike | undefined {
-    const globalWindow = (globalThis as { window?: Window }).window;
-    if (globalWindow === undefined) return undefined;
-    try {
-        return globalWindow.localStorage;
-    } catch {
-        return undefined;
-    }
 }
 
 /** Internal store type with reload capability, not exposed to consumers. */
@@ -786,6 +766,7 @@ export function MnemonicProvider({
     schemaMode = "default",
     schemaRegistry,
     ssr,
+    bootstrap,
 }: MnemonicProviderProps) {
     if (schemaMode === "strict" && !schemaRegistry) {
         throw new Error("MnemonicProvider strict mode requires schemaRegistry");
@@ -796,6 +777,7 @@ export function MnemonicProvider({
 
     const prefix = `${namespace}.`;
     const parentStore = useMnemonicOptional();
+    const bootstrapRawSeed = useRef(bootstrap?.raw).current;
 
     useEffect(() => {
         if (isProductionRuntime()) return;
@@ -812,7 +794,7 @@ export function MnemonicProvider({
     }, [namespace, parentStore, prefix]);
 
     const store = useMemo<MnemonicInternal>(() => {
-        const st = storage ?? defaultBrowserStorage();
+        const st = storage ?? getDefaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
         const devToolsRoot = ensureDevToolsRoot(enableDevTools);
         const canEnumerateKeys = detectEnumerableStorage(st);
@@ -822,8 +804,20 @@ export function MnemonicProvider({
          * In-memory cache of raw string values.
          * Maps unprefixed keys to their raw string values (or null if not present).
          * Provides fast reads without hitting storage on every access.
+         *
+         * Bootstrap seeds only populate confirmed raw strings. Confirmed
+         * absences (`null`) are allowed in bootstrap snapshots, but the
+         * provider revalidates them on first access so a value written between
+         * bootstrap and mount is not missed.
          */
         const cache = new Map<string, string | null>();
+        if (bootstrapRawSeed) {
+            for (const [key, raw] of Object.entries(bootstrapRawSeed)) {
+                if (raw != null) {
+                    cache.set(key, raw);
+                }
+            }
+        }
 
         /**
          * Per-key listener registry.
@@ -1107,7 +1101,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrapRawSeed]);
 
     const optionalBridge = useMemo(
         () =>

@@ -196,6 +196,20 @@ export interface MnemonicProviderOptions {
      * ```
      */
     ssr?: MnemonicProviderSSRConfig;
+
+    /**
+     * Optional bootstrap snapshot used to seed the provider cache before the
+     * first hook subscribes.
+     *
+     * Pass the object returned by `recallMnemonic(...)` when you synchronously
+     * read values before React renders, for example to apply a theme attribute
+     * before first paint and then ensure the first `useMnemonicKey(...)` read
+     * sees the same raw storage snapshot without re-reading storage.
+     *
+     * This seed is consumed only during the provider's initial mount. Later
+     * prop changes are ignored so rerenders do not recreate the internal store.
+     */
+    bootstrap?: MnemonicBootstrapSeed;
 }
 
 /**
@@ -256,6 +270,68 @@ export interface MnemonicProviderSSRConfig {
      */
     hydration?: MnemonicHydrationMode;
 }
+
+/**
+ * Initial bootstrap seed for a provider's in-memory cache.
+ *
+ * This is primarily used with `recallMnemonic(...)` from
+ * `react-mnemonic/bootstrap`, allowing apps to synchronously recall values
+ * before React renders and then hand the raw snapshot to `MnemonicProvider`
+ * so the first hook read does not hit storage again.
+ *
+ * The provider currently consumes `raw` to seed its internal cache. `values`
+ * are included so callers can carry the same snapshot object through app
+ * initialization without splitting it apart.
+ *
+ * @template TValues - Decoded values keyed by unprefixed storage key
+ */
+export type MnemonicBootstrapSeed<TValues extends Record<string, unknown> = Record<string, unknown>> = {
+    /**
+     * Raw storage strings keyed by the unprefixed mnemonic key name.
+     *
+     * Only keys that were read successfully should appear here.
+     *
+     * A present `null` entry means the key was confirmed absent when the
+     * bootstrap snapshot was taken. Providers may still choose to revalidate
+     * that absence on first access, so only non-null string entries are
+     * guaranteed to short-circuit an initial storage read.
+     *
+     * If storage was unavailable or unreadable during bootstrap, omit the key
+     * entirely so the provider can retry a normal read later.
+     */
+    raw?: Record<string, string | null>;
+
+    /**
+     * Decoded values recalled during the bootstrap step.
+     *
+     * The provider stores raw snapshots internally, but retaining the decoded
+     * values on the same object is convenient for app-level boot code such as
+     * first-paint theme application.
+     */
+    values?: TValues;
+};
+
+/**
+ * Fully populated snapshot returned by `recallMnemonic(...)`.
+ *
+ * @template TValues - Decoded values keyed by unprefixed storage key
+ */
+export type MnemonicBootstrapSnapshot<TValues extends Record<string, unknown> = Record<string, unknown>> = {
+    /**
+     * Raw storage strings keyed by the unprefixed mnemonic key name.
+     *
+     * Keys are only included when the bootstrap read successfully observed the
+     * underlying storage backend. A present `null` still means the key was
+     * confirmed absent at recall time, though providers may revalidate that
+     * absence before the first hook read.
+     */
+    raw: Record<string, string | null>;
+
+    /**
+     * Decoded values keyed by the unprefixed mnemonic key name.
+     */
+    values: TValues;
+};
 
 /**
  * Hook-level SSR controls for `useMnemonicKey(...)`.

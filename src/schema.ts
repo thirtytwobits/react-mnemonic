@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+/**
+ * Schema-aware public entrypoint.
+ *
+ * `react-mnemonic/schema` includes the provider, hooks, schema registry
+ * helpers, and migration utilities needed for strict schema enforcement and
+ * structural upgrades.
+ */
+
 export { MnemonicProvider, MnemonicProviderProps } from "./Mnemonic/provider";
 export { useMnemonicKey } from "./Mnemonic/use";
 export { useMnemonicRecovery } from "./Mnemonic/recovery";
@@ -45,6 +53,8 @@ export type {
     MnemonicDevToolsMeta,
     MnemonicDevToolsRegistry,
     MnemonicHydrationMode,
+    MnemonicBootstrapSeed,
+    MnemonicBootstrapSnapshot,
     MnemonicProviderSSRConfig,
     MnemonicKeySSRConfig,
     Unsubscribe,

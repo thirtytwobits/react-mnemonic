@@ -239,4 +239,37 @@ describe("useMnemonicKeyOptional with a schema-capable provider bridge", () => {
             '{"version":2,"payload":{"density":"comfortable","sidebar":false}}',
         );
     });
+
+    it("honors strict schema mode for writes", () => {
+        const storage = createMockStorage();
+        const registry = createSchemaRegistry();
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        function Consumer() {
+            const { value, set } = useMnemonicKeyOptional("settings", {
+                defaultValue: { density: "comfortable" as "comfortable" | "compact" },
+                schema: { version: 1 },
+            });
+
+            return (
+                <button onClick={() => set({ density: "compact" })} data-testid="strict-write">
+                    {value.density}
+                </button>
+            );
+        }
+
+        render(
+            <MnemonicProvider namespace="schema" storage={storage} schemaMode="strict" schemaRegistry={registry}>
+                <Consumer />
+            </MnemonicProvider>,
+        );
+
+        fireEvent.click(screen.getByTestId("strict-write"));
+
+        expect(storage.store.has("schema.settings")).toBe(false);
+        expect(errorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[Mnemonic] Schema error for key "settings" (WRITE_SCHEMA_REQUIRED):'),
+            'Write requires schema for key "settings" in strict mode',
+        );
+    });
 });

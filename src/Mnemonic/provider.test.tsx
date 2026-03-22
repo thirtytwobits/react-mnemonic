@@ -133,6 +133,40 @@ describe("MnemonicProvider", () => {
 
         warnSpy.mockRestore();
     });
+
+    it("treats bootstrap as an initialization-only seed", () => {
+        const storage = createMockStorage();
+        const onStore = vi.fn();
+        const firstBootstrap = {
+            raw: {
+                theme: '{"version":0,"payload":"\\"dark\\""}',
+            },
+        };
+        const secondBootstrap = {
+            raw: {
+                theme: '{"version":0,"payload":"\\"light\\""}',
+            },
+        };
+
+        const { rerender } = render(
+            <MnemonicProvider namespace="boot" storage={storage} bootstrap={firstBootstrap}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        const store = onStore.mock.calls[0]?.[0];
+        expect(store?.getRawSnapshot("theme")).toBe('{"version":0,"payload":"\\"dark\\""}');
+        expect(onStore).toHaveBeenCalledTimes(1);
+
+        rerender(
+            <MnemonicProvider namespace="boot" storage={storage} bootstrap={secondBootstrap}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>,
+        );
+
+        expect(onStore).toHaveBeenCalledTimes(1);
+        expect(store?.getRawSnapshot("theme")).toBe('{"version":0,"payload":"\\"dark\\""}');
+    });
 });
 
 describe("useMnemonic", () => {

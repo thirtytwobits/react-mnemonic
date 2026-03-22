@@ -23,11 +23,13 @@ requirement and missing durable state should be treated as a setup mistake.
 
 ## Pick the right entrypoint
 
-| Entrypoint                | Estimated size | Use when                                                                 |
-| ------------------------- | -------------- | ------------------------------------------------------------------------ |
-| `react-mnemonic/optional` | ~4.7 KB        | You want the tiny component-library shim that falls back to local memory |
-| `react-mnemonic/core`     | ~58 KB         | A provider is required and you want the lean persisted-state path        |
-| `react-mnemonic/schema`   | ~78 KB         | A provider is required and you want schema validation and migrations     |
+| Entrypoint                 | Estimated size | Use when                                                                 |
+| -------------------------- | -------------- | ------------------------------------------------------------------------ |
+| `react-mnemonic/optional`  | ~4.9 KB        | You want the tiny component-library shim that falls back to local memory |
+| `react-mnemonic/bootstrap` | ~25 KB         | You need synchronous first-paint recall before React renders             |
+| `react-mnemonic/core`      | ~61 KB         | A provider is required and you want the lean persisted-state path        |
+| `react-mnemonic/schema`    | ~80.5 KB       | A provider is required and you want schema validation and migrations     |
+| `react-mnemonic`           | ~80.5 KB       | You want the top-level full entrypoint                                   |
 
 These are rough current estimates based on the built ESM entry files in
 `dist/` before consumer-side minification and tree-shaking. They are useful for
