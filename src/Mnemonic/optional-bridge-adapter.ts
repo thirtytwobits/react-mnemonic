@@ -48,6 +48,7 @@ function encodeValueForWrite<T>(
     key: string,
     nextValue: T,
     options: OptionalMnemonicKeyOptions<T>,
+    schemaMode: Mnemonic["schemaMode"],
     schemaRegistry?: SchemaRegistry,
 ): string {
     return encodePersistedValueForWrite({
@@ -55,7 +56,7 @@ function encodeValueForWrite<T>(
         nextValue,
         codec: options.codec ?? JSONCodec,
         explicitVersion: options.schema?.version,
-        schemaMode: "default",
+        schemaMode,
         schemaRegistry,
     });
 }
@@ -200,7 +201,7 @@ export function createMnemonicOptionalBridge({
         },
         setValue: (key, nextValue, options) => {
             try {
-                api.setRaw(key, encodeValueForWrite(key, nextValue, options, schemaRegistry));
+                api.setRaw(key, encodeValueForWrite(key, nextValue, options, api.schemaMode, schemaRegistry));
             } catch (error) {
                 if (error instanceof SchemaError) {
                     console.error(`[Mnemonic] Schema error for key "${key}" (${error.code}):`, error.message);

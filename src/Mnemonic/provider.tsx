@@ -11,7 +11,7 @@
  * store contract.
  */
 
-import { createContext, useContext, useMemo, useEffect, ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, useRef, ReactNode } from "react";
 import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
 import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
@@ -777,6 +777,7 @@ export function MnemonicProvider({
 
     const prefix = `${namespace}.`;
     const parentStore = useMnemonicOptional();
+    const bootstrapRawSeed = useRef(bootstrap?.raw).current;
 
     useEffect(() => {
         if (isProductionRuntime()) return;
@@ -810,8 +811,8 @@ export function MnemonicProvider({
          * bootstrap and mount is not missed.
          */
         const cache = new Map<string, string | null>();
-        if (bootstrap?.raw) {
-            for (const [key, raw] of Object.entries(bootstrap.raw)) {
+        if (bootstrapRawSeed) {
+            for (const [key, raw] of Object.entries(bootstrapRawSeed)) {
                 if (raw != null) {
                     cache.set(key, raw);
                 }
@@ -1100,7 +1101,7 @@ export function MnemonicProvider({
         }
 
         return store;
-    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrap?.raw]);
+    }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrapRawSeed]);
 
     const optionalBridge = useMemo(
         () =>

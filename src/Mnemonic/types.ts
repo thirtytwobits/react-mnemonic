@@ -205,6 +205,9 @@ export interface MnemonicProviderOptions {
      * read values before React renders, for example to apply a theme attribute
      * before first paint and then ensure the first `useMnemonicKey(...)` read
      * sees the same raw storage snapshot without re-reading storage.
+     *
+     * This seed is consumed only during the provider's initial mount. Later
+     * prop changes are ignored so rerenders do not recreate the internal store.
      */
     bootstrap?: MnemonicBootstrapSeed;
 }
