@@ -65,10 +65,17 @@ survives a full page reload.
 
 ## Pick the right entrypoint
 
-- `react-mnemonic/core` for the lean persisted-state path
-- `react-mnemonic/schema` when you want schemas, validation, and migrations
-- `react-mnemonic/optional` for component libraries that should persist when a provider exists and silently fall back to in-memory state otherwise
-- `react-mnemonic` for the top-level full entrypoint
+| Entrypoint                 | Approx ESM size | Use when                                                                            |
+| -------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| `react-mnemonic/optional`  | ~4.9 KB         | You want the tiny component-library shim that falls back to local memory            |
+| `react-mnemonic/bootstrap` | ~25 KB          | You need synchronous first-paint recall before React renders                        |
+| `react-mnemonic/core`      | ~61 KB          | A provider is required and you want the lean persisted-state path                   |
+| `react-mnemonic/schema`    | ~80.5 KB        | A provider is required and you want schema validation, autoschema, and migrations   |
+| `react-mnemonic`           | ~80.5 KB        | You want the top-level full entrypoint with the same schema-capable runtime surface |
+
+These are rough current estimates from the built ESM entry files in `dist/`
+before consumer-side minification and tree-shaking. They are useful for
+relative comparison, not as a hard size guarantee.
 
 ## Optional persistence for component libraries
 

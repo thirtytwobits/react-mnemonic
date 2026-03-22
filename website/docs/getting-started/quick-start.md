@@ -37,9 +37,12 @@ export default function App() {
 The counter value persists in `localStorage` under the key `my-app.count` and
 survives full page reloads.
 
-Use `react-mnemonic/core` for the lean persisted-state path. If you need JSON
+Use `react-mnemonic/core` for the lean required-provider path. If you need JSON
 Schema validation, autoschema, or migrations, import from
 `react-mnemonic/schema` or the top-level `react-mnemonic` entrypoint instead.
+If you need to synchronously recall a value before React first renders, use
+`react-mnemonic/bootstrap` for that startup step and then pass the snapshot
+into `MnemonicProvider`.
 
 In server-rendered apps, the default contract is: render `defaultValue` on the
 server, then hydrate to persisted storage on the client. When you need a
@@ -50,6 +53,9 @@ If that same key needs to appear in multiple components, define it once with
 `defineMnemonicKey(...)` and reuse the descriptor. See
 [Canonical Key Definitions](../guides/canonical-key-definitions) for the
 pattern.
+
+For a current entrypoint-by-entrypoint size comparison, see
+[Optional Persistence](../guides/optional-persistence#pick-the-right-entrypoint).
 
 If you want runtime schemas and TypeScript types to come from the same source,
 see [Single Source of Truth Schemas](../guides/single-source-of-truth-schemas).

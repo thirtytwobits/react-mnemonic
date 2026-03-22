@@ -82,8 +82,15 @@ const diagnosticWarningRegistry = new WeakMap<object, Set<string>>();
 const diagnosticObjectIds = new WeakMap<object, number>();
 let nextDiagnosticObjectId = 1;
 
+/**
+ * Re-export the shared envelope serializer so hook reads and writes stay
+ * aligned with bootstrap recall and optional bridge persistence.
+ */
 export { serializeEnvelope } from "./persistence-shared";
 
+/**
+ * Attaches optional persistence metadata to a decoded value.
+ */
 export function withReadMetadata<T, Extra extends object = {}>(
     value: T,
     rewriteRaw?: string,

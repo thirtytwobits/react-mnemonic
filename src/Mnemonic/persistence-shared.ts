@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+/**
+ * Shared persistence primitives used by hook reads, optional
+ * bridge decoding, and bootstrap recall.
+ *
+ * Keeping envelope parsing, schema lookup, and write encoding here ensures the
+ * different entrypoints stay behaviorally aligned over time.
+ */
+
 import { CodecError } from "./codecs";
 import { validateJsonSchema } from "./json-schema";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
@@ -15,6 +23,9 @@ function objectHasOwn(value: object, property: PropertyKey): boolean {
     return Object.getOwnPropertyDescriptor(value, property) !== undefined;
 }
 
+/**
+ * Wraps a stored payload in the versioned mnemonic envelope format.
+ */
 export function serializeEnvelope(version: number, payload: unknown): string {
     return JSON.stringify({
         version,
@@ -22,6 +33,12 @@ export function serializeEnvelope(version: number, payload: unknown): string {
     } satisfies MnemonicEnvelope);
 }
 
+/**
+ * Parses and validates a raw storage string as a mnemonic envelope.
+ *
+ * @throws {SchemaError} When the stored value is not valid JSON or does not
+ * match the `{ version, payload }` envelope contract.
+ */
 export function parseEnvelope(key: string, rawText: string): MnemonicEnvelope {
     try {
         const parsed = JSON.parse(rawText) as MnemonicEnvelope;
@@ -43,6 +60,10 @@ export function parseEnvelope(key: string, rawText: string): MnemonicEnvelope {
     }
 }
 
+/**
+ * Decodes a string payload using the active codec while normalizing thrown
+ * errors to `CodecError`.
+ */
 export function decodeStringPayload<T>(key: string, payload: string, codec: Pick<Codec<T>, "decode">): T {
     try {
         return codec.decode(payload);
@@ -51,6 +72,10 @@ export function decodeStringPayload<T>(key: string, payload: string, codec: Pick
     }
 }
 
+/**
+ * Validates a decoded value against a JSON Schema and throws a typed
+ * `SchemaError` when validation fails.
+ */
 export function validateAgainstSchema(key: string, value: unknown, jsonSchema: JsonSchema): void {
     const errors = validateJsonSchema(value, jsonSchema);
     if (errors.length === 0) {
@@ -60,10 +85,16 @@ export function validateAgainstSchema(key: string, value: unknown, jsonSchema: J
     throw new SchemaError("TYPE_MISMATCH", `Schema validation failed for key "${key}": ${message}`);
 }
 
+/**
+ * Looks up the latest registered schema for a key, if one exists.
+ */
 export function getLatestSchema(schemaRegistry: SchemaRegistry | undefined, key: string): KeySchema | undefined {
     return schemaRegistry?.getLatestSchema(key);
 }
 
+/**
+ * Looks up the schema registered for a specific persisted version.
+ */
 export function getSchemaForVersion(
     schemaRegistry: SchemaRegistry | undefined,
     key: string,
@@ -72,6 +103,9 @@ export function getSchemaForVersion(
     return schemaRegistry?.getSchema(key, version);
 }
 
+/**
+ * Resolves the migration path between two schema versions.
+ */
 export function getMigrationPath(
     schemaRegistry: SchemaRegistry | undefined,
     key: string,
@@ -81,6 +115,12 @@ export function getMigrationPath(
     return schemaRegistry?.getMigrationPath(key, fromVersion, toVersion) ?? null;
 }
 
+/**
+ * Chooses the schema version that should govern an outgoing write.
+ *
+ * Explicit schema versions win when available. In non-strict modes the latest
+ * known schema may be used as a fallback when the explicit version is missing.
+ */
 export function resolveTargetWriteSchema({
     key,
     explicitVersion,
@@ -105,6 +145,10 @@ export function resolveTargetWriteSchema({
     return schemaMode === "strict" ? undefined : latestSchema;
 }
 
+/**
+ * Encodes an outgoing value into its persisted envelope, applying optional
+ * write-time migrations and schema validation first.
+ */
 export function encodePersistedValueForWrite<T>({
     key,
     nextValue,

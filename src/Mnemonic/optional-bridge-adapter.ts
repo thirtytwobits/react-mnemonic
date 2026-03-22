@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+/**
+ * Adapts a mounted provider into the optional-persistence bridge
+ * contract used by `useMnemonicKeyOptional(...)`.
+ *
+ * This module mirrors the provider's persistence semantics closely so optional
+ * consumers behave the same way once a real provider becomes available.
+ */
+
 import { CodecError, JSONCodec } from "./codecs";
 import { inferJsonSchema } from "./json-schema";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
@@ -163,6 +171,14 @@ function decodePersistedValue<T>(
     return decodeSchemaManagedEnvelope(key, envelope, schemaForVersion, latestSchema, schemaRegistry);
 }
 
+/**
+ * Creates the bridge used by optional hooks to delegate persistence work to a
+ * mounted `MnemonicProvider`.
+ *
+ * The bridge keeps optional consumers aligned with provider reads and writes,
+ * including schema validation, migrations, autoschema inference, and raw
+ * snapshot rewrites after successful decode.
+ */
 export function createMnemonicOptionalBridge({
     api,
     schemaRegistry,

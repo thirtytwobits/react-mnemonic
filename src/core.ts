@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
+/**
+ * Schema-light public entrypoint.
+ *
+ * `react-mnemonic/core` exposes the provider and hooks without the schema
+ * registry helpers used by the schema-aware entrypoints.
+ */
+
 export { MnemonicProvider, type MnemonicProviderOptions, type MnemonicProviderProps } from "./Mnemonic/provider-core";
 export { useMnemonicKey } from "./Mnemonic/use-core";
 export { useMnemonicRecovery } from "./Mnemonic/recovery";

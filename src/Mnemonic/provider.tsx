@@ -803,6 +803,11 @@ export function MnemonicProvider({
          * In-memory cache of raw string values.
          * Maps unprefixed keys to their raw string values (or null if not present).
          * Provides fast reads without hitting storage on every access.
+         *
+         * Bootstrap seeds only populate confirmed raw strings. Confirmed
+         * absences (`null`) are allowed in bootstrap snapshots, but the
+         * provider revalidates them on first access so a value written between
+         * bootstrap and mount is not missed.
          */
         const cache = new Map<string, string | null>();
         if (bootstrap?.raw) {
