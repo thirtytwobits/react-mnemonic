@@ -18,7 +18,7 @@ Install a specific version only when you need to pin your app to a particular
 release line:
 
 ```bash
-npm install react-mnemonic@1.3.0
+npm install react-mnemonic@1.4.0
 ```
 
 ## Peer dependencies
