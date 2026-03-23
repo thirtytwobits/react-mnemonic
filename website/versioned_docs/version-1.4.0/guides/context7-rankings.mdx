@@ -1,0 +1,39 @@
+---
+sidebar_position: 4
+title: Context7 Rankings
+description: External third-party rankings and usage signals from Context7 for AI coding tools and documentation sources.
+---
+
+# Context7 Rankings
+
+Use this page as a direct jump table into Context7 benchmark tabs for
+`react-mnemonic` and a few comparable React persistence options.
+
+## Benchmark Matrix
+
+| Solution                  | Shape                                                             | Context7 benchmark                                                                     |
+| ------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `react-mnemonic`          | Schema-aware persisted React state with SSR and migration support | [Open benchmark](https://context7.com/thirtytwobits/react-mnemonic?tab=benchmark)      |
+| `zustand`                 | Store-based state management with persistence middleware          | [Open benchmark](https://context7.com/pmndrs/zustand?tab=benchmark)                    |
+| `jotai`                   | Atom-based state with storage helpers                             | [Open benchmark](https://context7.com/pmndrs/jotai?tab=benchmark)                      |
+| `use-local-storage-state` | Focused hook for localStorage-backed React state                  | [Open benchmark](https://context7.com/astoilkov/use-local-storage-state?tab=benchmark) |
+| `usehooks-ts`             | Utility hook collection that includes `useLocalStorage`           | [Open benchmark](https://context7.com/juliencrn/usehooks-ts?tab=benchmark)             |
+
+## How to use it
+
+- Open the benchmark tab for the libraries you want to compare directly.
+- Use Context7 as an external third-party signal.
+- Use this repo's own documentation for API behavior, persistence semantics,
+  SSR details, and migration guidance.
+- Treat external rankings as one input, not a guarantee of product fit.
+
+## Notes
+
+- The docs site loads the Context7 widget globally. It is a third-party
+  script, so treat it as an external trust boundary.
+- These benchmark pages are live and may change over time.
+- The links above point straight to Context7 benchmark tabs rather than the
+  generic rankings landing page.
+- Some libraries are broader state-management tools while others are narrowly
+  focused persistence hooks, so compare them in the context of your actual use
+  case.

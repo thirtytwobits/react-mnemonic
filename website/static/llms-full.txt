@@ -1339,7 +1339,7 @@ If your assistant can fetch remote files, use the published GitHub Pages URLs:
 - `https://thirtytwobits.github.io/react-mnemonic/llms.txt`
 - `https://thirtytwobits.github.io/react-mnemonic/llms-full.txt`
 - `https://thirtytwobits.github.io/react-mnemonic/ai-contract.json`
-- `https://thirtytwobits.github.io/react-mnemonic/docs/1.3.0`
+- `https://thirtytwobits.github.io/react-mnemonic/docs/1.4.0`
 
 Use the hosted path when you want versioned, read-only retrieval without
 mounting the repository locally.
