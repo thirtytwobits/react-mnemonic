@@ -123,7 +123,7 @@ The docs site now uses Docusaurus versioning:
 To cut a new released docs snapshot:
 
 ```bash
-npm run docs:version -- 1.4.0
+npm run docs:version -- 1.5.0
 ```
 
 That command:
@@ -352,7 +352,7 @@ Runs on push to `main`:
 
 ### Releases (`release.yml`)
 
-Triggered by tagged releases matching `v*` (for example `v1.4.0` or
+Triggered by tagged releases matching `v*` (for example `v1.5.0` or
 `v1.1.0`):
 
 The repository-local prep flow happens before this via
