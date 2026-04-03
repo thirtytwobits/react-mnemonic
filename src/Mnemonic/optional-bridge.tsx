@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright Scott Dixon
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type Context } from "react";
 import type { KeySchema, Listener, MnemonicOptionalBridge, OptionalMnemonicKeyOptions, Unsubscribe } from "./types";
 
 export type OptionalReadResult<T> = {
@@ -19,7 +19,24 @@ export interface MnemonicOptionalBridgeInternal extends MnemonicOptionalBridge {
     commitSnapshot<T>(key: string, raw: string | null, snapshot: OptionalReadResult<T>): void;
 }
 
-export const MnemonicOptionalBridgeContext = createContext<MnemonicOptionalBridgeInternal | null>(null);
+const OPTIONAL_BRIDGE_CONTEXT_KEY = Symbol.for("react-mnemonic.optional-bridge-context");
+
+function getMnemonicOptionalBridgeContext(): Context<MnemonicOptionalBridgeInternal | null> {
+    const globalStore = globalThis as typeof globalThis & {
+        [key: symbol]: unknown;
+    };
+    const existing = globalStore[OPTIONAL_BRIDGE_CONTEXT_KEY];
+
+    if (existing) {
+        return existing as Context<MnemonicOptionalBridgeInternal | null>;
+    }
+
+    const context = createContext<MnemonicOptionalBridgeInternal | null>(null);
+    globalStore[OPTIONAL_BRIDGE_CONTEXT_KEY] = context;
+    return context;
+}
+
+export const MnemonicOptionalBridgeContext = getMnemonicOptionalBridgeContext();
 
 export function useMnemonicOptionalBridge(): MnemonicOptionalBridgeInternal | null {
     return useContext(MnemonicOptionalBridgeContext);
