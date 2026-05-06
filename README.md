@@ -13,6 +13,13 @@ AI-friendly, persistent, type-safe state for React.
 
 `react-mnemonic` gives your components persistent memory through a hook that feels like `useState`. Values survive reloads, can stay in sync across tabs, and remain SSR-safe by default. It is designed to be AI-friendly, prioritizing visible structure and unambiguous specifications. When you need more than raw storage, the package can validate, version, and migrate persisted data.
 
+## Need an "undo" stack?
+
+See our sister project, `react-amnesia`, an undo/redo framework for React:
+
+- [react-amnesia on GitHub](https://github.com/thirtytwobits/react-amnesia)
+- [react-amnesia documentation](https://thirtytwobits.github.io/react-amnesia/docs/getting-started/installation)
+
 ## Installation
 
 ```bash

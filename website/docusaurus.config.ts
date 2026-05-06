@@ -136,6 +136,11 @@ const config: Config = {
                     position: "right",
                 },
                 {
+                    href: "https://thirtytwobits.github.io/react-amnesia/docs/getting-started/installation",
+                    label: "Undo Stack Docs",
+                    position: "right",
+                },
+                {
                     href: "https://www.npmjs.com/package/react-mnemonic",
                     label: "npm",
                     position: "right",
@@ -171,6 +176,10 @@ const config: Config = {
                     title: "More",
                     items: [
                         { label: "GitHub", href: "https://github.com/thirtytwobits/react-mnemonic" },
+                        {
+                            label: "Undo Stack (react-amnesia)",
+                            href: "https://thirtytwobits.github.io/react-amnesia/docs/getting-started/installation",
+                        },
                         { label: "npm", href: "https://www.npmjs.com/package/react-mnemonic" },
                     ],
                 },

@@ -9,6 +9,10 @@ description: Get running with react-mnemonic in under a minute.
 Wrap your app in a `MnemonicProvider`, then call `useMnemonicKey` anywhere
 inside it.
 
+Need an "undo" stack? See our sister project, [react-amnesia](https://github.com/thirtytwobits/react-amnesia),
+an undo/redo framework for React, and its
+[documentation](https://thirtytwobits.github.io/react-amnesia/docs/getting-started/installation).
+
 ```tsx title="App.tsx"
 import { MnemonicProvider, useMnemonicKey } from "react-mnemonic/core";
 
