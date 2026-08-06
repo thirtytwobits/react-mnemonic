@@ -28,6 +28,7 @@ export type {
     MnemonicKeyDescriptor,
     Listener,
     Mnemonic,
+    MnemonicFlushResult,
     MnemonicKeyState,
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,

@@ -13,6 +13,7 @@ real apps often need a namespace-level recovery flow too:
 - clear saved filters without touching durable preferences
 - wipe a broken rollout state and keep the app usable
 - offer a support-friendly "reset app data" button
+- rewrite values that a full storage backend silently dropped
 
 `useMnemonicRecovery()` is the first-class hook for those flows.
 
@@ -22,11 +23,12 @@ real apps often need a namespace-level recovery flow too:
 import { useMnemonicRecovery } from "react-mnemonic";
 
 function RecoveryMenu() {
-    const { namespace, canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching } = useMnemonicRecovery({
-        onRecover: (event) => {
-            console.info("Recovery action", event.action, event.namespace, event.clearedKeys);
-        },
-    });
+    const { namespace, canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching, unpersistedKeys, flush } =
+        useMnemonicRecovery({
+            onRecover: (event) => {
+                console.info("Recovery action", event.action, event.namespace, event.clearedKeys);
+            },
+        });
 
     return (
         <div>
@@ -99,6 +101,58 @@ function ResetAppButton() {
 That gives users a deterministic way to escape bad persisted state without
 manual support intervention.
 
+## Recovering dropped writes
+
+Clearing is not the only thing that gets an app unstuck. When the storage
+backend rejects a write — a full quota is the common case — the value still
+lands in the in-memory cache and still re-renders subscribers, so `set(...)`
+succeeds from the caller's point of view while storage keeps the old value. The
+next reload quietly reverts to whatever last fit.
+
+`unpersistedKeys()` names those keys, and `flush()` rewrites them:
+
+```tsx
+function StorageRecoveryBanner() {
+    const { unpersistedKeys, flush, clearMatching } = useMnemonicRecovery();
+    const pending = unpersistedKeys();
+
+    if (pending.length === 0) return null;
+
+    return (
+        <div role="alert">
+            <p>{pending.length} change(s) could not be saved.</p>
+            <button
+                onClick={() => {
+                    // Make room first, then rewrite what was dropped.
+                    clearMatching((key) => key.startsWith("cache."));
+                    const { failed } = flush();
+                    if (failed.length > 0) {
+                        console.warn("Still unpersisted:", failed);
+                    }
+                }}
+            >
+                Free space and retry
+            </button>
+        </div>
+    );
+}
+```
+
+Notes on the contract:
+
+- `unpersistedKeys()` works on non-enumerable backends too, because the keys
+  come from the provider's own write queue rather than from storage.
+- `flush(keys?)` defaults to every unpersisted key and returns
+  `{ persisted, failed }`. Keys that are already durable are ignored, so the two
+  arrays cover exactly what was retried.
+- Keys that fail again stay queued, so a later `flush()` can still recover them.
+- A queued value is dropped if an external change reloads that key from storage;
+  the other tab's write wins rather than being overwritten by a retry.
+- `clearAll()` and `clearMatching(...)` cover unpersisted keys as well as stored
+  ones, so a reset cannot leave a value behind for a later flush to write back.
+
+Freeing space alone does not retry anything. Something has to call `flush()`.
+
 ## Recovery telemetry
 
 `onRecover` lets you record or surface recovery actions:
@@ -141,6 +195,7 @@ then namespace-wide enumeration is unavailable. In that case:
 - `clearAll()` throws
 - `clearMatching()` throws
 - `clearKeys([...])` still works
+- `unpersistedKeys()` and `flush()` still work
 
 The practical pattern for non-enumerable storage is to keep an explicit list of
 the durable keys your app owns and pass that to `clearKeys`.

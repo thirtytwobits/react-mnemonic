@@ -97,6 +97,55 @@ const { set } = useMnemonicKey("profile", {
 set({ name: "", email: "not-an-email" });
 ```
 
+## Unpersisted writes
+
+A storage backend can accept a value one moment and reject the next — the usual
+cause is the origin hitting its quota, but a blocked origin or a browser with no
+usable storage behaves the same way. In every case the write still updates the
+in-memory cache and re-renders subscribers, so `set(...)` looks exactly like a
+successful one. Nothing about the returned state tells you the value never left
+memory.
+
+`useMnemonicRecovery()` exposes the two operations that make this recoverable:
+
+```tsx
+import { useMnemonicRecovery } from "react-mnemonic";
+
+function SaveIndicator() {
+    const { unpersistedKeys, flush } = useMnemonicRecovery();
+    const pending = unpersistedKeys();
+
+    if (pending.length === 0) return <span>Saved</span>;
+
+    return (
+        <button
+            onClick={() => {
+                const { persisted, failed } = flush();
+                console.info("Recovered", persisted, "still failing", failed);
+            }}
+        >
+            {pending.length} unsaved {pending.length === 1 ? "change" : "changes"} — retry
+        </button>
+    );
+}
+```
+
+- `unpersistedKeys()` lists unprefixed keys whose current value is not known to
+  be in storage. It does not require an enumerable backend.
+- `flush(keys?)` re-attempts those writes and returns
+  `{ persisted, failed }`. Keys with nothing queued are ignored rather than
+  rewritten.
+
+A key stops being reported once it is written successfully, once a flush
+persists it, or once an external change reloads it from storage. Failed writes
+are kept rather than rolled back: the value the user just produced is the one
+worth keeping, and rolling it back would discard work that is still
+recoverable.
+
+Freeing space does not retry anything on its own. If your app evicts its own
+data — or the user clears something — call `flush()` afterwards, or the pending
+values stay in memory until the page unloads.
+
 ## Development diagnostics
 
 In development builds, Mnemonic also emits a small set of targeted warnings for

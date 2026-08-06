@@ -202,6 +202,25 @@ Prefer:
 - or mounting a temporary recovery boundary for the last authenticated namespace
 - keeping `reconcile(...)` as a read-time backstop, not the only cleanup mechanism
 
+## Treating A Returned `set(...)` As Proof The Value Is Saved
+
+`set(...)` updates the in-memory cache and notifies subscribers whether or not
+the storage backend accepted the write. A full quota, a blocked origin, or a
+browser with no usable storage all produce a normal-looking `set(...)` and a
+component that shows the new value while storage still holds the old one.
+
+Wrong:
+
+- clearing a "you have unsaved changes" flag as soon as `set(...)` returns
+- reporting "saved" in the UI on the strength of the re-render alone
+- assuming a dropped write will be retried later on its own
+
+Prefer:
+
+- reading `useMnemonicRecovery().unpersistedKeys()` after writes that must be durable
+- calling `flush(...)` once the app or the user has freed space
+- keeping the unsaved-changes indicator until the key is no longer reported as unpersisted
+
 ## Treating The Provider As Optional
 
 `useMnemonicKey(...)` is not a global singleton hook.

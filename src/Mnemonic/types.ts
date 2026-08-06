@@ -791,6 +791,11 @@ export interface SchemaRegistry {
  *
  * In all error cases the library falls back to its in-memory cache, so
  * components continue to function when the storage backend is unavailable.
+ * A mutation that the backend rejected is queued rather than forgotten: the key
+ * is reported by {@link Mnemonic.unpersistedKeys} and can be re-attempted with
+ * {@link Mnemonic.flush} once the backend is healthy again. Logging is squelched
+ * per failure streak, so those queues — not the console — are the reliable
+ * signal that a value is memory-only.
  *
  * Promise-returning `getItem`, `setItem`, or `removeItem` implementations are
  * treated as an invalid contract at runtime. Mnemonic logs the misuse once and
@@ -908,6 +913,29 @@ export type Unsubscribe = () => void;
 export type Listener = () => void;
 
 /**
+ * Outcome of a flush of previously unpersisted writes.
+ *
+ * Returned by {@link Mnemonic.flush} and by the `flush` helper on
+ * {@link MnemonicRecoveryHook}. The two arrays partition exactly the keys that
+ * were re-attempted; keys with nothing queued are not reported at all.
+ */
+export interface MnemonicFlushResult {
+    /**
+     * Unprefixed keys whose queued value reached the storage backend.
+     *
+     * These keys are no longer reported by `unpersistedKeys()`.
+     */
+    persisted: string[];
+
+    /**
+     * Unprefixed keys that were re-attempted and failed again.
+     *
+     * These keys stay queued, so a later flush can retry them.
+     */
+    failed: string[];
+}
+
+/**
  * Low-level Mnemonic store API provided via React Context.
  *
  * This interface powers `MnemonicProvider` internally and is also exposed to
@@ -1008,6 +1036,36 @@ export type Mnemonic = {
      * @returns Object mapping unprefixed keys to raw string values
      */
     dump: () => Record<string, string>;
+
+    /**
+     * List unprefixed keys whose cached value is not known to be in storage.
+     *
+     * A key is queued here when `setRaw` or `removeRaw` updated the cache but
+     * the storage backend rejected the mutation — a quota error, a blocked
+     * origin, a backend that broke the synchronous `StorageLike` contract, or
+     * no backend at all. The provider keeps serving the cached value, so this
+     * is the only way to tell a durable write from an in-memory one.
+     *
+     * Entries clear when the same key is written again successfully, when
+     * {@link Mnemonic.flush} persists them, or when an external change reloads
+     * the key from storage.
+     *
+     * @returns Unprefixed keys in the order their mutations were queued
+     */
+    unpersistedKeys: () => string[];
+
+    /**
+     * Re-attempt writes that never reached the storage backend.
+     *
+     * This is the recovery half of {@link Mnemonic.unpersistedKeys}: once space
+     * frees up, something has to rewrite the values that were dropped, and
+     * nothing else in the library does.
+     *
+     * @param keys - Unprefixed keys to retry. Defaults to every unpersisted
+     *   key. Keys with nothing queued are ignored rather than rewritten.
+     * @returns Which keys reached storage and which are still unpersisted
+     */
+    flush: (keys?: readonly string[]) => MnemonicFlushResult;
 
     /**
      * The active schema enforcement mode for this provider.
@@ -1114,6 +1172,9 @@ export interface MnemonicRecoveryHook {
     /**
      * Clears every key in the current namespace.
      *
+     * Covers keys that only exist as unpersisted writes as well as keys in
+     * storage, so a reset cannot leave a value queued for a later flush.
+     *
      * @throws {Error} When the storage backend cannot enumerate namespace keys
      */
     clearAll: () => string[];
@@ -1128,9 +1189,38 @@ export interface MnemonicRecoveryHook {
     /**
      * Clears namespace keys whose names match the supplied predicate.
      *
+     * The predicate sees unpersisted keys alongside stored ones.
+     *
      * @throws {Error} When the storage backend cannot enumerate namespace keys
      */
     clearMatching: (predicate: (key: string) => boolean) => string[];
+
+    /**
+     * Lists unprefixed keys whose current value is not known to be in storage.
+     *
+     * Writes that the storage backend rejected — a full quota being the common
+     * case — still update the in-memory cache, so the app keeps showing the new
+     * value while storage holds the old one. This is how an app detects that
+     * divergence.
+     *
+     * Unlike `listKeys()`, this does not require an enumerable backend.
+     *
+     * @returns Unprefixed keys in the order their writes were queued
+     */
+    unpersistedKeys: () => string[];
+
+    /**
+     * Re-attempts writes that never reached storage.
+     *
+     * Call this after freeing space — the app evicted its own data, or the user
+     * cleared something — to persist the values that were dropped. Nothing else
+     * retries them.
+     *
+     * @param keys - Unprefixed keys to retry. Defaults to every unpersisted
+     *   key. Keys with nothing queued are ignored.
+     * @returns Which keys reached storage and which are still unpersisted
+     */
+    flush: (keys?: readonly string[]) => MnemonicFlushResult;
 }
 
 /**

@@ -65,7 +65,14 @@ Writes follow this order:
 4. Validate the value against the target schema when schema-managed.
 5. Encode the versioned envelope.
 6. Write the raw string through the provider cache and storage layer.
-7. Notify subscribers for the key.
+7. If the storage backend rejected the write, queue the key as unpersisted. Otherwise clear any entry queued for it.
+8. Notify subscribers for the key.
+
+The cache is updated whether or not step 6 reached storage, so a rejected write
+is still what components see. Rejection is reported through
+`useMnemonicRecovery().unpersistedKeys()` and retried through `flush(...)`. A
+queued entry clears when the key is written successfully, when a flush persists
+it, or when an external change reloads that key from storage.
 
 ## Storage Adapter Boundaries
 
