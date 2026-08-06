@@ -97,7 +97,7 @@
         "url": "https://github.com/thirtytwobits/react-mnemonic/issues"
     },
     "engines": {
-        "node": ">=18"
+        "node": ">=20"
     },
     "peerDependencies": {
         "react": ">=18",
