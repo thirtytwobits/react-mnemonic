@@ -142,6 +142,16 @@ are kept rather than rolled back: the value the user just produced is the one
 worth keeping, and rolling it back would discard work that is still
 recoverable.
 
+A key is only reported when storage is observed to disagree with what the
+provider is serving. A rejected write of a value storage already holds — a
+cross-tab echo, or a `reset()` to the value already on disk — is not reported,
+so a durable key never shows up as unsaved.
+
+The queue holds one entry per distinct key, not per write: repeated failures on
+the same key replace the entry and release the superseded value. What it retains
+is normally the same string the provider's cache already holds, so a dropped
+write costs a map entry rather than a second copy of the payload.
+
 Freeing space does not retry anything on its own. If your app evicts its own
 data — or the user clears something — call `flush()` afterwards, or the pending
 values stay in memory until the page unloads.

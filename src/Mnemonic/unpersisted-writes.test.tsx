@@ -218,6 +218,61 @@ describe("Mnemonic.unpersistedKeys", () => {
         expect(store.unpersistedKeys()).toEqual(["k"]);
     });
 
+    it("does not queue a rejected write that storage already satisfies", () => {
+        // The cross-tab handler echoes another tab's value back through
+        // setRaw. If the backend rejects that no-op write, the key is still
+        // durable — queueing it would report unsaved changes forever.
+        const storage = createQuotaStorage();
+        storage.store.set("ns.k", "theirs");
+        const store = renderStore(storage);
+        storage.full = true;
+
+        store.setRaw("k", "theirs");
+
+        expect(store.unpersistedKeys()).toEqual([]);
+        expect(store.flush()).toEqual({ persisted: [], failed: [] });
+    });
+
+    it("does not queue a rejected removal for a key storage no longer has", () => {
+        const storage = createQuotaStorage();
+        storage.removeItem = () => {
+            throw new DOMException("blocked", "SecurityError");
+        };
+        const store = renderStore(storage);
+
+        store.removeRaw("absent");
+
+        expect(store.unpersistedKeys()).toEqual([]);
+    });
+
+    it("still queues a rejected write when storage holds something different", () => {
+        const storage = createQuotaStorage();
+        storage.store.set("ns.k", "theirs");
+        const store = renderStore(storage);
+        storage.full = true;
+
+        store.setRaw("k", "mine");
+
+        expect(store.unpersistedKeys()).toEqual(["k"]);
+    });
+
+    it("keeps one queue entry per key regardless of how many writes fail", () => {
+        const storage = createQuotaStorage();
+        const store = renderStore(storage);
+        storage.full = true;
+
+        for (let i = 0; i < 500; i++) {
+            store.setRaw("draft", `revision-${i}`);
+        }
+
+        // The queue is bounded by distinct keys, not by write volume, and only
+        // the latest value is retained.
+        expect(store.unpersistedKeys()).toEqual(["draft"]);
+        storage.full = false;
+        expect(store.flush()).toEqual({ persisted: ["draft"], failed: [] });
+        expect(storage.store.get("ns.draft")).toBe("revision-499");
+    });
+
     it("does not require an enumerable backend", () => {
         const storage = createQuotaStorage();
         delete (storage as Partial<StorageLike>).key;

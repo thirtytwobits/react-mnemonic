@@ -862,6 +862,14 @@ export function MnemonicProvider({
          * The pending raw value is held here rather than read back from the
          * cache so a pending write survives cache eviction during an external
          * reload.
+         *
+         * Memory: one entry per distinct key, not per write — repeated failures
+         * on the same key replace the entry and release the superseded string.
+         * The retained string is normally the same one the cache already holds,
+         * so a queued write costs a map entry rather than a copy of the payload.
+         * The exception is a key an external reload evicted from the cache,
+         * where this map becomes the only retainer; that is deliberate, since
+         * dropping it would discard the write it exists to recover.
          */
         const pendingWrites = new Map<string, string | null>();
 
@@ -971,12 +979,38 @@ export function MnemonicProvider({
         };
 
         /**
-         * Applies the storage half of a mutation and reports whether it landed.
+         * Reports whether storage already holds what a failed mutation intended.
+         *
+         * A backend can reject a write that would not have changed anything:
+         * the cross-tab handler echoing a value another tab already stored, or
+         * a reset to the value on disk. A thrown quota error says the write was
+         * refused, not that the cache and storage disagree. Reading back keeps
+         * the queue a record of observed divergence instead of thrown
+         * exceptions, so a durable key is never reported as unsaved.
+         *
+         * Deliberately bypasses the shared access callbacks: this is a
+         * diagnostic read on an already-failed path and must not reset the
+         * error-logging squelches.
+         */
+        const storageAlreadyHolds = (key: string, raw: string | null): boolean => {
+            if (!st) return false;
+            try {
+                const current = st.getItem(fullKey(key));
+                if (isPromiseLike(current)) return false;
+                return current === raw;
+            } catch {
+                return false;
+            }
+        };
+
+        /**
+         * Applies the storage half of a mutation and reports whether the value
+         * ended up in storage.
          *
          * @param key - Unprefixed key being mutated
          * @param raw - Raw value to store, or null to remove the key
-         * @returns True when the backend accepted the mutation, false when the
-         *   value stayed in memory only
+         * @returns True when storage holds the intended value afterwards, false
+         *   when the value stayed in memory only
          */
         const persistToStorage = (key: string, raw: string | null): boolean => {
             if (!st || asyncContractViolationDetected) return false;
@@ -998,7 +1032,7 @@ export function MnemonicProvider({
                     logQuotaError(key, err);
                 }
                 logAccessError(err);
-                return false;
+                return storageAlreadyHolds(key, raw);
             }
         };
 

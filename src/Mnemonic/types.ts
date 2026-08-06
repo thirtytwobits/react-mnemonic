@@ -1046,9 +1046,15 @@ export type Mnemonic = {
      * no backend at all. The provider keeps serving the cached value, so this
      * is the only way to tell a durable write from an in-memory one.
      *
+     * A key is only queued when storage is observed to disagree with the
+     * cache. A rejected write of a value storage already holds — a cross-tab
+     * echo, or a reset to the value on disk — is not reported, so a durable key
+     * is never shown as unsaved.
+     *
      * Entries clear when the same key is written again successfully, when
      * {@link Mnemonic.flush} persists them, or when an external change reloads
-     * the key from storage.
+     * the key from storage. The queue holds one entry per distinct key, not per
+     * write.
      *
      * @returns Unprefixed keys in the order their mutations were queued
      */
