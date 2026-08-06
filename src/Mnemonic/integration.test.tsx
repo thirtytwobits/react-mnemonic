@@ -2,6 +2,7 @@
 // Copyright Scott Dixon
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { MockInstance } from "vitest";
 import { render, act } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
@@ -588,8 +589,8 @@ describe("useSyncExternalStore – rapid mutations", () => {
 
 describe("cross-tab sync – listener lifecycle", () => {
     let storage: ReturnType<typeof createMockStorage>;
-    let addSpy: ReturnType<typeof vi.spyOn>;
-    let removeSpy: ReturnType<typeof vi.spyOn>;
+    let addSpy: MockInstance<typeof window.addEventListener>;
+    let removeSpy: MockInstance<typeof window.removeEventListener>;
 
     beforeEach(() => {
         storage = createMockStorage();
