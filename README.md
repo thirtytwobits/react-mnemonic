@@ -68,17 +68,19 @@ survives a full page reload.
 - Optional cross-tab synchronization
 - SSR-safe defaults for server-rendered React apps
 - Optional schema validation, versioning, migrations, and reconciliation
+- Dropped writes are reported rather than swallowed: a full quota or blocked
+  origin surfaces through `onStorageError` and stays retryable with `flush()`
 - Zero runtime dependencies with published TypeScript types
 
 ## Pick the right entrypoint
 
 | Entrypoint                 | Approx ESM size | Use when                                                                            |
 | -------------------------- | --------------- | ----------------------------------------------------------------------------------- |
-| `react-mnemonic/optional`  | ~4.9 KB         | You want the tiny component-library shim that falls back to local memory            |
-| `react-mnemonic/bootstrap` | ~25 KB          | You need synchronous first-paint recall before React renders                        |
-| `react-mnemonic/core`      | ~61 KB          | A provider is required and you want the lean persisted-state path                   |
-| `react-mnemonic/schema`    | ~80.5 KB        | A provider is required and you want schema validation, autoschema, and migrations   |
-| `react-mnemonic`           | ~80.5 KB        | You want the top-level full entrypoint with the same schema-capable runtime surface |
+| `react-mnemonic/optional`  | ~5.2 KB         | You want the tiny component-library shim that falls back to local memory            |
+| `react-mnemonic/bootstrap` | ~24.5 KB        | You need synchronous first-paint recall before React renders                        |
+| `react-mnemonic/core`      | ~65.3 KB        | A provider is required and you want the lean persisted-state path                   |
+| `react-mnemonic/schema`    | ~84.6 KB        | A provider is required and you want schema validation, autoschema, and migrations   |
+| `react-mnemonic`           | ~84.6 KB        | You want the top-level full entrypoint with the same schema-capable runtime surface |
 
 These are rough current estimates from the built ESM entry files in `dist/`
 before consumer-side minification and tree-shaking. They are useful for
@@ -136,6 +138,8 @@ schema-capable `MnemonicProvider`.
 - [Quick Start](https://thirtytwobits.github.io/react-mnemonic/docs/getting-started/quick-start)
 - [Optional Persistence](https://thirtytwobits.github.io/react-mnemonic/docs/guides/optional-persistence)
 - [Server Rendering](https://thirtytwobits.github.io/react-mnemonic/docs/guides/server-rendering)
+- [Error Handling](https://thirtytwobits.github.io/react-mnemonic/docs/guides/error-handling)
+- [Reset and Recovery](https://thirtytwobits.github.io/react-mnemonic/docs/guides/reset-and-recovery)
 - [Canonical Key Definitions](https://thirtytwobits.github.io/react-mnemonic/docs/guides/canonical-key-definitions)
 - [Single Source of Truth Schemas](https://thirtytwobits.github.io/react-mnemonic/docs/guides/single-source-of-truth-schemas)
 - [Schema Migration](https://thirtytwobits.github.io/react-mnemonic/docs/guides/schema-migration)

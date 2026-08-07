@@ -259,19 +259,44 @@ function resolveTargetVersion(currentVersion, target, preid) {
     }
 }
 
+function releaseDateStamp() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Moves the accumulated `[Unreleased]` notes under a dated heading for this
+ * version, leaving an empty `[Unreleased]` behind for the next cycle.
+ *
+ * This used to rename the top heading in place, which meant every tagged
+ * release shipped a CHANGELOG that still said "Unreleased" and no release ever
+ * got a section of its own. The empty-notes check below is the other half of
+ * that fix: releases 1.2.0 through 1.5.0 each shipped without a single new
+ * entry, and nothing objected.
+ */
 function updateChangelog(version) {
     const changelog = readText(changelogPath);
-    const headingPattern = /^## \[(?<current>[^\]]+)\] - Unreleased$/m;
-    const match = changelog.match(headingPattern);
-    if (!match?.groups?.current) {
-        fail("Unable to locate the top unreleased heading in CHANGELOG.md");
+    const unreleasedPattern = /^## \[Unreleased\]\s*$/m;
+    const match = unreleasedPattern.exec(changelog);
+    if (!match) {
+        fail("Unable to locate the '## [Unreleased]' heading in CHANGELOG.md");
     }
 
-    const nextChangelog = changelog.replace(headingPattern, `## [${version}] - Unreleased`);
-    if (nextChangelog === changelog) {
-        fail("Unable to update CHANGELOG.md heading");
+    const afterHeading = match.index + match[0].length;
+    const remainder = changelog.slice(afterHeading);
+    const nextHeadingOffset = remainder.search(/^## \[/m);
+    const notes = (nextHeadingOffset === -1 ? remainder : remainder.slice(0, nextHeadingOffset)).trim();
+
+    if (notes.length === 0) {
+        fail(
+            `CHANGELOG.md has no entries under '## [Unreleased]'. Describe what ${version} changes before releasing it.`,
+        );
     }
-    writeText(changelogPath, nextChangelog);
+
+    const tail = nextHeadingOffset === -1 ? "" : remainder.slice(nextHeadingOffset);
+    writeText(
+        changelogPath,
+        `${changelog.slice(0, afterHeading)}\n\n## [${version}] - ${releaseDateStamp()}\n\n${notes}\n\n${tail}`,
+    );
 }
 
 function updateSecurity(version) {

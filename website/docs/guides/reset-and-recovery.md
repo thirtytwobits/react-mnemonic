@@ -153,6 +153,17 @@ Notes on the contract:
 
 Freeing space alone does not retry anything. Something has to call `flush()`.
 
+`unpersistedKeys()` is the pull half of this: it answers "is anything unsaved
+right now?", which means something has to think to ask. For the push half, pass
+[`onStorageError`](./error-handling.md#being-told-when-a-write-is-dropped) to the
+provider and be told the moment a write is dropped.
+
+The two agree for storage-layer failures — a key reported as `"quota"`,
+`"access"`, or `"contract"` is exactly a key `unpersistedKeys()` will list. They
+diverge for `"schema"`, `"codec"`, and `"unknown"`, which are rejected before
+storage is reached and so are never queued. Those cannot be recovered by
+`flush()`; the value itself is the problem.
+
 ## Recovery telemetry
 
 `onRecover` lets you record or surface recovery actions:
