@@ -208,15 +208,35 @@ The event describes the mutation that was dropped:
   [Custom storage adapters](./custom-storage.md).
 - **`"unknown"`** — an unclassified failure. Treat it like `"access"`.
 
-Three details matter when writing the handler:
+### Not every event can be retried
+
+`onStorageError` is deliberately wider than `unpersistedKeys()`, and the two
+groups of reasons want different handling:
+
+| Reasons                             | Cache                            | Queued for `flush()` | What it means                    |
+| ----------------------------------- | -------------------------------- | -------------------- | -------------------------------- |
+| `"quota"`, `"access"`, `"contract"` | holds the new value              | yes                  | environment problem, recoverable |
+| `"schema"`, `"codec"`, `"unknown"`  | unchanged, previous value stands | no                   | application bug, not retryable   |
+
+A storage-layer drop is a write that was fine but could not land, so it is
+queued and `flush()` can put it through later. A pre-storage failure never
+became a write at all — the value was rejected before the backend was called, so
+there is nothing queued and nothing to retry, and retrying would fail
+identically because the value itself is the problem.
+
+The practical consequence: do not tell the user "we'll try again" on a
+`"schema"` or `"codec"` event, and do not expect those keys to appear in
+`unpersistedKeys()`.
+
+### Handler details
 
 - **It fires on every dropped mutation.** The matching console messages are
   logged once and then squelched; this callback is not, so you can count
   failures or track them per key. Debounce in the handler if you are driving a
   toast from it.
 - **It only fires for writes that were actually dropped.** A rejected write that
-  storage turns out to already satisfy is not reported, exactly as it is not
-  queued by `unpersistedKeys()`. The two channels agree.
+  storage turns out to already satisfy — a cross-tab echo, a `reset()` to the
+  value on disk — is not reported, exactly as it is not queued.
 - **It runs synchronously inside the mutation**, after the cache is updated and
   subscribers are notified, so the handler sees a fully applied write. Throwing
   is contained and logged once; writing to the store from inside it is not

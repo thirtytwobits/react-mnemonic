@@ -217,7 +217,12 @@ export function createMnemonicOptionalBridge({
                     reportStorageError(api, { key, operation: "set", reason: "codec", error });
                     return;
                 }
-                throw error;
+                // Rethrowing here escaped through `useMnemonicKeyOptional().set`,
+                // which does not catch, breaking the contract that a set never
+                // throws — and hiding the failure from `onStorageError`. Treat
+                // it the way the required hooks treat theirs.
+                console.error(`[Mnemonic] Failed to persist key "${key}":`, error);
+                reportStorageError(api, { key, operation: "set", reason: "unknown", error });
             }
         },
         removeValue: (key) => {

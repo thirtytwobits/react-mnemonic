@@ -638,6 +638,10 @@ export function useMnemonicKeyState<T, Extra extends object>(
                     reportStorageError(api, { key, operation: "set", reason: "codec", error: err });
                     return;
                 }
+                // Logged as well as reported, so a reset that fails for an
+                // unclassified reason stays diagnosable without a handler —
+                // matching set() rather than failing silently.
+                console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
                 reportStorageError(api, { key, operation: "set", reason: "unknown", error: err });
                 return;
             }

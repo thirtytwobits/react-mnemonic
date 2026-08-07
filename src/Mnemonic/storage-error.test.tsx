@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { MnemonicProvider, useMnemonic } from "./provider";
 import { useMnemonicKey } from "./use";
+import { useMnemonicKeyOptional } from "./use-key-optional";
 import { CodecError } from "./codecs";
 import type { Codec, MnemonicStorageErrorEvent, StorageLike } from "./types";
 
@@ -295,6 +296,147 @@ describe("onStorageError – pre-storage failures", () => {
         const event = onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent;
         expect(event.reason).toBe("unknown");
         expect(event.error).toBeInstanceOf(TypeError);
+    });
+
+    it("logs an unclassified reset failure so it stays diagnosable without a handler", () => {
+        const storage = createQuotaStorage();
+        const onStorageError = vi.fn();
+        const badCodec: Codec<string> = {
+            encode: () => {
+                throw new TypeError("something else entirely");
+            },
+            decode: (s) => s,
+        };
+        const api = renderKey(storage, onStorageError, badCodec);
+
+        act(() => {
+            api().reset();
+        });
+
+        expect((onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent).reason).toBe("unknown");
+        const logs = errorSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes("Failed to persist key"));
+        expect(logs).toHaveLength(1);
+    });
+
+    it("leaves the cache and the retry queue untouched when a value never reaches storage", () => {
+        const storage = createQuotaStorage();
+        const onStorageError = vi.fn();
+        let store: ReturnType<typeof useMnemonic> | undefined;
+        let api: ReturnType<typeof useMnemonicKey<string>> | undefined;
+        const badCodec: Codec<string> = {
+            encode: (v) => {
+                if (v === "bad") throw new CodecError("encode fail");
+                return v;
+            },
+            decode: (s) => s,
+        };
+        function Probe() {
+            store = useMnemonic();
+            api = useMnemonicKey("k", { defaultValue: "x", codec: badCodec });
+            return null;
+        }
+        render(
+            <MnemonicProvider namespace="ns" storage={storage} onStorageError={onStorageError}>
+                <Probe />
+            </MnemonicProvider>,
+        );
+
+        act(() => {
+            api!.set("good");
+        });
+        const rawBefore = store!.getRawSnapshot("k");
+        const storedBefore = storage.store.get("ns.k");
+
+        act(() => {
+            api!.set("bad");
+        });
+
+        // The report fired, but a pre-storage rejection is not a dropped write:
+        // the previous value still stands and there is nothing to flush.
+        expect((onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent).reason).toBe("codec");
+        expect(api!.value).toBe("good");
+        expect(store!.getRawSnapshot("k")).toBe(rawBefore);
+        expect(storage.store.get("ns.k")).toBe(storedBefore);
+        expect(store!.unpersistedKeys()).toEqual([]);
+        expect(store!.flush()).toEqual({ persisted: [], failed: [] });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// The optional hook reaches storage through the provider's store
+// ---------------------------------------------------------------------------
+
+describe("onStorageError – optional hooks under a provider", () => {
+    function renderOptionalKey(codec: Codec<string>, onStorageError: (event: MnemonicStorageErrorEvent) => void) {
+        const storage = createQuotaStorage();
+        let api: ReturnType<typeof useMnemonicKeyOptional<string>> | undefined;
+        function Probe() {
+            api = useMnemonicKeyOptional("k", { defaultValue: "x", codec });
+            return null;
+        }
+        render(
+            <MnemonicProvider namespace="ns" storage={storage} onStorageError={onStorageError}>
+                <Probe />
+            </MnemonicProvider>,
+        );
+        return { storage, api: () => api! };
+    }
+
+    it("reports a codec failure rather than letting it escape set()", () => {
+        const onStorageError = vi.fn();
+        const { api } = renderOptionalKey(
+            {
+                encode: () => {
+                    throw new CodecError("encode fail");
+                },
+                decode: (s) => s,
+            },
+            onStorageError,
+        );
+
+        expect(() =>
+            act(() => {
+                api().set("anything");
+            }),
+        ).not.toThrow();
+
+        expect((onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent).reason).toBe("codec");
+    });
+
+    it("reports an unclassified failure instead of throwing out of set()", () => {
+        const onStorageError = vi.fn();
+        const { api } = renderOptionalKey(
+            {
+                encode: () => {
+                    throw new TypeError("something else entirely");
+                },
+                decode: (s) => s,
+            },
+            onStorageError,
+        );
+
+        // This used to rethrow, escaping through a set() that does not catch.
+        expect(() =>
+            act(() => {
+                api().set("anything");
+            }),
+        ).not.toThrow();
+
+        const event = onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent;
+        expect(event.reason).toBe("unknown");
+        expect(event.error).toBeInstanceOf(TypeError);
+    });
+
+    it("reports a quota drop through the shared store", () => {
+        const onStorageError = vi.fn();
+        const { storage, api } = renderOptionalKey({ encode: (v) => v, decode: (s) => s }, onStorageError);
+        storage.full = true;
+
+        act(() => {
+            api().set("v");
+        });
+
+        expect((onStorageError.mock.calls[0]![0] as MnemonicStorageErrorEvent).reason).toBe("quota");
     });
 });
 

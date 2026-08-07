@@ -212,7 +212,7 @@ export interface MnemonicProviderOptions {
     bootstrap?: MnemonicBootstrapSeed;
 
     /**
-     * Called when a mutation updated the cache but never reached storage.
+     * Called when a mutation did not reach storage.
      *
      * Without this, a dropped write produces only a `console.error`, which is
      * invisible to the people using the application. This is the programmatic
@@ -225,12 +225,23 @@ export interface MnemonicProviderOptions {
      * retry.
      *
      * @remarks
+     * **Not every event is queued for retry.** The callback is strictly wider
+     * than {@link Mnemonic.unpersistedKeys}, and
+     * {@link MnemonicStorageErrorEvent.reason} says which kind you have:
+     *
+     * - `"quota"`, `"access"`, `"contract"` are storage-layer drops. The cache
+     *   holds the new value, the key is queued, and `flush()` can retry it.
+     *   For these the two channels agree exactly — this says a write was
+     *   dropped, `unpersistedKeys()` says it is still outstanding.
+     * - `"schema"`, `"codec"`, `"unknown"` are rejected before storage is
+     *   called. The cache is unchanged and nothing is queued, so these events
+     *   have no matching `unpersistedKeys()` entry and `flush()` will not
+     *   retry them. Do not promise the user a retry for these.
+     *
      * **It reports drops, not throws.** A write the backend rejects that turns
      * out to leave storage holding the intended value already — a cross-tab
-     * echo, a reset to the value on disk — is not reported. The callback fires
-     * exactly when a key is queued as unpersisted, so it stays in step with
-     * {@link Mnemonic.unpersistedKeys}: this says a write was dropped, that
-     * says what is still outstanding, and {@link Mnemonic.flush} retries it.
+     * echo, a reset to the value on disk — is not reported at all, matching the
+     * fact that it is not queued either.
      *
      * **It is not squelched.** The matching console messages are logged once
      * and then suppressed until the next success; this callback fires on every
@@ -997,12 +1008,26 @@ export type Listener = () => void;
 export type MnemonicStorageErrorReason = "quota" | "access" | "schema" | "codec" | "contract" | "unknown";
 
 /**
- * A mutation that updated the in-memory cache but never reached storage.
+ * A mutation that did not reach storage.
  *
  * Delivered to {@link MnemonicProviderOptions.onStorageError}. Every field
  * describes the mutation that was dropped, not the state of the store
- * afterwards — the cache still serves the new value, and the key is queued for
- * {@link Mnemonic.flush}.
+ * afterwards.
+ *
+ * @remarks
+ * What happened to the value depends on how far it got, which
+ * {@link MnemonicStorageErrorEvent.reason} tells you:
+ *
+ * - **Storage-layer drops** (`"quota"`, `"access"`, `"contract"`) — the value
+ *   was valid and the cache now serves it, but the backend would not take it.
+ *   The key is queued, so {@link Mnemonic.unpersistedKeys} reports it and
+ *   {@link Mnemonic.flush} can retry it. This is worth telling the user about,
+ *   and it is recoverable.
+ * - **Pre-storage failures** (`"schema"`, `"codec"`, `"unknown"`) — the value
+ *   was rejected before storage was ever called. The cache is unchanged, so
+ *   the previous value still stands; nothing is queued, and there is nothing
+ *   for `flush()` to retry. Retrying would fail identically, because the value
+ *   itself is the problem. These are application bugs.
  *
  * @see {@link MnemonicProviderOptions.onStorageError} - Where this is delivered
  * @see {@link Mnemonic.unpersistedKeys} - What is currently outstanding
