@@ -15,7 +15,14 @@ import { createContext, useContext, useMemo, useEffect, useRef, ReactNode } from
 import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
 import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
-import type { Mnemonic, MnemonicProviderOptions, StorageLike, Listener, Unsubscribe } from "./types";
+import type {
+    Mnemonic,
+    MnemonicFlushResult,
+    MnemonicProviderOptions,
+    StorageLike,
+    Listener,
+    Unsubscribe,
+} from "./types";
 
 /**
  * React Context for the Mnemonic store.
@@ -324,24 +331,36 @@ function decodeDevToolsValue(raw: string): unknown {
     }
 }
 
+/**
+ * Outcome of a single raw storage read.
+ *
+ * A read that failed and a key that is genuinely absent both yield a `null`
+ * value, so callers that must tell those apart — anything deciding whether
+ * storage has authoritatively spoken for a key — read `ok` rather than
+ * inferring from the value.
+ */
+type StorageReadResult = { ok: true; raw: string | null } | { ok: false; raw: null };
+
+const STORAGE_READ_FAILED: StorageReadResult = { ok: false, raw: null };
+
 function readStorageRaw(
     storage: StorageLike | undefined,
     storageKey: string,
     callbacks: StorageAccessCallbacks,
-): string | null {
-    if (!storage) return null;
+): StorageReadResult {
+    if (!storage) return STORAGE_READ_FAILED;
 
     try {
         const raw = storage.getItem(storageKey);
         if (isPromiseLike(raw)) {
             callbacks.onAsyncViolation("getItem", raw);
-            return null;
+            return STORAGE_READ_FAILED;
         }
         callbacks.onAccessSuccess();
-        return raw;
+        return { ok: true, raw };
     } catch (error) {
         callbacks.onAccessError(error);
-        return null;
+        return STORAGE_READ_FAILED;
     }
 }
 
@@ -380,6 +399,7 @@ function syncCacheEntryFromStorage({
     cache,
     emit,
     callbacks,
+    onCacheSyncedFromStorage,
 }: {
     key: string;
     storageKey: string;
@@ -387,13 +407,25 @@ function syncCacheEntryFromStorage({
     cache: Map<string, string | null>;
     emit: (key: string) => void;
     callbacks: StorageAccessCallbacks;
+    onCacheSyncedFromStorage: (key: string) => void;
 }): boolean {
     const fresh = readStorageRaw(storage, storageKey, callbacks);
+    if (fresh.ok) {
+        // Storage just won this key back, so any write we were still holding
+        // for it is superseded rather than pending.
+        //
+        // Only a read that actually succeeded can supersede a queued write. A
+        // failed read reports the same null as an absent key, so forgetting the
+        // write here would discard it on the strength of an error and leave
+        // flush() with nothing to retry. The unreadable case keeps its queue
+        // entry and reaches storage on the next flush.
+        onCacheSyncedFromStorage(key);
+    }
     const cached = cache.get(key) ?? null;
-    if (fresh === cached) {
+    if (fresh.raw === cached) {
         return false;
     }
-    cache.set(key, fresh);
+    cache.set(key, fresh.raw);
     emit(key);
     return true;
 }
@@ -406,6 +438,7 @@ function reloadNamedKeysFromStorage({
     cache,
     emit,
     callbacks,
+    onCacheSyncedFromStorage,
 }: {
     changedKeys: string[];
     prefix: string;
@@ -414,6 +447,7 @@ function reloadNamedKeysFromStorage({
     cache: Map<string, string | null>;
     emit: (key: string) => void;
     callbacks: StorageAccessCallbacks;
+    onCacheSyncedFromStorage: (key: string) => void;
 }): boolean {
     let changed = false;
 
@@ -430,6 +464,7 @@ function reloadNamedKeysFromStorage({
                     cache,
                     emit,
                     callbacks,
+                    onCacheSyncedFromStorage,
                 }) || changed;
             continue;
         }
@@ -448,6 +483,7 @@ function reloadSubscribedKeysFromStorage({
     cache,
     emit,
     callbacks,
+    onCacheSyncedFromStorage,
 }: {
     prefix: string;
     storage: StorageLike | undefined;
@@ -455,6 +491,7 @@ function reloadSubscribedKeysFromStorage({
     cache: Map<string, string | null>;
     emit: (key: string) => void;
     callbacks: StorageAccessCallbacks;
+    onCacheSyncedFromStorage: (key: string) => void;
 }): boolean {
     let changed = false;
 
@@ -468,6 +505,7 @@ function reloadSubscribedKeysFromStorage({
                 cache,
                 emit,
                 callbacks,
+                onCacheSyncedFromStorage,
             }) || changed;
     }
 
@@ -518,7 +556,9 @@ function createDevToolsProviderApi({
         },
         remove: (key: string) => removeRaw(key),
         clear: () => {
-            for (const key of keys()) {
+            // Storage enumeration misses keys that only exist as unpersisted
+            // writes, and those would survive the clear.
+            for (const key of new Set([...keys(), ...store.unpersistedKeys()])) {
                 removeRaw(key);
             }
         },
@@ -536,6 +576,7 @@ function createReloadFromStorage({
     callbacks,
     devToolsRoot,
     namespace,
+    onCacheSyncedFromStorage,
 }: {
     storage: StorageLike | undefined;
     hasAsyncContractViolation: () => boolean;
@@ -546,6 +587,7 @@ function createReloadFromStorage({
     callbacks: StorageAccessCallbacks;
     devToolsRoot: DevToolsRegistryRoot | null;
     namespace: string;
+    onCacheSyncedFromStorage: (key: string) => void;
 }): (changedKeys?: string[]) => void {
     return (changedKeys?: string[]) => {
         if (!storage || hasAsyncContractViolation()) return;
@@ -560,6 +602,7 @@ function createReloadFromStorage({
                   cache,
                   emit,
                   callbacks,
+                  onCacheSyncedFromStorage,
               })
             : reloadNamedKeysFromStorage({
                   changedKeys,
@@ -569,6 +612,7 @@ function createReloadFromStorage({
                   cache,
                   emit,
                   callbacks,
+                  onCacheSyncedFromStorage,
               });
 
         if (changed) {
@@ -826,6 +870,29 @@ export function MnemonicProvider({
          */
         const listeners = new Map<string, Set<Listener>>();
 
+        /**
+         * Mutations that updated the cache but never reached the storage backend.
+         *
+         * Maps unprefixed keys to the raw value that still needs to be written,
+         * or to `null` when the pending mutation is a removal. Entries are added
+         * when a write or removal fails (or when there is no usable backend to
+         * write to) and removed as soon as the same value reaches storage,
+         * either through a later mutation or through {@link flush}.
+         *
+         * The pending raw value is held here rather than read back from the
+         * cache so a pending write survives cache eviction during an external
+         * reload.
+         *
+         * Memory: one entry per distinct key, not per write — repeated failures
+         * on the same key replace the entry and release the superseded string.
+         * The retained string is normally the same one the cache already holds,
+         * so a queued write costs a map entry rather than a copy of the payload.
+         * The exception is a key an external reload evicted from the cache,
+         * where this map becomes the only retainer; that is deliberate, since
+         * dropping it would discard the write it exists to recover.
+         */
+        const pendingWrites = new Map<string, string | null>();
+
         /** Whether a QuotaExceededError has already been logged since the last successful write. */
         let quotaErrorLogged = false;
 
@@ -911,40 +978,125 @@ export function MnemonicProvider({
                 cache.set(key, null);
                 return null;
             }
-            const raw = readStorageRaw(st, fullKey(key), storageAccessCallbacks);
+            // A read that fails caches null, same as an absent key: the caller
+            // gets defaultValue either way, and the access callbacks have
+            // already reported the failure.
+            const { raw } = readStorageRaw(st, fullKey(key), storageAccessCallbacks);
             cache.set(key, raw);
             return raw;
+        };
+
+        /**
+         * Logs a QuotaExceededError once, squelching repeats until the next
+         * successful write resets the flag.
+         */
+        const logQuotaError = (key: string, err: unknown): void => {
+            if (!quotaErrorLogged && err instanceof DOMException && err.name === "QuotaExceededError") {
+                console.error(
+                    `[Mnemonic] Storage quota exceeded writing key "${key}". ` +
+                        "Data is cached in memory but will not persist. " +
+                        "Call flush() after freeing space to retry.",
+                );
+                quotaErrorLogged = true;
+            }
+        };
+
+        /**
+         * Reports whether storage already holds what a failed mutation intended.
+         *
+         * A backend can reject a write that would not have changed anything:
+         * the cross-tab handler echoing a value another tab already stored, or
+         * a reset to the value on disk. A thrown quota error says the write was
+         * refused, not that the cache and storage disagree. Reading back keeps
+         * the queue a record of observed divergence instead of thrown
+         * exceptions, so a durable key is never reported as unsaved.
+         *
+         * Deliberately bypasses the shared access callbacks: this is a
+         * diagnostic read on an already-failed path and must not reset the
+         * error-logging squelches.
+         */
+        const storageAlreadyHolds = (key: string, raw: string | null): boolean => {
+            if (!st) return false;
+            try {
+                const current = st.getItem(fullKey(key));
+                if (isPromiseLike(current)) return false;
+                return current === raw;
+            } catch {
+                return false;
+            }
+        };
+
+        /**
+         * Applies the storage half of a mutation and reports whether the value
+         * ended up in storage.
+         *
+         * @param key - Unprefixed key being mutated
+         * @param raw - Raw value to store, or null to remove the key
+         * @returns True when storage holds the intended value afterwards, false
+         *   when the value stayed in memory only
+         */
+        const persistToStorage = (key: string, raw: string | null): boolean => {
+            if (!st || asyncContractViolationDetected) return false;
+
+            const isRemoval = raw === null;
+            try {
+                const result = isRemoval ? st.removeItem(fullKey(key)) : st.setItem(fullKey(key), raw);
+                if (isPromiseLike(result)) {
+                    handleAsyncStorageContractViolation(isRemoval ? "removeItem" : "setItem", result);
+                    return false;
+                }
+                if (!isRemoval) {
+                    quotaErrorLogged = false;
+                }
+                accessErrorLogged = false;
+                return true;
+            } catch (err) {
+                if (!isRemoval) {
+                    logQuotaError(key, err);
+                }
+                logAccessError(err);
+                return storageAlreadyHolds(key, raw);
+            }
+        };
+
+        /**
+         * Records whether the cached value for a key is known to be in storage.
+         *
+         * A mutation that never reached the backend stays queued here so
+         * {@link unpersistedKeys} can report it and {@link flush} can retry it.
+         */
+        const recordPersistence = (key: string, raw: string | null, landed: boolean): void => {
+            if (landed) {
+                pendingWrites.delete(key);
+                return;
+            }
+            pendingWrites.set(key, raw);
+        };
+
+        /**
+         * Drops any pending mutation for a key that storage has just won back.
+         *
+         * Called when an external change reloads the key, at which point the
+         * cache mirrors storage again and retrying the old value would
+         * resurrect state the provider no longer serves.
+         */
+        const forgetPendingWrite = (key: string): void => {
+            pendingWrites.delete(key);
         };
 
         /**
          * Writes a raw string value to both cache and storage.
          * Notifies listeners after the write completes.
          *
+         * The cache is updated even when the backend rejects the write, so the
+         * key is queued as unpersisted rather than silently reported as saved.
+         *
          * @param key - Unprefixed key to write
          * @param raw - Raw string value to store
          */
         const writeRaw = (key: string, raw: string) => {
             cache.set(key, raw);
-            if (st && !asyncContractViolationDetected) {
-                try {
-                    const result = st.setItem(fullKey(key), raw);
-                    if (isPromiseLike(result)) {
-                        handleAsyncStorageContractViolation("setItem", result);
-                    } else {
-                        quotaErrorLogged = false;
-                        accessErrorLogged = false;
-                    }
-                } catch (err) {
-                    if (!quotaErrorLogged && err instanceof DOMException && err.name === "QuotaExceededError") {
-                        console.error(
-                            `[Mnemonic] Storage quota exceeded writing key "${key}". ` +
-                                "Data is cached in memory but will not persist.",
-                        );
-                        quotaErrorLogged = true;
-                    }
-                    logAccessError(err);
-                }
-            }
+            recordPersistence(key, raw, persistToStorage(key, raw));
             emit(key);
             bumpDevToolsVersion(devToolsRoot, namespace, `set:${key}`);
         };
@@ -953,24 +1105,66 @@ export function MnemonicProvider({
          * Removes a key from both cache and storage.
          * Notifies listeners after the removal completes.
          *
+         * A removal that the backend rejects is queued the same way a rejected
+         * write is, so the stale stored value can be cleared by a later flush.
+         *
          * @param key - Unprefixed key to remove
          */
         const removeRaw = (key: string) => {
             cache.set(key, null);
-            if (st && !asyncContractViolationDetected) {
-                try {
-                    const result = st.removeItem(fullKey(key));
-                    if (isPromiseLike(result)) {
-                        handleAsyncStorageContractViolation("removeItem", result);
-                    } else {
-                        accessErrorLogged = false;
-                    }
-                } catch (err) {
-                    logAccessError(err);
-                }
-            }
+            recordPersistence(key, null, persistToStorage(key, null));
             emit(key);
             bumpDevToolsVersion(devToolsRoot, namespace, `remove:${key}`);
+        };
+
+        /**
+         * Lists keys whose cached value is not known to be in storage.
+         *
+         * @returns Unprefixed keys in the order they entered the queue. A key
+         *   already queued keeps its position when a later mutation to it also
+         *   fails, so this is not the order values were last written.
+         */
+        const unpersistedKeys = (): string[] => Array.from(pendingWrites.keys());
+
+        /**
+         * Re-attempts queued mutations that never reached storage.
+         *
+         * @param keysToFlush - Unprefixed keys to retry. Defaults to every
+         *   unpersisted key. Keys with nothing queued are ignored.
+         * @returns Which keys reached storage and which are still pending
+         */
+        const flush = (keysToFlush?: readonly string[]): MnemonicFlushResult => {
+            const targets =
+                keysToFlush === undefined ? Array.from(pendingWrites.keys()) : Array.from(new Set(keysToFlush));
+            const persisted: string[] = [];
+            const failed: string[] = [];
+
+            for (const key of targets) {
+                if (!pendingWrites.has(key)) continue;
+                const raw = pendingWrites.get(key) ?? null;
+                if (!persistToStorage(key, raw)) {
+                    failed.push(key);
+                    continue;
+                }
+
+                pendingWrites.delete(key);
+                persisted.push(key);
+
+                // A pending write can outlive its cache entry when an external
+                // reload evicts an unsubscribed key. Re-seat the cache so reads
+                // agree with what was just written.
+                const cached = cache.has(key) ? (cache.get(key) ?? null) : undefined;
+                if (cached !== raw) {
+                    cache.set(key, raw);
+                    emit(key);
+                }
+            }
+
+            if (persisted.length > 0) {
+                bumpDevToolsVersion(devToolsRoot, namespace, "flush");
+            }
+
+            return { persisted, failed };
         };
 
         /**
@@ -1061,6 +1255,7 @@ export function MnemonicProvider({
             callbacks: storageAccessCallbacks,
             devToolsRoot,
             namespace,
+            onCacheSyncedFromStorage: forgetPendingWrite,
         });
 
         /**
@@ -1076,6 +1271,8 @@ export function MnemonicProvider({
             removeRaw,
             keys,
             dump,
+            unpersistedKeys,
+            flush,
             reloadFromStorage,
             schemaMode,
             ssrHydration,

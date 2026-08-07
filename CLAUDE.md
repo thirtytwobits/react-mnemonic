@@ -15,6 +15,7 @@ state with `react-mnemonic`.
 - `set(next)` persists a new value for the key.
 - `reset()` persists `defaultValue` again.
 - `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
+- `set(...)` never throws when storage rejects the write. Use `useMnemonicRecovery().unpersistedKeys()` to detect dropped writes and `flush()` to retry them once space frees up.
 - Use `set(null)` when "cleared" is a durable state that must survive reload.
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.

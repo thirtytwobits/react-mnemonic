@@ -6,11 +6,17 @@ import { useMnemonic } from "./provider";
 import { getRuntimeNodeEnv } from "./runtime";
 import type {
     Mnemonic,
+    MnemonicFlushResult,
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,
     MnemonicRecoveryHook,
     UseMnemonicRecoveryOptions,
 } from "./types";
+
+/** A fresh empty result so callers never share mutable arrays. */
+function emptyFlushResult(): MnemonicFlushResult {
+    return { persisted: [], failed: [] };
+}
 
 function uniqueKeys(keys: readonly string[]): string[] {
     return [...new Set(keys)];
@@ -79,6 +85,18 @@ export function useMnemonicRecoveryFromApi(
 
     const listKeys = useCallback(() => (active ? api.keys() : []), [active, api]);
 
+    /**
+     * Every key the namespace is currently answering for.
+     *
+     * Storage enumeration misses keys that only exist as unpersisted writes, so
+     * clearing by enumeration alone would leave them queued — and a later
+     * `flush()` would write them back after a reset.
+     */
+    const listAllKeys = useCallback(
+        () => (active ? uniqueKeys([...api.keys(), ...api.unpersistedKeys()]) : []),
+        [active, api],
+    );
+
     const clearResolvedKeys = useCallback(
         (action: MnemonicRecoveryAction, keys: readonly string[]) => {
             if (!active) return [];
@@ -111,8 +129,8 @@ export function useMnemonicRecoveryFromApi(
                 "clearAll requires an enumerable storage backend. Use clearKeys([...]) with an explicit key list instead.",
             );
         }
-        return clearResolvedKeys("clear-all", api.keys());
-    }, [active, api, clearResolvedKeys, namespace]);
+        return clearResolvedKeys("clear-all", listAllKeys());
+    }, [active, api, clearResolvedKeys, listAllKeys, namespace]);
 
     const clearMatching = useCallback(
         (predicate: (key: string) => boolean) => {
@@ -131,10 +149,17 @@ export function useMnemonicRecoveryFromApi(
             }
             return clearResolvedKeys(
                 "clear-matching",
-                api.keys().filter((key) => predicate(key)),
+                listAllKeys().filter((key) => predicate(key)),
             );
         },
-        [active, api, clearResolvedKeys, namespace],
+        [active, api, clearResolvedKeys, listAllKeys, namespace],
+    );
+
+    const unpersistedKeys = useCallback(() => (active ? api.unpersistedKeys() : []), [active, api]);
+
+    const flush = useCallback(
+        (keys?: readonly string[]) => (active ? api.flush(keys) : emptyFlushResult()),
+        [active, api],
     );
 
     return useMemo(
@@ -145,7 +170,9 @@ export function useMnemonicRecoveryFromApi(
             clearAll,
             clearKeys,
             clearMatching,
+            unpersistedKeys,
+            flush,
         }),
-        [namespace, active, api.canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching],
+        [namespace, active, api.canEnumerateKeys, listKeys, clearAll, clearKeys, clearMatching, unpersistedKeys, flush],
     );
 }

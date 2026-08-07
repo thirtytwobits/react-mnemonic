@@ -90,6 +90,7 @@ Read these pages in order when context is tight:
 - `set(next)` persists a new value for the key.
 - `reset()` persists `defaultValue` again.
 - `remove()` deletes the key entirely, so the next read falls back to `defaultValue`.
+- `set(...)` never throws when storage rejects the write. Use `useMnemonicRecovery().unpersistedKeys()` to detect dropped writes and `flush()` to retry them once space frees up.
 - Use `set(null)` when "cleared" is a durable state that must survive reload.
 - Do not persist access tokens, refresh tokens, raw session IDs, or other auth credentials as durable UI state.
 - Auth-scoped durable state should use a user-aware namespace and be cleared on logout or expiry.
@@ -212,7 +213,14 @@ Writes follow this order:
 4. Validate the value against the target schema when schema-managed.
 5. Encode the versioned envelope.
 6. Write the raw string through the provider cache and storage layer.
-7. Notify subscribers for the key.
+7. If the storage backend rejected the write, queue the key as unpersisted. Otherwise clear any entry queued for it.
+8. Notify subscribers for the key.
+
+The cache is updated whether or not step 6 reached storage, so a rejected write
+is still what components see. Rejection is reported through
+`useMnemonicRecovery().unpersistedKeys()` and retried through `flush(...)`. A
+queued entry clears when the key is written successfully, when a flush persists
+it, or when an external change reloads that key from storage.
 
 ## Storage Adapter Boundaries
 
@@ -1217,6 +1225,25 @@ Prefer:
 - clearing the authenticated namespace before swapping auth state
 - or mounting a temporary recovery boundary for the last authenticated namespace
 - keeping `reconcile(...)` as a read-time backstop, not the only cleanup mechanism
+
+## Treating A Returned `set(...)` As Proof The Value Is Saved
+
+`set(...)` updates the in-memory cache and notifies subscribers whether or not
+the storage backend accepted the write. A full quota, a blocked origin, or a
+browser with no usable storage all produce a normal-looking `set(...)` and a
+component that shows the new value while storage still holds the old one.
+
+Wrong:
+
+- clearing a "you have unsaved changes" flag as soon as `set(...)` returns
+- reporting "saved" in the UI on the strength of the re-render alone
+- assuming a dropped write will be retried later on its own
+
+Prefer:
+
+- reading `useMnemonicRecovery().unpersistedKeys()` after writes that must be durable
+- calling `flush(...)` once the app or the user has freed space
+- keeping the unsaved-changes indicator until the key is no longer reported as unpersisted
 
 ## Treating The Provider As Optional
 
