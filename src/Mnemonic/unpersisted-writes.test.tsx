@@ -446,6 +446,80 @@ describe("unpersisted writes and external changes", () => {
         expect(storage.store.get("ns.unsubscribed")).toBe("mine");
         expect(store.getRawSnapshot("unsubscribed")).toBe("mine");
     });
+
+    it("keeps a queued write when the reload cannot read the key back", () => {
+        const storage = createQuotaStorage();
+        let notify: ((changedKeys?: string[]) => void) | undefined;
+        storage.onExternalChange = (callback) => {
+            notify = callback;
+            return () => {
+                notify = undefined;
+            };
+        };
+        const readStore = storage.getItem;
+        let readsThrow = false;
+        storage.getItem = (key: string) => {
+            if (readsThrow) throw new DOMException("read blocked", "SecurityError");
+            return readStore(key);
+        };
+
+        const store = renderStore(storage);
+        store.subscribeRaw("k", () => {});
+
+        storage.full = true;
+        store.setRaw("k", "mine");
+        expect(store.unpersistedKeys()).toEqual(["k"]);
+
+        // The backend refuses the read, which reports the same null as an
+        // absent key. The reload still drops the key to a null snapshot, but
+        // nothing has been *observed* to supersede the queued write, so it must
+        // survive rather than be discarded on the strength of an error.
+        readsThrow = true;
+        act(() => {
+            notify?.(["ns.k"]);
+        });
+
+        expect(store.unpersistedKeys()).toEqual(["k"]);
+
+        // Still recoverable once the backend comes back, which re-seats the
+        // cache the failed reload had emptied.
+        readsThrow = false;
+        storage.full = false;
+        expect(store.flush()).toEqual({ persisted: ["k"], failed: [] });
+        expect(storage.store.get("ns.k")).toBe("mine");
+        expect(store.getRawSnapshot("k")).toBe("mine");
+    });
+
+    it("keeps a queued write when the reload's read breaks the synchronous contract", () => {
+        const storage = createQuotaStorage();
+        let notify: ((changedKeys?: string[]) => void) | undefined;
+        storage.onExternalChange = (callback) => {
+            notify = callback;
+            return () => {
+                notify = undefined;
+            };
+        };
+        const readStore = storage.getItem;
+        let readsAsync = false;
+        storage.getItem = (key: string) =>
+            readsAsync ? (Promise.resolve(null) as unknown as string | null) : readStore(key);
+
+        const store = renderStore(storage);
+        store.subscribeRaw("k", () => {});
+
+        storage.full = true;
+        store.setRaw("k", "mine");
+        expect(store.unpersistedKeys()).toEqual(["k"]);
+
+        // A getItem that returns a thenable is a contract violation, not an
+        // answer about what storage holds, so the queued write stands.
+        readsAsync = true;
+        act(() => {
+            notify?.(["ns.k"]);
+        });
+
+        expect(store.unpersistedKeys()).toEqual(["k"]);
+    });
 });
 
 // ---------------------------------------------------------------------------

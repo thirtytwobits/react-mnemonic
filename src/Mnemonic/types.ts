@@ -1056,7 +1056,11 @@ export type Mnemonic = {
      * the key from storage. The queue holds one entry per distinct key, not per
      * write.
      *
-     * @returns Unprefixed keys in the order their mutations were queued
+     * @returns Unprefixed keys in the order they entered the queue. Because
+     *   the queue holds one entry per key, a key that is already queued keeps
+     *   its original position when a later mutation to it is also rejected —
+     *   only its pending value is replaced. Treat this as first-failure order,
+     *   not most-recently-written order.
      */
     unpersistedKeys: () => string[];
 
@@ -1211,7 +1215,9 @@ export interface MnemonicRecoveryHook {
      *
      * Unlike `listKeys()`, this does not require an enumerable backend.
      *
-     * @returns Unprefixed keys in the order their writes were queued
+     * @returns Unprefixed keys in the order they entered the queue. A key that
+     *   is already queued keeps its position when a later write to it also
+     *   fails, so this is first-failure order, not last-written order.
      */
     unpersistedKeys: () => string[];
 

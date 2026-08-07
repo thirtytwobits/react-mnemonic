@@ -331,24 +331,36 @@ function decodeDevToolsValue(raw: string): unknown {
     }
 }
 
+/**
+ * Outcome of a single raw storage read.
+ *
+ * A read that failed and a key that is genuinely absent both yield a `null`
+ * value, so callers that must tell those apart — anything deciding whether
+ * storage has authoritatively spoken for a key — read `ok` rather than
+ * inferring from the value.
+ */
+type StorageReadResult = { ok: true; raw: string | null } | { ok: false; raw: null };
+
+const STORAGE_READ_FAILED: StorageReadResult = { ok: false, raw: null };
+
 function readStorageRaw(
     storage: StorageLike | undefined,
     storageKey: string,
     callbacks: StorageAccessCallbacks,
-): string | null {
-    if (!storage) return null;
+): StorageReadResult {
+    if (!storage) return STORAGE_READ_FAILED;
 
     try {
         const raw = storage.getItem(storageKey);
         if (isPromiseLike(raw)) {
             callbacks.onAsyncViolation("getItem", raw);
-            return null;
+            return STORAGE_READ_FAILED;
         }
         callbacks.onAccessSuccess();
-        return raw;
+        return { ok: true, raw };
     } catch (error) {
         callbacks.onAccessError(error);
-        return null;
+        return STORAGE_READ_FAILED;
     }
 }
 
@@ -398,14 +410,22 @@ function syncCacheEntryFromStorage({
     onCacheSyncedFromStorage: (key: string) => void;
 }): boolean {
     const fresh = readStorageRaw(storage, storageKey, callbacks);
-    // Storage just won this key back, so any write we were still holding for
-    // it is superseded rather than pending.
-    onCacheSyncedFromStorage(key);
+    if (fresh.ok) {
+        // Storage just won this key back, so any write we were still holding
+        // for it is superseded rather than pending.
+        //
+        // Only a read that actually succeeded can supersede a queued write. A
+        // failed read reports the same null as an absent key, so forgetting the
+        // write here would discard it on the strength of an error and leave
+        // flush() with nothing to retry. The unreadable case keeps its queue
+        // entry and reaches storage on the next flush.
+        onCacheSyncedFromStorage(key);
+    }
     const cached = cache.get(key) ?? null;
-    if (fresh === cached) {
+    if (fresh.raw === cached) {
         return false;
     }
-    cache.set(key, fresh);
+    cache.set(key, fresh.raw);
     emit(key);
     return true;
 }
@@ -958,7 +978,10 @@ export function MnemonicProvider({
                 cache.set(key, null);
                 return null;
             }
-            const raw = readStorageRaw(st, fullKey(key), storageAccessCallbacks);
+            // A read that fails caches null, same as an absent key: the caller
+            // gets defaultValue either way, and the access callbacks have
+            // already reported the failure.
+            const { raw } = readStorageRaw(st, fullKey(key), storageAccessCallbacks);
             cache.set(key, raw);
             return raw;
         };
@@ -1097,7 +1120,9 @@ export function MnemonicProvider({
         /**
          * Lists keys whose cached value is not known to be in storage.
          *
-         * @returns Unprefixed keys in the order their mutations were queued
+         * @returns Unprefixed keys in the order they entered the queue. A key
+         *   already queued keeps its position when a later mutation to it also
+         *   fails, so this is not the order values were last written.
          */
         const unpersistedKeys = (): string[] => Array.from(pendingWrites.keys());
 
