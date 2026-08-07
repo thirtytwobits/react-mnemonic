@@ -1,0 +1,56 @@
+version: 2
+
+updates:
+    # The published library, the docs site, and the consumer fixtures are four
+    # separate npm manifests. Security alerts already covered them without any
+    # config; version updates did not, which is how transitive dependencies in
+    # website/ and fixtures/ drifted far enough to accumulate a backlog.
+    - package-ecosystem: npm
+      directories:
+          - /
+          - /website
+          - /fixtures/consumers/react-ssr
+          - /fixtures/consumers/vite-react
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 5
+      groups:
+          # Routine upkeep arrives as one reviewable PR rather than dozens.
+          # Majors are deliberately left out of the group so each one gets its
+          # own PR and its own decision.
+          npm-minor-and-patch:
+              patterns:
+                  - "*"
+              update-types:
+                  - minor
+                  - patch
+      ignore:
+          # react and react-dom are held at the oldest supported major on
+          # purpose: peerDependencies declare ">=18", and the fixtures exist to
+          # prove that floor still builds and hydrates. Moving them is a
+          # support-policy change, not dependency upkeep, so it should not
+          # arrive as an automated PR. CI already exercises newer React through
+          # the pack-install matrix.
+          - dependency-name: react
+            update-types:
+                - version-update:semver-major
+          - dependency-name: react-dom
+            update-types:
+                - version-update:semver-major
+          - dependency-name: "@types/react"
+            update-types:
+                - version-update:semver-major
+          - dependency-name: "@types/react-dom"
+            update-types:
+                - version-update:semver-major
+
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+          day: monday
+      groups:
+          github-actions:
+              patterns:
+                  - "*"
