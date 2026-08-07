@@ -259,19 +259,70 @@ function resolveTargetVersion(currentVersion, target, preid) {
     }
 }
 
-function updateChangelog(version) {
-    const changelog = readText(changelogPath);
-    const headingPattern = /^## \[(?<current>[^\]]+)\] - Unreleased$/m;
-    const match = changelog.match(headingPattern);
-    if (!match?.groups?.current) {
-        fail("Unable to locate the top unreleased heading in CHANGELOG.md");
+function releaseDateStamp() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Moves the accumulated `[Unreleased]` notes under a dated heading for this
+ * version, leaving an empty `[Unreleased]` behind for the next cycle.
+ *
+ * This used to rename the top heading in place, which meant every tagged
+ * release shipped a CHANGELOG that still said "Unreleased" and no release ever
+ * got a section of its own. The empty-notes check below is the other half of
+ * that fix: releases 1.2.0 through 1.5.0 each shipped without a single new
+ * entry, and nothing objected.
+ */
+const unreleasedCompareLinkPattern =
+    /^\[unreleased\]:\s*(?<base>\S+\/compare\/)(?<previousTag>\S+?)\.\.\.HEAD[ \t]*$/im;
+
+/**
+ * Repoints the `[unreleased]` compare link at the new tag and adds the link
+ * definition the new heading needs.
+ *
+ * Without this the promoted `## [1.6.0]` heading would have no matching
+ * reference definition, so it would render as literal bracketed text rather
+ * than a link, and `[unreleased]` would keep comparing against the tag before
+ * last. The previous tag is read out of the existing link rather than derived
+ * from a version string, because the two have not always matched in this
+ * repository — `v1.2.1-beta1` tagged version `1.2.1-beta1.0`.
+ */
+function updateChangelogLinks(changelog, version) {
+    const match = unreleasedCompareLinkPattern.exec(changelog);
+    if (!match?.groups) {
+        fail("Unable to locate the '[unreleased]: <url>/compare/<tag>...HEAD' link definition in CHANGELOG.md");
     }
 
-    const nextChangelog = changelog.replace(headingPattern, `## [${version}] - Unreleased`);
-    if (nextChangelog === changelog) {
-        fail("Unable to update CHANGELOG.md heading");
+    const { base, previousTag } = match.groups;
+    const tag = `v${version}`;
+    return changelog.replace(
+        unreleasedCompareLinkPattern,
+        `[unreleased]: ${base}${tag}...HEAD\n[${version}]: ${base}${previousTag}...${tag}`,
+    );
+}
+
+function updateChangelog(version) {
+    const changelog = readText(changelogPath);
+    const unreleasedPattern = /^## \[Unreleased\]\s*$/m;
+    const match = unreleasedPattern.exec(changelog);
+    if (!match) {
+        fail("Unable to locate the '## [Unreleased]' heading in CHANGELOG.md");
     }
-    writeText(changelogPath, nextChangelog);
+
+    const afterHeading = match.index + match[0].length;
+    const remainder = changelog.slice(afterHeading);
+    const nextHeadingOffset = remainder.search(/^## \[/m);
+    const notes = (nextHeadingOffset === -1 ? remainder : remainder.slice(0, nextHeadingOffset)).trim();
+
+    if (notes.length === 0) {
+        fail(
+            `CHANGELOG.md has no entries under '## [Unreleased]'. Describe what ${version} changes before releasing it.`,
+        );
+    }
+
+    const tail = nextHeadingOffset === -1 ? "" : remainder.slice(nextHeadingOffset);
+    const promoted = `${changelog.slice(0, afterHeading)}\n\n## [${version}] - ${releaseDateStamp()}\n\n${notes}\n\n${tail}`;
+    writeText(changelogPath, updateChangelogLinks(promoted, version));
 }
 
 function updateSecurity(version) {
