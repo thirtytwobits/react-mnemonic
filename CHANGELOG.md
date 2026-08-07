@@ -17,6 +17,7 @@ Versioning.
 - Immutable schema registry helper via `createSchemaRegistry`
 - Interactive documentation site and generated API reference
 - `unpersistedKeys()` and `flush(keys?)` on the `Mnemonic` store and on `useMnemonicRecovery()`, for detecting and re-attempting writes that never reached storage
+- `onStorageError` on `MnemonicProvider`, called when a mutation updates the cache but never reaches storage. The event carries the unprefixed `key`, the `operation`, a classified `reason` (`"quota"`, `"access"`, `"schema"`, `"codec"`, `"contract"`, `"unknown"`), the underlying `error`, and the approximate `bytes` that could not be written. Exported as `MnemonicStorageErrorEvent` and `MnemonicStorageErrorReason` ([#102](https://github.com/thirtytwobits/react-mnemonic/issues/102))
 
 ### Changed
 

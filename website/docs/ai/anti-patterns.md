@@ -220,6 +220,26 @@ Prefer:
 - reading `useMnemonicRecovery().unpersistedKeys()` after writes that must be durable
 - calling `flush(...)` once the app or the user has freed space
 - keeping the unsaved-changes indicator until the key is no longer reported as unpersisted
+- passing `onStorageError` to the provider so a drop surfaces the moment it happens, instead of only when something thinks to poll
+
+## Leaving A Dropped Write To `console.error`
+
+Every way a write can be dropped logs to the console and nothing else. Users do
+not have a console open, and in an Electron or Tauri shell nobody sees it at
+all. Treating the log as the error path means persistence failures are silent
+in production.
+
+Wrong:
+
+- relying on the `[Mnemonic]` console messages as the failure signal
+- wrapping `StorageLike` to catch backend throws and calling that complete coverage
+- assuming schema and codec failures reach a custom backend where a wrapper could see them
+
+Prefer:
+
+- passing `onStorageError` to `MnemonicProvider` and routing it to real UI or telemetry
+- branching on `event.reason` — `"quota"` is actionable by the user, `"contract"` is a bug in the adapter
+- debouncing inside the handler, since it fires per dropped mutation and is not squelched like the console
 
 ## Treating The Provider As Optional
 

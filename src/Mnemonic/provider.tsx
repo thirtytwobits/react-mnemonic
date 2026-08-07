@@ -15,10 +15,12 @@ import { createContext, useContext, useMemo, useEffect, useRef, ReactNode } from
 import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
 import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
+import { registerStorageErrorReporter, reportStorageError } from "./storage-error";
 import type {
     Mnemonic,
     MnemonicFlushResult,
     MnemonicProviderOptions,
+    MnemonicStorageErrorReason,
     StorageLike,
     Listener,
     Unsubscribe,
@@ -158,6 +160,52 @@ type StorageAccessCallbacks = {
     onAccessSuccess: () => void;
     onAsyncViolation: (method: "getItem" | "setItem" | "removeItem", thenable: PromiseLike<unknown>) => void;
 };
+
+/**
+ * Why a single storage mutation did not land, paired with whatever was thrown.
+ *
+ * `error` is `undefined` for failures with nothing to throw: no backend at all,
+ * or writes disabled after a synchronous-contract violation.
+ */
+type PersistFailure = {
+    reason: MnemonicStorageErrorReason;
+    error: unknown;
+};
+
+/**
+ * Outcome of applying the storage half of a mutation.
+ *
+ * Modelled as a discriminated union rather than a boolean so the reason a write
+ * was dropped survives the trip back to the caller that has to report it.
+ */
+type PersistResult = { landed: true } | { landed: false; failure: PersistFailure };
+
+const PERSIST_LANDED: PersistResult = { landed: true };
+
+/**
+ * Distinguishes a full backend from one that refused for another reason.
+ *
+ * Anything that is not a `QuotaExceededError` — including non-`DOMException`
+ * throws from custom backends — is reported as an access failure, which is what
+ * it looks like from the caller's side: storage would not take the write.
+ */
+function classifyStorageThrow(error: unknown): MnemonicStorageErrorReason {
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+        return "quota";
+    }
+    return "access";
+}
+
+/**
+ * Approximate stored size of a raw value, in bytes.
+ *
+ * Counted as UTF-16 code units times two, matching how browsers account
+ * `localStorage` quota. Backends that store UTF-8 will use a different amount;
+ * this is a diagnostic aid for quota reporting, not an exact measure.
+ */
+function approximateStoredBytes(raw: string): number {
+    return raw.length * 2;
+}
 
 function detectEnumerableStorage(storage: StorageLike | undefined): boolean {
     if (!storage) return false;
@@ -811,6 +859,7 @@ export function MnemonicProvider({
     schemaRegistry,
     ssr,
     bootstrap,
+    onStorageError,
 }: MnemonicProviderProps) {
     if (schemaMode === "strict" && !schemaRegistry) {
         throw new Error("MnemonicProvider strict mode requires schemaRegistry");
@@ -822,6 +871,19 @@ export function MnemonicProvider({
     const prefix = `${namespace}.`;
     const parentStore = useMnemonicOptional();
     const bootstrapRawSeed = useRef(bootstrap?.raw).current;
+
+    /**
+     * Latest `onStorageError`, read through a ref so the handler can be an
+     * inline arrow without recreating the store on every render.
+     *
+     * Seeded with the first value rather than left empty, so a write that fails
+     * during the initial commit — a child effect writing before this provider's
+     * own effect runs — still reaches the handler.
+     */
+    const onStorageErrorRef = useRef(onStorageError);
+    useEffect(() => {
+        onStorageErrorRef.current = onStorageError;
+    }, [onStorageError]);
 
     useEffect(() => {
         if (isProductionRuntime()) return;
@@ -901,6 +963,34 @@ export function MnemonicProvider({
 
         /** Whether the storage backend has violated the synchronous StorageLike contract. */
         let asyncContractViolationDetected = false;
+
+        /**
+         * Reports a dropped mutation to the provider's `onStorageError`.
+         *
+         * Called after the cache, the pending-write queue, and subscribers have
+         * all been updated, so a handler that reads the store — or writes to it
+         * — sees a consistent snapshot rather than a half-applied mutation.
+         * Throw containment and recursion guarding live in `reportStorageError`
+         * so hook-side schema and codec reports get the same treatment.
+         *
+         * The early return keeps the no-handler case free: without a handler,
+         * every write in a storage-less environment would otherwise allocate an
+         * event nobody reads.
+         *
+         * `bytes` is attached only when there was an encoded value to size.
+         * Removals carry none, and schema or codec failures never got far
+         * enough to produce one.
+         */
+        const emitStorageError = (key: string, raw: string | null, failure: PersistFailure): void => {
+            if (!onStorageErrorRef.current) return;
+            reportStorageError(store, {
+                key,
+                operation: raw === null ? "remove" : "set",
+                reason: failure.reason,
+                error: failure.error,
+                ...(raw === null ? {} : { bytes: approximateStoredBytes(raw) }),
+            });
+        };
         const storageAccessCallbacks: StorageAccessCallbacks = {
             onAccessError: (err) => logAccessError(err),
             onAccessSuccess: () => {
@@ -1032,30 +1122,40 @@ export function MnemonicProvider({
          *
          * @param key - Unprefixed key being mutated
          * @param raw - Raw value to store, or null to remove the key
-         * @returns True when storage holds the intended value afterwards, false
-         *   when the value stayed in memory only
+         * @returns `landed` when storage holds the intended value afterwards,
+         *   otherwise the classified reason the value stayed in memory only
          */
-        const persistToStorage = (key: string, raw: string | null): boolean => {
-            if (!st || asyncContractViolationDetected) return false;
+        const persistToStorage = (key: string, raw: string | null): PersistResult => {
+            // No backend at all is an access failure with nothing thrown: the
+            // write is just as dropped as one a backend refused.
+            if (!st) return { landed: false, failure: { reason: "access", error: undefined } };
+            // Writes stay disabled for the rest of this provider's life once a
+            // backend has broken the synchronous contract.
+            if (asyncContractViolationDetected) {
+                return { landed: false, failure: { reason: "contract", error: undefined } };
+            }
 
             const isRemoval = raw === null;
             try {
                 const result = isRemoval ? st.removeItem(fullKey(key)) : st.setItem(fullKey(key), raw);
                 if (isPromiseLike(result)) {
                     handleAsyncStorageContractViolation(isRemoval ? "removeItem" : "setItem", result);
-                    return false;
+                    return { landed: false, failure: { reason: "contract", error: undefined } };
                 }
                 if (!isRemoval) {
                     quotaErrorLogged = false;
                 }
                 accessErrorLogged = false;
-                return true;
+                return PERSIST_LANDED;
             } catch (err) {
                 if (!isRemoval) {
                     logQuotaError(key, err);
                 }
                 logAccessError(err);
-                return storageAlreadyHolds(key, raw);
+                // A refused write that storage already satisfies is durable
+                // after all, so it is neither queued nor reported as dropped.
+                if (storageAlreadyHolds(key, raw)) return PERSIST_LANDED;
+                return { landed: false, failure: { reason: classifyStorageThrow(err), error: err } };
             }
         };
 
@@ -1096,9 +1196,13 @@ export function MnemonicProvider({
          */
         const writeRaw = (key: string, raw: string) => {
             cache.set(key, raw);
-            recordPersistence(key, raw, persistToStorage(key, raw));
+            const result = persistToStorage(key, raw);
+            recordPersistence(key, raw, result.landed);
             emit(key);
             bumpDevToolsVersion(devToolsRoot, namespace, `set:${key}`);
+            // Reported last so a handler that reads or writes the store sees a
+            // fully applied mutation.
+            if (!result.landed) emitStorageError(key, raw, result.failure);
         };
 
         /**
@@ -1112,9 +1216,11 @@ export function MnemonicProvider({
          */
         const removeRaw = (key: string) => {
             cache.set(key, null);
-            recordPersistence(key, null, persistToStorage(key, null));
+            const result = persistToStorage(key, null);
+            recordPersistence(key, null, result.landed);
             emit(key);
             bumpDevToolsVersion(devToolsRoot, namespace, `remove:${key}`);
+            if (!result.landed) emitStorageError(key, null, result.failure);
         };
 
         /**
@@ -1142,8 +1248,14 @@ export function MnemonicProvider({
             for (const key of targets) {
                 if (!pendingWrites.has(key)) continue;
                 const raw = pendingWrites.get(key) ?? null;
-                if (!persistToStorage(key, raw)) {
+                const result = persistToStorage(key, raw);
+                if (!result.landed) {
                     failed.push(key);
+                    // A retry that fails is another dropped write. The caller
+                    // also sees it in `failed`, but a provider-level handler
+                    // should not have to reconcile two channels to learn that
+                    // a key is still not saved.
+                    emitStorageError(key, raw, result.failure);
                     continue;
                 }
 
@@ -1279,6 +1391,12 @@ export function MnemonicProvider({
             crossTabSyncMode,
             ...(schemaRegistry ? { schemaRegistry } : {}),
         };
+
+        // Registered unconditionally rather than only when a handler exists:
+        // `onStorageError` can arrive on a later render, and the store outlives
+        // any single value of that prop. The reporter reads the ref each time,
+        // so a handler added after mount still receives reports.
+        registerStorageErrorReporter(store, (event) => onStorageErrorRef.current?.(event));
 
         /**
          * DevTools integration.
