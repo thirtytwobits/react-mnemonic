@@ -273,6 +273,34 @@ function releaseDateStamp() {
  * that fix: releases 1.2.0 through 1.5.0 each shipped without a single new
  * entry, and nothing objected.
  */
+const unreleasedCompareLinkPattern =
+    /^\[unreleased\]:\s*(?<base>\S+\/compare\/)(?<previousTag>\S+?)\.\.\.HEAD[ \t]*$/im;
+
+/**
+ * Repoints the `[unreleased]` compare link at the new tag and adds the link
+ * definition the new heading needs.
+ *
+ * Without this the promoted `## [1.6.0]` heading would have no matching
+ * reference definition, so it would render as literal bracketed text rather
+ * than a link, and `[unreleased]` would keep comparing against the tag before
+ * last. The previous tag is read out of the existing link rather than derived
+ * from a version string, because the two have not always matched in this
+ * repository — `v1.2.1-beta1` tagged version `1.2.1-beta1.0`.
+ */
+function updateChangelogLinks(changelog, version) {
+    const match = unreleasedCompareLinkPattern.exec(changelog);
+    if (!match?.groups) {
+        fail("Unable to locate the '[unreleased]: <url>/compare/<tag>...HEAD' link definition in CHANGELOG.md");
+    }
+
+    const { base, previousTag } = match.groups;
+    const tag = `v${version}`;
+    return changelog.replace(
+        unreleasedCompareLinkPattern,
+        `[unreleased]: ${base}${tag}...HEAD\n[${version}]: ${base}${previousTag}...${tag}`,
+    );
+}
+
 function updateChangelog(version) {
     const changelog = readText(changelogPath);
     const unreleasedPattern = /^## \[Unreleased\]\s*$/m;
@@ -293,10 +321,8 @@ function updateChangelog(version) {
     }
 
     const tail = nextHeadingOffset === -1 ? "" : remainder.slice(nextHeadingOffset);
-    writeText(
-        changelogPath,
-        `${changelog.slice(0, afterHeading)}\n\n## [${version}] - ${releaseDateStamp()}\n\n${notes}\n\n${tail}`,
-    );
+    const promoted = `${changelog.slice(0, afterHeading)}\n\n## [${version}] - ${releaseDateStamp()}\n\n${notes}\n\n${tail}`;
+    writeText(changelogPath, updateChangelogLinks(promoted, version));
 }
 
 function updateSecurity(version) {

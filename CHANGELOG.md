@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 Entries under `[Unreleased]` describe work merged since the last tag. Each
 release moves that section under a dated heading of its own.
 
+Headings are the released package versions, as published to npm. Two early
+prerelease tags do not match their version exactly — `v1.1.0-beta.0` tagged
+`1.1.0-beta0`, and `v1.2.1-beta1` tagged `1.2.1-beta1.0` — so the compare links
+below point at the tag while the heading names the version.
+
 ## [Unreleased]
 
 ### Added
