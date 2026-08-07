@@ -125,6 +125,38 @@ function warnOnce(api: object, id: string, message: string): void {
     console.warn(message);
 }
 
+/**
+ * Classifies, logs, and reports a write that failed before reaching storage.
+ *
+ * `set` and `reset` differ only in where the value came from; once encoding has
+ * thrown they fail identically, so they share one policy rather than two copies
+ * that can drift. A reset reports as `"set"` because that is what it is: a write
+ * of `defaultValue`.
+ *
+ * These failures never reach the backend, so the provider cannot classify them.
+ * Reporting here is what lets `onStorageError` cover every way a write can be
+ * dropped rather than only the storage half. Nothing is queued for retry — the
+ * value itself is the problem, so a later `flush()` would fail identically.
+ *
+ * @param api - Store the write was destined for, used to route the report
+ * @param key - Unprefixed key being written
+ * @param err - Whatever encoding threw
+ */
+function reportPreStorageWriteFailure(api: Mnemonic, key: string, err: unknown): void {
+    if (err instanceof SchemaError) {
+        console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
+        reportStorageError(api, { key, operation: "set", reason: "schema", error: err });
+        return;
+    }
+    if (err instanceof CodecError) {
+        console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
+        reportStorageError(api, { key, operation: "set", reason: "codec", error: err });
+        return;
+    }
+    console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
+    reportStorageError(api, { key, operation: "set", reason: "unknown", error: err });
+}
+
 function stableDiagnosticValue(value: unknown): string {
     if (typeof value === "function") {
         const source = Function.prototype.toString.call(value).split(/\s+/).join(" ").trim();
@@ -598,21 +630,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 const encoded = encodeForWrite(nextVal);
                 api.setRaw(key, encoded);
             } catch (err) {
-                // These never reach storage, so the provider cannot classify
-                // them. Report from here so `onStorageError` covers the whole
-                // set of ways a write can be dropped, not just the storage half.
-                if (err instanceof SchemaError) {
-                    console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
-                    reportStorageError(api, { key, operation: "set", reason: "schema", error: err });
-                    return;
-                }
-                if (err instanceof CodecError) {
-                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
-                    reportStorageError(api, { key, operation: "set", reason: "codec", error: err });
-                    return;
-                }
-                console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
-                reportStorageError(api, { key, operation: "set", reason: "unknown", error: err });
+                reportPreStorageWriteFailure(api, key, err);
             }
         };
     }, [active, api, key, decodeForRead, encodeForWrite]);
@@ -627,23 +645,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 const encoded = encodeForWrite(v);
                 api.setRaw(key, encoded);
             } catch (err) {
-                // A reset is a write of defaultValue, so it reports as "set".
-                if (err instanceof SchemaError) {
-                    console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
-                    reportStorageError(api, { key, operation: "set", reason: "schema", error: err });
-                    return;
-                }
-                if (err instanceof CodecError) {
-                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
-                    reportStorageError(api, { key, operation: "set", reason: "codec", error: err });
-                    return;
-                }
-                // Logged as well as reported, so a reset that fails for an
-                // unclassified reason stays diagnosable without a handler —
-                // matching set() rather than failing silently.
-                console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
-                reportStorageError(api, { key, operation: "set", reason: "unknown", error: err });
-                return;
+                reportPreStorageWriteFailure(api, key, err);
             }
         };
     }, [active, api, key, getFallback, encodeForWrite]);
