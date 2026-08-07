@@ -29,6 +29,8 @@ export type {
     Listener,
     Mnemonic,
     MnemonicFlushResult,
+    MnemonicStorageErrorEvent,
+    MnemonicStorageErrorReason,
     MnemonicKeyState,
     MnemonicRecoveryAction,
     MnemonicRecoveryEvent,

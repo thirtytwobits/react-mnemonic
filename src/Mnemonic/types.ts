@@ -210,6 +210,74 @@ export interface MnemonicProviderOptions {
      * prop changes are ignored so rerenders do not recreate the internal store.
      */
     bootstrap?: MnemonicBootstrapSeed;
+
+    /**
+     * Called when a mutation did not reach storage.
+     *
+     * Without this, a dropped write produces only a `console.error`, which is
+     * invisible to the people using the application. This is the programmatic
+     * channel: it lets an app tell the user their changes are not being saved
+     * while they can still do something about it.
+     *
+     * Fires for every classified failure — quota, blocked access, schema
+     * rejection, encode failure, and synchronous-contract violations — whether
+     * the mutation came from `set()`, `reset()`, `remove()`, or a `flush()`
+     * retry.
+     *
+     * @remarks
+     * **Not every event is queued for retry.** The callback is strictly wider
+     * than {@link Mnemonic.unpersistedKeys}, and
+     * {@link MnemonicStorageErrorEvent.reason} says which kind you have:
+     *
+     * - `"quota"`, `"access"`, `"contract"` are storage-layer drops. The cache
+     *   holds the new value, the key is queued, and `flush()` can retry it.
+     *   For these the two channels agree exactly — this says a write was
+     *   dropped, `unpersistedKeys()` says it is still outstanding.
+     * - `"schema"`, `"codec"`, `"unknown"` are rejected before storage is
+     *   called. The cache is unchanged and nothing is queued, so these events
+     *   have no matching `unpersistedKeys()` entry and `flush()` will not
+     *   retry them. Do not promise the user a retry for these.
+     *
+     * **It reports drops, not throws.** A write the backend rejects that turns
+     * out to leave storage holding the intended value already — a cross-tab
+     * echo, a reset to the value on disk — is not reported at all, matching the
+     * fact that it is not queued either.
+     *
+     * **It is not squelched.** The matching console messages are logged once
+     * and then suppressed until the next success; this callback fires on every
+     * dropped mutation, so a caller can count failures or track them per key.
+     * Debounce in the handler if you are driving a notification from it.
+     *
+     * **Keep the handler cheap and side-effect-light.** It runs synchronously
+     * inside the mutation, after the cache is updated and subscribers are
+     * notified. Writing to the store from inside it is not recommended; a
+     * nested failure is dropped rather than reported, to avoid unbounded
+     * recursion. Throwing is contained — the mutation still completes — and is
+     * reported once per store.
+     *
+     * @example
+     * ```tsx
+     * <MnemonicProvider
+     *   namespace="app"
+     *   onStorageError={(event) => {
+     *     if (event.reason === "quota") {
+     *       toast.error("Out of space — your changes are not being saved.");
+     *     }
+     *     telemetry.record("mnemonic_write_dropped", {
+     *       key: event.key,
+     *       reason: event.reason,
+     *     });
+     *   }}
+     * >
+     *   <App />
+     * </MnemonicProvider>
+     * ```
+     *
+     * @see {@link MnemonicStorageErrorEvent} - Shape of the reported event
+     * @see {@link Mnemonic.unpersistedKeys} - Which keys are still outstanding
+     * @see {@link Mnemonic.flush} - Re-attempt the dropped writes
+     */
+    onStorageError?: (event: MnemonicStorageErrorEvent) => void;
 }
 
 /**
@@ -783,19 +851,23 @@ export interface SchemaRegistry {
  *   via `console.error` with the prefix `[Mnemonic] Storage access error`.
  *   Squelched until any storage operation succeeds, then the flag resets.
  *
- * - **All other error types** — Silently suppressed.
+ * - **All other error types** — Not logged.
  *
  * Custom `StorageLike` implementations are encouraged to throw `DOMException`
- * for storage access failures so the library can surface diagnostics. Throwing
- * non-`DOMException` errors is safe but results in silent suppression.
+ * for storage access failures so the library can surface console diagnostics.
+ * Throwing other error types is safe and never goes unreported: whatever is
+ * thrown reaches {@link MnemonicProviderOptions.onStorageError} as an `"access"`
+ * failure, and the key is queued for retry either way. Only the console message
+ * is `DOMException`-specific.
  *
  * In all error cases the library falls back to its in-memory cache, so
  * components continue to function when the storage backend is unavailable.
  * A mutation that the backend rejected is queued rather than forgotten: the key
  * is reported by {@link Mnemonic.unpersistedKeys} and can be re-attempted with
  * {@link Mnemonic.flush} once the backend is healthy again. Logging is squelched
- * per failure streak, so those queues — not the console — are the reliable
- * signal that a value is memory-only.
+ * per failure streak, so those queues and
+ * {@link MnemonicProviderOptions.onStorageError} — not the console — are the
+ * reliable signal that a value is memory-only.
  *
  * Promise-returning `getItem`, `setItem`, or `removeItem` implementations are
  * treated as an invalid contract at runtime. Mnemonic logs the misuse once and
@@ -911,6 +983,94 @@ export type Unsubscribe = () => void;
  * Used by the external store contract to notify React when state updates.
  */
 export type Listener = () => void;
+
+/**
+ * Why a mutation never reached the storage backend.
+ *
+ * - `"quota"` — The backend threw `QuotaExceededError`. Storage is full.
+ * - `"access"` — The backend threw for another reason (`SecurityError` from a
+ *   blocked origin, a disk error from a custom backend), or there is no usable
+ *   backend at all. `error` is `undefined` in the no-backend case, because
+ *   nothing was thrown.
+ * - `"schema"` — The value failed JSON Schema validation, so it was never
+ *   offered to the backend. `error` is a `SchemaError`.
+ * - `"codec"` — The value could not be encoded to a string. `error` is a
+ *   `CodecError`.
+ * - `"contract"` — The backend broke the synchronous `StorageLike` contract by
+ *   returning a thenable. Writes stay disabled for the rest of the provider's
+ *   life, so every later mutation reports this reason. `error` is `undefined`;
+ *   a contract violation is a broken backend, not a thrown error.
+ * - `"unknown"` — The write failed for a reason the library does not classify.
+ *   Rare; treat it the same as `"access"` for user-facing purposes.
+ *
+ * @see {@link MnemonicStorageErrorEvent} - Event carrying this reason
+ */
+export type MnemonicStorageErrorReason = "quota" | "access" | "schema" | "codec" | "contract" | "unknown";
+
+/**
+ * A mutation that did not reach storage.
+ *
+ * Delivered to {@link MnemonicProviderOptions.onStorageError}. Every field
+ * describes the mutation that was dropped, not the state of the store
+ * afterwards.
+ *
+ * @remarks
+ * What happened to the value depends on how far it got, which
+ * {@link MnemonicStorageErrorEvent.reason} tells you:
+ *
+ * - **Storage-layer drops** (`"quota"`, `"access"`, `"contract"`) — the value
+ *   was valid and the cache now serves it, but the backend would not take it.
+ *   The key is queued, so {@link Mnemonic.unpersistedKeys} reports it and
+ *   {@link Mnemonic.flush} can retry it. This is worth telling the user about,
+ *   and it is recoverable.
+ * - **Pre-storage failures** (`"schema"`, `"codec"`, `"unknown"`) — the value
+ *   was rejected before storage was ever called. The cache is unchanged, so
+ *   the previous value still stands; nothing is queued, and there is nothing
+ *   for `flush()` to retry. Retrying would fail identically, because the value
+ *   itself is the problem. These are application bugs.
+ *
+ * @see {@link MnemonicProviderOptions.onStorageError} - Where this is delivered
+ * @see {@link Mnemonic.unpersistedKeys} - What is currently outstanding
+ */
+export interface MnemonicStorageErrorEvent {
+    /**
+     * Unprefixed key whose mutation was dropped.
+     *
+     * This is the key as written in application code, without the namespace
+     * prefix the storage backend sees.
+     */
+    key: string;
+
+    /**
+     * Which kind of mutation was dropped.
+     *
+     * `"remove"` covers `remove()` and any internal removal; everything else,
+     * including `reset()`, reports `"set"`.
+     */
+    operation: "set" | "remove";
+
+    /** Why the mutation did not reach storage. */
+    reason: MnemonicStorageErrorReason;
+
+    /**
+     * The underlying error, when there was one.
+     *
+     * `undefined` when the failure had nothing to throw: no storage backend is
+     * available, or writes are disabled after a `"contract"` violation.
+     */
+    error: unknown;
+
+    /**
+     * Approximate size of the value that could not be written.
+     *
+     * Measured as UTF-16 code units times two, which is how browsers account
+     * `localStorage` usage. Absent for removals and for `"schema"` / `"codec"`
+     * failures, where no encoded value was ever produced. Custom backends that
+     * store UTF-8 will see a different real size; treat this as a diagnostic
+     * estimate rather than an exact byte count.
+     */
+    bytes?: number;
+}
 
 /**
  * Outcome of a flush of previously unpersisted writes.

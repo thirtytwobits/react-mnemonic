@@ -12,6 +12,7 @@
 import { CodecError, JSONCodec } from "./codecs";
 import { inferJsonSchema } from "./json-schema";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
+import { reportStorageError } from "./storage-error";
 import {
     decodeStringPayload,
     encodePersistedValueForWrite,
@@ -203,15 +204,25 @@ export function createMnemonicOptionalBridge({
             try {
                 api.setRaw(key, encodeValueForWrite(key, nextValue, options, api.schemaMode, schemaRegistry));
             } catch (error) {
+                // Optional hooks reach storage through the provider's store, so
+                // their dropped writes belong on the same reporting channel as
+                // the required hooks'.
                 if (error instanceof SchemaError) {
                     console.error(`[Mnemonic] Schema error for key "${key}" (${error.code}):`, error.message);
+                    reportStorageError(api, { key, operation: "set", reason: "schema", error });
                     return;
                 }
                 if (error instanceof CodecError) {
                     console.error(`[Mnemonic] Codec error for key "${key}":`, error.message);
+                    reportStorageError(api, { key, operation: "set", reason: "codec", error });
                     return;
                 }
-                throw error;
+                // Rethrowing here escaped through `useMnemonicKeyOptional().set`,
+                // which does not catch, breaking the contract that a set never
+                // throws — and hiding the failure from `onStorageError`. Treat
+                // it the way the required hooks treat theirs.
+                console.error(`[Mnemonic] Failed to persist key "${key}":`, error);
+                reportStorageError(api, { key, operation: "set", reason: "unknown", error });
             }
         },
         removeValue: (key) => {

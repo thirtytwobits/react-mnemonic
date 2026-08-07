@@ -87,6 +87,10 @@ Write errors (from `set` or `reset`) are caught and logged to `console.error`.
 They don't throw to the calling component. If a schema validation fails on
 write, the value is **not persisted** — the previous stored value remains.
 
+The console is the default signal, not the only one: pass
+[`onStorageError`](#being-told-when-a-write-is-dropped) to the provider to
+receive these failures programmatically.
+
 ```tsx
 const { set } = useMnemonicKey("profile", {
     defaultValue: { name: "", email: "" },
@@ -155,6 +159,92 @@ write costs a map entry rather than a second copy of the payload.
 Freeing space does not retry anything on its own. If your app evicts its own
 data — or the user clears something — call `flush()` afterwards, or the pending
 values stay in memory until the page unloads.
+
+## Being told when a write is dropped
+
+`unpersistedKeys()` answers "is anything unsaved right now?", which means
+something has to think to ask. `onStorageError` is the push half: the provider
+calls it the moment a mutation is dropped, so the app can react without polling.
+
+```tsx
+<MnemonicProvider
+    namespace="app"
+    onStorageError={(event) => {
+        if (event.reason === "quota") {
+            toast.error("Out of space — your changes are not being saved.");
+        }
+        telemetry.record("mnemonic_write_dropped", {
+            key: event.key,
+            reason: event.reason,
+        });
+    }}
+>
+    <App />
+</MnemonicProvider>
+```
+
+The event describes the mutation that was dropped:
+
+| Field       | Meaning                                                                      |
+| ----------- | ---------------------------------------------------------------------------- |
+| `key`       | Unprefixed key, as written in application code                               |
+| `operation` | `"set"` or `"remove"`. `reset()` reports as `"set"`                          |
+| `reason`    | `"quota"`, `"access"`, `"schema"`, `"codec"`, `"contract"`, or `"unknown"`   |
+| `error`     | What was thrown, or `undefined` when nothing was                             |
+| `bytes`     | Approximate size of the value that could not be written; absent for removals |
+
+`reason` is worth branching on, because the reasons are not equally actionable:
+
+- **`"quota"`** — storage is full. The user can do something about this, so it
+  is the case worth surfacing in the UI.
+- **`"access"`** — the backend refused for another reason, such as a
+  `SecurityError` on a blocked origin, or there is no usable backend at all.
+  When there was no backend, `error` is `undefined`.
+- **`"schema"`** and **`"codec"`** — the value was rejected before storage was
+  ever called. These are application bugs, not environment problems.
+- **`"contract"`** — a `StorageLike` returned a Promise. Writes stay disabled
+  for the rest of the provider's life, so every later mutation reports this. It
+  means the adapter is broken; see
+  [Custom storage adapters](./custom-storage.md).
+- **`"unknown"`** — an unclassified failure. Treat it like `"access"`.
+
+### Not every event can be retried
+
+`onStorageError` is deliberately wider than `unpersistedKeys()`, and the two
+groups of reasons want different handling:
+
+| Reasons                             | Cache                            | Queued for `flush()` | What it means                    |
+| ----------------------------------- | -------------------------------- | -------------------- | -------------------------------- |
+| `"quota"`, `"access"`, `"contract"` | holds the new value              | yes                  | environment problem, recoverable |
+| `"schema"`, `"codec"`, `"unknown"`  | unchanged, previous value stands | no                   | application bug, not retryable   |
+
+A storage-layer drop is a write that was fine but could not land, so it is
+queued and `flush()` can put it through later. A pre-storage failure never
+became a write at all — the value was rejected before the backend was called, so
+there is nothing queued and nothing to retry, and retrying would fail
+identically because the value itself is the problem.
+
+The practical consequence: do not tell the user "we'll try again" on a
+`"schema"` or `"codec"` event, and do not expect those keys to appear in
+`unpersistedKeys()`.
+
+### Handler details
+
+- **It fires on every dropped mutation.** The matching console messages are
+  logged once and then squelched; this callback is not, so you can count
+  failures or track them per key. Debounce in the handler if you are driving a
+  toast from it.
+- **It only fires for writes that were actually dropped.** A rejected write that
+  storage turns out to already satisfy — a cross-tab echo, a `reset()` to the
+  value on disk — is not reported, exactly as it is not queued.
+- **It runs synchronously inside the mutation**, after the cache is updated and
+  subscribers are notified, so the handler sees a fully applied write. Throwing
+  is contained and logged once; writing to the store from inside it is not
+  recommended, and a nested failure is dropped rather than reported so it cannot
+  recurse.
+
+A `flush()` retry that fails reports here too, so a provider-level handler does
+not have to reconcile two channels to learn that a key is still not saved.
 
 ## Development diagnostics
 

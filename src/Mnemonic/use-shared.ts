@@ -10,6 +10,7 @@ import {
 } from "./persistence-shared";
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { getRuntimeNodeEnv } from "./runtime";
+import { reportStorageError } from "./storage-error";
 import type { Mnemonic, MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
 
 export type ReadResult<T, Extra extends object = {}> = {
@@ -122,6 +123,38 @@ function warnOnce(api: object, id: string, message: string): void {
     if (warnings.has(id)) return;
     warnings.add(id);
     console.warn(message);
+}
+
+/**
+ * Classifies, logs, and reports a write that failed before reaching storage.
+ *
+ * `set` and `reset` differ only in where the value came from; once encoding has
+ * thrown they fail identically, so they share one policy rather than two copies
+ * that can drift. A reset reports as `"set"` because that is what it is: a write
+ * of `defaultValue`.
+ *
+ * These failures never reach the backend, so the provider cannot classify them.
+ * Reporting here is what lets `onStorageError` cover every way a write can be
+ * dropped rather than only the storage half. Nothing is queued for retry — the
+ * value itself is the problem, so a later `flush()` would fail identically.
+ *
+ * @param api - Store the write was destined for, used to route the report
+ * @param key - Unprefixed key being written
+ * @param err - Whatever encoding threw
+ */
+function reportPreStorageWriteFailure(api: Mnemonic, key: string, err: unknown): void {
+    if (err instanceof SchemaError) {
+        console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
+        reportStorageError(api, { key, operation: "set", reason: "schema", error: err });
+        return;
+    }
+    if (err instanceof CodecError) {
+        console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
+        reportStorageError(api, { key, operation: "set", reason: "codec", error: err });
+        return;
+    }
+    console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
+    reportStorageError(api, { key, operation: "set", reason: "unknown", error: err });
 }
 
 function stableDiagnosticValue(value: unknown): string {
@@ -597,15 +630,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 const encoded = encodeForWrite(nextVal);
                 api.setRaw(key, encoded);
             } catch (err) {
-                if (err instanceof SchemaError) {
-                    console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
-                    return;
-                }
-                if (err instanceof CodecError) {
-                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
-                    return;
-                }
-                console.error(`[Mnemonic] Failed to persist key "${key}":`, err);
+                reportPreStorageWriteFailure(api, key, err);
             }
         };
     }, [active, api, key, decodeForRead, encodeForWrite]);
@@ -620,14 +645,7 @@ export function useMnemonicKeyState<T, Extra extends object>(
                 const encoded = encodeForWrite(v);
                 api.setRaw(key, encoded);
             } catch (err) {
-                if (err instanceof SchemaError) {
-                    console.error(`[Mnemonic] Schema error for key "${key}" (${err.code}):`, err.message);
-                    return;
-                }
-                if (err instanceof CodecError) {
-                    console.error(`[Mnemonic] Codec encode error for key "${key}":`, err.message);
-                }
-                return;
+                reportPreStorageWriteFailure(api, key, err);
             }
         };
     }, [active, api, key, getFallback, encodeForWrite]);

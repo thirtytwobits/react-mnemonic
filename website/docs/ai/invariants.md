@@ -67,12 +67,26 @@ Writes follow this order:
 6. Write the raw string through the provider cache and storage layer.
 7. If the storage backend rejected the write, queue the key as unpersisted. Otherwise clear any entry queued for it.
 8. Notify subscribers for the key.
+9. If the write was dropped, call `onStorageError` with the classified reason.
 
 The cache is updated whether or not step 6 reached storage, so a rejected write
 is still what components see. Rejection is reported through
 `useMnemonicRecovery().unpersistedKeys()` and retried through `flush(...)`. A
 queued entry clears when the key is written successfully, when a flush persists
 it, or when an external change reloads that key from storage.
+
+Step 9 runs last so the handler observes a fully applied mutation. For failures
+at step 6 it fires exactly when step 7 queued the key, so the two stay in step:
+`onStorageError` says a write was dropped, `unpersistedKeys()` says it is still
+outstanding, and `flush(...)` retries it.
+
+`onStorageError` is strictly wider than `unpersistedKeys()`. Failures that never
+reach step 6 — schema rejection at step 4, encode failure at step 5 — are
+reported through the same callback with reason `"schema"`, `"codec"`, or
+`"unknown"`, but the write never happened: the cache still holds the previous
+value, no key is queued, and `flush(...)` has nothing to retry. Treat the
+storage-layer reasons (`"quota"`, `"access"`, `"contract"`) as recoverable and
+the pre-storage reasons as application bugs.
 
 ## Storage Adapter Boundaries
 
