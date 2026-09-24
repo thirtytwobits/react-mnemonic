@@ -16,6 +16,13 @@ updates:
           day: monday
       open-pull-requests-limit: 5
       groups:
+          # vitest and its @vitest/* plugins pin each other's exact version, so
+          # a major bump of any one alone cannot pass npm ci. Keep them in one
+          # PR. Listed first so it takes precedence over the catch-all group.
+          vitest:
+              patterns:
+                  - vitest
+                  - "@vitest/*"
           # Routine upkeep arrives as one reviewable PR rather than dozens.
           # Majors are deliberately left out of the group so each one gets its
           # own PR and its own decision.
