@@ -239,9 +239,9 @@ export interface MnemonicProviderOptions {
      *   retry them. Do not promise the user a retry for these.
      *
      * **It reports drops, not throws.** A write the backend rejects that turns
-     * out to leave storage holding the intended value already — a cross-tab
-     * echo, a reset to the value on disk — is not reported at all, matching the
-     * fact that it is not queued either.
+     * out to leave storage holding the intended value already — a reset to the
+     * value on disk, for example — is not reported at all, matching the fact
+     * that it is not queued either.
      *
      * **It is not squelched.** The matching console messages are logged once
      * and then suppressed until the next success; this callback fires on every
@@ -1207,9 +1207,9 @@ export type Mnemonic = {
      * is the only way to tell a durable write from an in-memory one.
      *
      * A key is only queued when storage is observed to disagree with the
-     * cache. A rejected write of a value storage already holds — a cross-tab
-     * echo, or a reset to the value on disk — is not reported, so a durable key
-     * is never shown as unsaved.
+     * cache. A rejected write of a value storage already holds — a reset to
+     * the value on disk, for example — is not reported, so a durable key is
+     * never shown as unsaved.
      *
      * Entries clear when the same key is written again successfully, when
      * {@link Mnemonic.flush} persists them, or when an external change reloads

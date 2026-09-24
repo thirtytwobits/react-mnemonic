@@ -27,6 +27,9 @@ Under the hood this uses the browser's native `storage` event, which fires in
 all tabs **except** the one that made the change. Changes within the same tab
 are synchronized automatically via React's state management.
 
+A tab that receives the event re-reads the key from storage and never writes
+it, so an event that arrives after later writes shows the latest stored value.
+
 ## Custom backends
 
 For non-localStorage persistence stacks (for example, a synchronous cache backed

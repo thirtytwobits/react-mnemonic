@@ -16,6 +16,7 @@ import { createMnemonicOptionalBridge } from "./optional-bridge-adapter";
 import { MnemonicOptionalBridgeProvider } from "./optional-bridge-provider";
 import { getDefaultBrowserStorage, getNativeBrowserStorages, getRuntimeNodeEnv } from "./runtime";
 import { registerStorageErrorReporter, reportStorageError } from "./storage-error";
+import { registerStorageReload, reloadFromStorage } from "./storage-reload";
 import type {
     Mnemonic,
     MnemonicFlushResult,
@@ -93,13 +94,8 @@ export interface MnemonicProviderProps extends Readonly<MnemonicProviderOptions>
     readonly children: ReactNode;
 }
 
-/** Internal store type with reload capability, not exposed to consumers. */
-type MnemonicInternal = Mnemonic & {
-    reloadFromStorage: (changedKeys?: string[]) => void;
-};
-
 /** Internal store extension to retain a strong provider API reference while mounted. */
-type MnemonicInternalWithDevToolsHold = MnemonicInternal & {
+type MnemonicWithDevToolsHold = Mnemonic & {
     __devToolsProviderApiHold?: DevToolsProviderApi;
 };
 
@@ -111,7 +107,7 @@ type WeakRefLike<T extends object> = {
 type WeakRefConstructorLike = new <T extends object>(target: T) => WeakRefLike<T>;
 
 type DevToolsProviderApi = {
-    getStore: () => MnemonicInternal;
+    getStore: () => Mnemonic;
     dump: () => Record<string, string>;
     get: (key: string) => unknown;
     set: (key: string, value: unknown) => void;
@@ -574,7 +570,7 @@ function createDevToolsProviderApi({
     writeRaw,
     removeRaw,
 }: {
-    store: MnemonicInternal;
+    store: Mnemonic;
     dump: () => Record<string, string>;
     keys: () => string[];
     readThrough: (key: string) => string | null;
@@ -681,7 +677,7 @@ function registerDevToolsProvider({
 }: {
     devToolsRoot: DevToolsRegistryRoot;
     namespace: string;
-    store: MnemonicInternalWithDevToolsHold;
+    store: MnemonicWithDevToolsHold;
     dump: () => Record<string, string>;
     keys: () => string[];
     readThrough: (key: string) => string | null;
@@ -899,7 +895,7 @@ export function MnemonicProvider({
         );
     }, [namespace, parentStore, prefix]);
 
-    const store = useMemo<MnemonicInternal>(() => {
+    const store = useMemo<Mnemonic>(() => {
         const st = storage ?? getDefaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
         const devToolsRoot = ensureDevToolsRoot(enableDevTools);
@@ -1094,12 +1090,11 @@ export function MnemonicProvider({
         /**
          * Reports whether storage already holds what a failed mutation intended.
          *
-         * A backend can reject a write that would not have changed anything:
-         * the cross-tab handler echoing a value another tab already stored, or
-         * a reset to the value on disk. A thrown quota error says the write was
-         * refused, not that the cache and storage disagree. Reading back keeps
-         * the queue a record of observed divergence instead of thrown
-         * exceptions, so a durable key is never reported as unsaved.
+         * A backend can reject a write that would not have changed anything,
+         * such as a reset to the value on disk. A thrown quota error says the
+         * write was refused, not that the cache and storage disagree. Reading
+         * back keeps the queue a record of observed divergence instead of
+         * thrown exceptions, so a durable key is never reported as unsaved.
          *
          * Deliberately bypasses the shared access callbacks: this is a
          * diagnostic read on an already-failed path and must not reset the
@@ -1354,10 +1349,11 @@ export function MnemonicProvider({
          *   that changed. When undefined, performs a blanket reload of all
          *   actively subscribed keys. When an empty array, does nothing.
          *
-         * Called by the onExternalChange subscription when the storage adapter
-         * signals that data has changed externally (e.g., from another tab).
+         * Called when storage changes outside this document: through a custom
+         * backend's `onExternalChange`, or through the browser `storage` event
+         * a `listenCrossTab` hook hears.
          */
-        const reloadFromStorage = createReloadFromStorage({
+        const reload = createReloadFromStorage({
             storage: st,
             hasAsyncContractViolation: () => asyncContractViolationDetected,
             prefix,
@@ -1374,7 +1370,7 @@ export function MnemonicProvider({
          * The Mnemonic store API object.
          * Implements the contract expected by useSyncExternalStore.
          */
-        const store: MnemonicInternalWithDevToolsHold = {
+        const store: MnemonicWithDevToolsHold = {
             prefix,
             canEnumerateKeys,
             subscribeRaw,
@@ -1385,7 +1381,6 @@ export function MnemonicProvider({
             dump,
             unpersistedKeys,
             flush,
-            reloadFromStorage,
             schemaMode,
             ssrHydration,
             crossTabSyncMode,
@@ -1397,6 +1392,7 @@ export function MnemonicProvider({
         // any single value of that prop. The reporter reads the ref each time,
         // so a handler added after mount still receives reports.
         registerStorageErrorReporter(store, (event) => onStorageErrorRef.current?.(event));
+        registerStorageReload(store, reload);
 
         /**
          * DevTools integration.
@@ -1430,7 +1426,7 @@ export function MnemonicProvider({
     // Subscribe to external storage changes (e.g., cross-tab BroadcastChannel)
     useEffect(() => {
         if (!storage?.onExternalChange) return;
-        return storage.onExternalChange((changedKeys) => store.reloadFromStorage(changedKeys));
+        return storage.onExternalChange((changedKeys) => reloadFromStorage(store, changedKeys));
     }, [storage, store]);
 
     return (

@@ -49,6 +49,13 @@ function dispatchStorageEvent(init: StorageEventInit = {}) {
     window.dispatchEvent(event);
 }
 
+/** What a browser does when another tab changes storage: apply the change, then fire `storage` here. */
+function changeInAnotherTab(storage: ReturnType<typeof createMockStorage>, key: string, newValue: string): void {
+    const oldValue = storage.store.get(key) ?? null;
+    storage.store.set(key, newValue);
+    dispatchStorageEvent({ key, oldValue, newValue });
+}
+
 /**
  * Renders a hook inside a MnemonicProvider and captures both the hook result
  * and the underlying store API for direct manipulation.
@@ -681,7 +688,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            dispatchStorageEvent({ key: "ns.theme", newValue: env(JSON.stringify("dark")) });
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("dark")));
         });
 
         expect(onChange).toHaveBeenCalledWith("dark", "light");
@@ -696,7 +703,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            dispatchStorageEvent({ key: "ns.count", newValue: env("42") });
+            changeInAnotherTab(storage, "ns.count", env("42"));
         });
 
         // JSONCodec decodes "42" → 42
@@ -713,7 +720,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            dispatchStorageEvent({ key: "ns.count", newValue: env("not-a-number") });
+            changeInAnotherTab(storage, "ns.count", env("not-a-number"));
         });
 
         // JSONCodec throws for "not-a-number", fallback to default
@@ -729,10 +736,7 @@ describe("cross-tab sync – data flow integration", () => {
         );
 
         act(() => {
-            dispatchStorageEvent({
-                key: "other-ns.theme",
-                newValue: env(JSON.stringify("dark")),
-            });
+            changeInAnotherTab(storage, "other-ns.theme", env(JSON.stringify("dark")));
         });
 
         expect(result.current.value).toBe("light");
@@ -750,14 +754,37 @@ describe("cross-tab sync – data flow integration", () => {
 
         act(() => {
             for (let i = 1; i <= 10; i++) {
-                dispatchStorageEvent({
-                    key: "ns.count",
-                    newValue: env(String(i)),
-                });
+                changeInAnotherTab(storage, "ns.count", env(String(i)));
             }
         });
 
         expect(result.current.value).toBe(10);
+    });
+
+    it("events delivered after a burst of writes show only what storage holds and leave it there", () => {
+        const onChange = vi.fn();
+        const { result } = renderHookWithStore(storage, "ns", () =>
+            useMnemonicKey("count", {
+                defaultValue: 0,
+                listenCrossTab: true,
+                onChange,
+            }),
+        );
+        const writes = Array.from({ length: 10 }, (_, index) => env(String(index + 1)));
+        for (const raw of writes) storage.store.set("ns.count", raw);
+        const stored = writes[writes.length - 1];
+
+        let oldValue: string | null = null;
+        for (const newValue of writes) {
+            act(() => {
+                dispatchStorageEvent({ key: "ns.count", oldValue, newValue });
+            });
+            oldValue = newValue;
+        }
+
+        expect(storage.store.get("ns.count")).toBe(stored);
+        expect(result.current.value).toBe(10);
+        expect(onChange.mock.calls.map(([value]) => value)).toEqual([10]);
     });
 
     it("multiple components sync when a storage event arrives", () => {
@@ -792,7 +819,7 @@ describe("cross-tab sync – data flow integration", () => {
         expect(v2).toBe("a");
 
         act(() => {
-            dispatchStorageEvent({ key: "ns.shared", newValue: env(JSON.stringify("b")) });
+            changeInAnotherTab(storage, "ns.shared", env(JSON.stringify("b")));
         });
 
         expect(v1).toBe("b");
@@ -811,7 +838,7 @@ describe("cross-tab sync – data flow integration", () => {
 
         // Should not throw after the component is unmounted
         expect(() => {
-            dispatchStorageEvent({ key: "ns.theme", newValue: env(JSON.stringify("dark")) });
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("dark")));
         }).not.toThrow();
     });
 
@@ -827,14 +854,9 @@ describe("cross-tab sync – data flow integration", () => {
         );
         expect(tabBResult.current.value).toBe("initial");
 
-        // Tab A: writes "updated" to storage (simulated by direct storage write + event)
+        // Tab A: writes "updated" to storage
         act(() => {
-            storage.store.set("ns.data", env(JSON.stringify("updated")));
-            dispatchStorageEvent({
-                key: "ns.data",
-                oldValue: null,
-                newValue: env(JSON.stringify("updated")),
-            });
+            changeInAnotherTab(storage, "ns.data", env(JSON.stringify("updated")));
         });
 
         // Tab B: receives the update
