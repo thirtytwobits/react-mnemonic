@@ -61,7 +61,8 @@ export type MnemonicBootstrapKeyDefinition<T, K extends string = string> = Reado
  * an inline `{ key, ...options }` definition.
  */
 export type MnemonicBootstrapKeyInput<T, K extends string = string> =
-    MnemonicKeyDescriptor<T, K> | MnemonicBootstrapKeyDefinition<T, K>;
+    | MnemonicKeyDescriptor<T, K>
+    | MnemonicBootstrapKeyDefinition<T, K>;
 
 type InferMnemonicBootstrapKey<TInput> =
     TInput extends MnemonicKeyDescriptor<unknown, infer K extends string>
