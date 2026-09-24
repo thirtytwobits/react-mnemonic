@@ -1387,8 +1387,9 @@ describe("MnemonicProvider – DevTools", () => {
     });
 
     it("marks capabilities and skips provider registration when WeakRef is unavailable", () => {
-        (globalThis as any).WeakRef = undefined;
+        // Spy before removing WeakRef: vitest's spy machinery uses WeakRef itself.
         const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+        (globalThis as any).WeakRef = undefined;
 
         render(
             <MnemonicProvider namespace="no-weak" storage={createMockStorage()} enableDevTools={true}>
@@ -1405,6 +1406,9 @@ describe("MnemonicProvider – DevTools", () => {
     });
 
     it("skips provider registration if WeakRef becomes unavailable between root creation and registration", () => {
+        // Spy before installing the counting getter so vitest's own WeakRef
+        // reads don't consume the provider's first read.
+        const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
         let weakRefReads = 0;
         Object.defineProperty(globalThis, "WeakRef", {
             configurable: true,
@@ -1413,8 +1417,6 @@ describe("MnemonicProvider – DevTools", () => {
                 return weakRefReads === 1 ? originalWeakRef : undefined;
             },
         });
-
-        const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
 
         render(
             <MnemonicProvider namespace="weak-race" storage={createMockStorage()} enableDevTools={true}>
