@@ -15,6 +15,8 @@ below point at the tag while the heading names the version.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-24
+
 ### Added
 
 - `unpersistedKeys()` and `flush(keys?)` on the `Mnemonic` store and on `useMnemonicRecovery()`, for detecting and re-attempting writes that never reached storage ([#101](https://github.com/thirtytwobits/react-mnemonic/issues/101))
@@ -126,7 +128,8 @@ below point at the tag while the heading names the version.
 
 - Initial alpha publish of the persistent-state core
 
-[unreleased]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.5.0...HEAD
+[unreleased]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/thirtytwobits/react-mnemonic/compare/v1.2.1-beta1...v1.3.0

@@ -69,11 +69,14 @@ const config: Config = {
                 docs: {
                     sidebarPath: "./sidebars.ts",
                     editUrl: "https://github.com/thirtytwobits/react-mnemonic/tree/main/website/",
-                    lastVersion: "1.5.0",
+                    lastVersion: "1.6.0",
                     versions: {
                         current: {
                             label: "Next",
                             path: "next",
+                        },
+                        "1.6.0": {
+                            label: "1.6.0",
                         },
                         "1.5.0": {
                             label: "1.5.0",
