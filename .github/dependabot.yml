@@ -44,6 +44,14 @@ updates:
           - dependency-name: "@types/react-dom"
             update-types:
                 - version-update:semver-major
+          # typedoc 0.28 (used for the API docs, directly and through
+          # docusaurus-plugin-typedoc) only accepts TypeScript up to 6.0, so a
+          # TypeScript major cannot pass npm ci until typedoc supports it.
+          # Remove this once typedoc does. The consumer fixtures already
+          # verify that TypeScript 7 users can consume the library.
+          - dependency-name: typescript
+            update-types:
+                - version-update:semver-major
 
     - package-ecosystem: github-actions
       directory: /

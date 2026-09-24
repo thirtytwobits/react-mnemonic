@@ -66,7 +66,9 @@ function parseRecipeTitles(markdown) {
 }
 
 async function formatMarkdown(body) {
-    return await format(body.trimEnd() + "\n", {
+    // Front matter is only recognized at the very start of the file, so drop the
+    // leading newline the template literals below begin with.
+    return await format(body.trim() + "\n", {
         ...prettierConfig,
         parser: "markdown",
     });
