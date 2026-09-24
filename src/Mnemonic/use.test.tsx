@@ -52,6 +52,19 @@ function dispatchStorageEvent(init: StorageEventInit = {}) {
     window.dispatchEvent(event);
 }
 
+/** What a browser does when another tab changes storage: apply the change, then fire `storage` here. */
+function changeInAnotherTab(
+    storage: ReturnType<typeof createMockStorage>,
+    key: string | null,
+    newValue: string | null,
+): void {
+    const oldValue = key === null ? null : (storage.store.get(key) ?? null);
+    if (key === null) storage.store.clear();
+    else if (newValue === null) storage.store.delete(key);
+    else storage.store.set(key, newValue);
+    dispatchStorageEvent({ key, oldValue, newValue });
+}
+
 const originalProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
 const originalNodeEnv = originalProcess?.env?.NODE_ENV;
 
@@ -801,10 +814,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("light");
 
         act(() => {
-            dispatchStorageEvent({
-                key: "ns.theme",
-                newValue: env(JSON.stringify("dark")),
-            });
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("dark")));
         });
         expect(result.current.value).toBe("dark");
     });
@@ -820,10 +830,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("dark");
 
         act(() => {
-            dispatchStorageEvent({
-                key: "ns.theme",
-                newValue: null,
-            });
+            changeInAnotherTab(storage, "ns.theme", null);
         });
         expect(result.current.value).toBe("light"); // falls back to default
     });
@@ -839,10 +846,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
         expect(result.current.value).toBe("dark");
 
         act(() => {
-            dispatchStorageEvent({
-                key: null,
-                newValue: null,
-            });
+            changeInAnotherTab(storage, null, null);
         });
 
         expect(result.current.value).toBe("light");
@@ -856,12 +860,89 @@ describe("useMnemonicKey – cross-tab sync", () => {
             }),
         );
         act(() => {
-            dispatchStorageEvent({
-                key: "ns.other",
-                newValue: "irrelevant",
-            });
+            changeInAnotherTab(storage, "ns.other", "irrelevant");
         });
         expect(result.current.value).toBe("light");
+    });
+
+    it("an event that arrives after a later write shows the later value and leaves it stored", () => {
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                listenCrossTab: true,
+            }),
+        );
+        const earlier = env(JSON.stringify("dark"));
+        const later = env(JSON.stringify("sepia"));
+        storage.store.set("ns.theme", earlier);
+        storage.store.set("ns.theme", later);
+
+        act(() => {
+            dispatchStorageEvent({ key: "ns.theme", oldValue: null, newValue: earlier });
+        });
+
+        expect(result.current.value).toBe("sepia");
+        expect(storage.store.get("ns.theme")).toBe(later);
+    });
+
+    it("a removal that arrives after the key was written again keeps the new value", () => {
+        const removed = env(JSON.stringify("dark"));
+        storage.store.set("ns.theme", removed);
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                listenCrossTab: true,
+            }),
+        );
+        const rewritten = env(JSON.stringify("sepia"));
+        storage.store.set("ns.theme", rewritten);
+
+        act(() => {
+            dispatchStorageEvent({ key: "ns.theme", oldValue: removed, newValue: null });
+        });
+
+        expect(result.current.value).toBe("sepia");
+        expect(storage.store.get("ns.theme")).toBe(rewritten);
+    });
+
+    it("a clear() that arrives after the key was written again keeps the new value", () => {
+        storage.store.set("ns.theme", env(JSON.stringify("dark")));
+        const { result } = renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                listenCrossTab: true,
+            }),
+        );
+        const rewritten = env(JSON.stringify("sepia"));
+        storage.store.set("ns.theme", rewritten);
+
+        act(() => {
+            dispatchStorageEvent({ key: null, newValue: null });
+        });
+
+        expect(result.current.value).toBe("sepia");
+        expect(storage.store.get("ns.theme")).toBe(rewritten);
+    });
+
+    it("receiving another tab's changes writes nothing to storage", () => {
+        renderHook(storage, "ns", () =>
+            useMnemonicKey("theme", {
+                defaultValue: "light",
+                listenCrossTab: true,
+            }),
+        );
+        const setItem = vi.spyOn(storage, "setItem");
+        const removeItem = vi.spyOn(storage, "removeItem");
+
+        act(() => {
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("dark")));
+            changeInAnotherTab(storage, "ns.theme", null);
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("sepia")));
+            changeInAnotherTab(storage, null, null);
+        });
+
+        expect(setItem).not.toHaveBeenCalled();
+        expect(removeItem).not.toHaveBeenCalled();
     });
 
     it("does not listen when listenCrossTab is false", () => {
@@ -872,10 +953,7 @@ describe("useMnemonicKey – cross-tab sync", () => {
             }),
         );
         act(() => {
-            dispatchStorageEvent({
-                key: "ns.theme",
-                newValue: env(JSON.stringify("dark")),
-            });
+            changeInAnotherTab(storage, "ns.theme", env(JSON.stringify("dark")));
         });
         expect(result.current.value).toBe("light"); // unchanged
     });

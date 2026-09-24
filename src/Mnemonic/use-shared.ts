@@ -11,6 +11,7 @@ import {
 import { SchemaError, type MnemonicEnvelope } from "./schema";
 import { getRuntimeNodeEnv } from "./runtime";
 import { reportStorageError } from "./storage-error";
+import { reloadFromStorage } from "./storage-reload";
 import type { Mnemonic, MnemonicKeyDescriptor, MnemonicKeyState, UseMnemonicKeyOptions } from "./types";
 
 export type ReadResult<T, Extra extends object = {}> = {
@@ -602,17 +603,12 @@ export function useMnemonicKeyState<T, Extra extends object>(
 
         const storageKey = api.prefix + key;
 
+        // The event reports a change storage already holds, and later writes may
+        // have followed it, so the key is re-read rather than set from
+        // `newValue`. A clear() arrives with a null key.
         const handler = (e: StorageEvent) => {
-            if (e.key === null) {
-                api.removeRaw(key);
-                return;
-            }
-            if (e.key !== storageKey) return;
-            if (e.newValue == null) {
-                api.removeRaw(key);
-                return;
-            }
-            api.setRaw(key, e.newValue);
+            if (e.key !== null && e.key !== storageKey) return;
+            reloadFromStorage(api, [storageKey]);
         };
 
         globalWindow.addEventListener("storage", handler);

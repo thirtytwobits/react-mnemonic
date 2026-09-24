@@ -148,8 +148,8 @@ recoverable.
 
 A key is only reported when storage is observed to disagree with what the
 provider is serving. A rejected write of a value storage already holds — a
-cross-tab echo, or a `reset()` to the value already on disk — is not reported,
-so a durable key never shows up as unsaved.
+`reset()` to the value already on disk, for example — is not reported, so a
+durable key never shows up as unsaved.
 
 The queue holds one entry per distinct key, not per write: repeated failures on
 the same key replace the entry and release the superseded value. What it retains
@@ -235,8 +235,8 @@ The practical consequence: do not tell the user "we'll try again" on a
   failures or track them per key. Debounce in the handler if you are driving a
   toast from it.
 - **It only fires for writes that were actually dropped.** A rejected write that
-  storage turns out to already satisfy — a cross-tab echo, a `reset()` to the
-  value on disk — is not reported, exactly as it is not queued.
+  storage turns out to already satisfy — a `reset()` to the value on disk, for
+  example — is not reported, exactly as it is not queued.
 - **It runs synchronously inside the mutation**, after the cache is updated and
   subscribers are notified, so the handler sees a fully applied write. Throwing
   is contained and logged once; writing to the store from inside it is not
