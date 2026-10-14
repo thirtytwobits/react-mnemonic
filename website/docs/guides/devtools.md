@@ -23,6 +23,10 @@ the hosted demos do not expose a writable global registry.
 When enabled, the provider registers a helper object on `window` under the
 `__REACT_MNEMONIC_DEVTOOLS__` namespace.
 
+Registration happens after the provider commits. React StrictMode and discarded
+renders do not create duplicate registrations. Rebuilding a provider's store
+replaces its registration, and unmounting or disabling DevTools removes it.
+
 ## Browser extension integration
 
 The `react-mnemonic` DevTools extension uses
@@ -84,7 +88,10 @@ app?.clear();
 ## Multiple providers
 
 If your app uses multiple providers, each one registers as a weak entry in the
-global registry:
+global registry. Each mounted provider with DevTools enabled must use a distinct
+namespace. Two mounted providers sharing a namespace throw in non-production
+runtimes; in production, or when `NODE_ENV` is unavailable, the registry warns
+and keeps the first registration:
 
 ```js
 const providers = __REACT_MNEMONIC_DEVTOOLS__.list();
@@ -95,7 +102,8 @@ for (const provider of providers) {
 ```
 
 If `resolve(namespace)` returns `null`, that provider is no longer available
-(for example, it was unmounted and garbage-collected).
+(for example, it was unmounted). Unmount cleanup removes the entry immediately,
+even if another reference keeps the store alive.
 
 :::tip
 Leave `enableDevTools` off in production to avoid polluting `window` and

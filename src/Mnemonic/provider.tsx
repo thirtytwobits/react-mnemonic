@@ -618,7 +618,7 @@ function createReloadFromStorage({
     cache,
     emit,
     callbacks,
-    devToolsRoot,
+    getDevToolsRoot,
     namespace,
     onCacheSyncedFromStorage,
 }: {
@@ -629,7 +629,7 @@ function createReloadFromStorage({
     cache: Map<string, string | null>;
     emit: (key: string) => void;
     callbacks: StorageAccessCallbacks;
-    devToolsRoot: DevToolsRegistryRoot | null;
+    getDevToolsRoot: () => DevToolsRegistryRoot | null;
     namespace: string;
     onCacheSyncedFromStorage: (key: string) => void;
 }): (changedKeys?: string[]) => void {
@@ -660,7 +660,7 @@ function createReloadFromStorage({
               });
 
         if (changed) {
-            bumpDevToolsVersion(devToolsRoot, namespace, isFullReload ? "reload:full" : "reload:granular");
+            bumpDevToolsVersion(getDevToolsRoot(), namespace, isFullReload ? "reload:full" : "reload:granular");
         }
     };
 }
@@ -683,8 +683,8 @@ function registerDevToolsProvider({
     readThrough: (key: string) => string | null;
     writeRaw: (key: string, raw: string) => void;
     removeRaw: (key: string) => void;
-}): void {
-    let infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
+}): Unsubscribe | undefined {
+    const infoMessage = `[Mnemonic DevTools] Namespace "${namespace}" available via window.__REACT_MNEMONIC_DEVTOOLS__.resolve("${namespace}")`;
 
     if (!devToolsRoot.capabilities.weakRef) {
         console.info(
@@ -726,15 +726,28 @@ function registerDevToolsProvider({
     store.__devToolsProviderApiHold = providerApi;
 
     const now = Date.now();
-    devToolsRoot.providers[namespace] = {
+    const entry: DevToolsProviderEntry = {
         namespace,
         weakRef: new WeakRefCtor(providerApi),
         registeredAt: now,
         lastSeenAt: now,
         staleSince: null,
     };
+    devToolsRoot.providers[namespace] = entry;
     bumpDevToolsVersion(devToolsRoot, namespace, "registry:namespace-registered");
     console.info(infoMessage);
+
+    return () => {
+        // Only release this registration; an ignored duplicate or a newer
+        // registration must never lose its namespace to another cleanup.
+        if (devToolsRoot.providers[namespace] === entry) {
+            delete devToolsRoot.providers[namespace];
+            bumpDevToolsVersion(devToolsRoot, namespace, "registry:namespace-unregistered");
+        }
+        if (store.__devToolsProviderApiHold === providerApi) {
+            delete store.__devToolsProviderApiHold;
+        }
+    };
 }
 
 /**
@@ -895,10 +908,10 @@ export function MnemonicProvider({
         );
     }, [namespace, parentStore, prefix]);
 
-    const store = useMemo<Mnemonic>(() => {
+    const { store, mountDevTools } = useMemo(() => {
         const st = storage ?? getDefaultBrowserStorage();
         const ssrHydration = ssr?.hydration ?? "immediate";
-        const devToolsRoot = ensureDevToolsRoot(enableDevTools);
+        let devToolsRoot: DevToolsRegistryRoot | null = null;
         const canEnumerateKeys = detectEnumerableStorage(st);
         const crossTabSyncMode = getCrossTabSyncMode(storage, st);
 
@@ -1361,7 +1374,7 @@ export function MnemonicProvider({
             cache,
             emit,
             callbacks: storageAccessCallbacks,
-            devToolsRoot,
+            getDevToolsRoot: () => devToolsRoot,
             namespace,
             onCacheSyncedFromStorage: forgetPendingWrite,
         });
@@ -1394,12 +1407,12 @@ export function MnemonicProvider({
         registerStorageErrorReporter(store, (event) => onStorageErrorRef.current?.(event));
         registerStorageReload(store, reload);
 
-        /**
-         * DevTools integration.
-         * Exposes a weak-provider registry on the window object when enabled.
-         */
-        if (devToolsRoot) {
-            registerDevToolsProvider({
+        // Acquire the global registration only after React commits this store.
+        // Discarded renders never publish a provider or initialize the registry.
+        const mountDevTools = (): Unsubscribe | undefined => {
+            devToolsRoot = ensureDevToolsRoot(enableDevTools);
+            if (!devToolsRoot) return;
+            const unregister = registerDevToolsProvider({
                 devToolsRoot,
                 namespace,
                 store,
@@ -1409,10 +1422,16 @@ export function MnemonicProvider({
                 writeRaw,
                 removeRaw,
             });
-        }
+            return () => {
+                unregister?.();
+                devToolsRoot = null;
+            };
+        };
 
-        return store;
+        return { store, mountDevTools };
     }, [namespace, storage, enableDevTools, schemaMode, schemaRegistry, ssr?.hydration, bootstrapRawSeed]);
+
+    useEffect(() => mountDevTools(), [mountDevTools]);
 
     const optionalBridge = useMemo(
         () =>
