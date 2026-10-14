@@ -5,6 +5,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MnemonicProvider, useMnemonic } from "./provider";
+import { createSchemaRegistry } from "./schema-registry";
 import type { StorageLike } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -875,6 +876,171 @@ describe("MnemonicProvider – DevTools", () => {
     function getRegistry() {
         return (window as any).__REACT_MNEMONIC_DEVTOOLS__;
     }
+
+    it.each(["development", "production", undefined])(
+        "registers the committed StrictMode store with NODE_ENV=%s",
+        (env) => {
+            if (env === undefined) {
+                (globalThis as any).process = undefined;
+            } else {
+                setNodeEnv(env);
+            }
+            const storage = createMockStorage();
+            const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+            let committedStore: ReturnType<typeof useMnemonic> | undefined;
+            const onStore = (store: ReturnType<typeof useMnemonic>) => {
+                committedStore = store;
+            };
+            const { unmount } = render(
+                <React.StrictMode>
+                    <MnemonicProvider namespace="strict" storage={storage} enableDevTools>
+                        <StoreConsumer onStore={onStore} />
+                    </MnemonicProvider>
+                </React.StrictMode>,
+            );
+
+            const registry = getRegistry();
+            expect(registry.resolve("strict").getStore()).toBe(committedStore);
+            expect(registry.list()).toHaveLength(1);
+            expect(warnSpy).not.toHaveBeenCalled();
+            unmount();
+            expect(registry.resolve("strict")).toBeNull();
+            expect(registry.list()).toEqual([]);
+            expect((committedStore as any).__devToolsProviderApiHold).toBeUndefined();
+            warnSpy.mockRestore();
+        },
+    );
+
+    it("does not register a provider whose render is suspended and discarded", () => {
+        const pending = new Promise<never>(() => {});
+        function SuspendedChild(): React.ReactNode {
+            throw pending;
+        }
+        const { unmount } = render(
+            <React.Suspense fallback={<div>loading</div>}>
+                <MnemonicProvider namespace="suspended" storage={createMockStorage()} enableDevTools>
+                    <SuspendedChild />
+                </MnemonicProvider>
+            </React.Suspense>,
+        );
+
+        expect(screen.getByText("loading")).toBeTruthy();
+        expect(getRegistry()).toBeUndefined();
+        unmount();
+    });
+
+    it("replaces registration when storage changes and releases it when disabled", () => {
+        setNodeEnv("development");
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        let committedStore: ReturnType<typeof useMnemonic> | undefined;
+        const onStore = (store: ReturnType<typeof useMnemonic>) => {
+            committedStore = store;
+        };
+        const tree = (storage: StorageLike, enableDevTools = true, namespace = "replacement") => (
+            <MnemonicProvider namespace={namespace} storage={storage} enableDevTools={enableDevTools}>
+                <StoreConsumer onStore={onStore} />
+            </MnemonicProvider>
+        );
+        const { rerender, unmount } = render(tree(storageA));
+        const registry = getRegistry();
+        const previousApi = registry.resolve("replacement");
+        const previousStore = previousApi.getStore();
+        const initialVersion = registry.__meta.version;
+
+        rerender(tree(storageB));
+        const replacementApi = registry.resolve("replacement");
+        expect(replacementApi).not.toBe(previousApi);
+        expect(replacementApi.getStore()).toBe(committedStore);
+        expect((previousStore as any).__devToolsProviderApiHold).toBeUndefined();
+        replacementApi.set("value", "new");
+        expect(storageB.store.get("replacement.value")).toBe(JSON.stringify("new"));
+        expect(storageA.store.size).toBe(0);
+        expect(registry.__meta.version).toBeGreaterThan(initialVersion);
+
+        rerender(tree(storageB, true, "renamed"));
+        expect(registry.resolve("replacement")).toBeNull();
+        expect(registry.resolve("renamed").getStore()).toBe(committedStore);
+        rerender(tree(storageB, false, "renamed"));
+        expect(registry.resolve("renamed")).toBeNull();
+        expect(registry.list()).toEqual([]);
+        rerender(tree(storageB, true, "renamed"));
+        expect(registry.resolve("renamed").getStore()).toBe(committedStore);
+        unmount();
+        expect(registry.list()).toEqual([]);
+        expect(registry.__meta.lastChange).toBe("renamed.registry:namespace-unregistered");
+    });
+
+    it("does not unregister the first provider when an ignored duplicate unmounts", () => {
+        setNodeEnv("production");
+        const storageA = createMockStorage();
+        const storageB = createMockStorage();
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const first = render(
+            <MnemonicProvider namespace="owner" storage={storageA} enableDevTools>
+                <div />
+            </MnemonicProvider>,
+        );
+        const registry = getRegistry();
+        const firstApi = registry.resolve("owner");
+        const duplicate = render(
+            <MnemonicProvider namespace="owner" storage={storageB} enableDevTools>
+                <div />
+            </MnemonicProvider>,
+        );
+        duplicate.unmount();
+        expect(registry.resolve("owner")).toBe(firstApi);
+        first.unmount();
+        expect(registry.resolve("owner")).toBeNull();
+        warnSpy.mockRestore();
+    });
+
+    it("replaces registration when the schema registry changes", () => {
+        setNodeEnv("development");
+        const storage = createMockStorage();
+        const registryA = createSchemaRegistry({ schemas: [], migrations: [] });
+        const registryB = createSchemaRegistry({ schemas: [], migrations: [] });
+        const tree = (schemaRegistry: typeof registryA) => (
+            <MnemonicProvider
+                namespace="schema-change"
+                storage={storage}
+                schemaRegistry={schemaRegistry}
+                enableDevTools
+            >
+                <div />
+            </MnemonicProvider>
+        );
+        const { rerender } = render(tree(registryA));
+        const registry = getRegistry();
+        const oldStore = registry.resolve("schema-change").getStore();
+        rerender(tree(registryB));
+        const newStore = registry.resolve("schema-change").getStore();
+        expect(newStore).not.toBe(oldStore);
+        expect(newStore.schemaRegistry).toBe(registryB);
+        expect((oldStore as any).__devToolsProviderApiHold).toBeUndefined();
+    });
+
+    it("reports external reloads through the registry initialized after render", () => {
+        const storage = createMockStorageWithExternalChange();
+        const { unmount } = render(
+            <MnemonicProvider namespace="reload-meta" storage={storage} enableDevTools>
+                <div />
+            </MnemonicProvider>,
+        );
+        const registry = getRegistry();
+        const store = registry.resolve("reload-meta").getStore();
+        const unsubscribe = store.subscribeRaw("value", vi.fn());
+        const initialVersion = registry.__meta.version;
+        storage.store.set("reload-meta.value", "changed");
+        storage.triggerExternalChange();
+        expect(registry.__meta.version).toBe(initialVersion + 1);
+        expect(registry.__meta.lastChange).toBe("reload-meta.reload:full");
+        unsubscribe();
+        unmount();
+        const unmountedVersion = registry.__meta.version;
+        store.setRaw("value", "after unmount");
+        expect(registry.__meta.version).toBe(unmountedVersion);
+    });
 
     it("registers devtools registry root when enableDevTools is true", () => {
         const storage = createMockStorage();
