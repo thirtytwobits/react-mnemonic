@@ -28,7 +28,7 @@
         "react-dom": "^18.3.1",
         "react-mnemonic": "file:..",
         "typedoc": "^0.28.17",
-        "typedoc-plugin-markdown": "^4.10.0"
+        "typedoc-plugin-markdown": "^4.14.0"
     },
     "devDependencies": {
         "@docusaurus/module-type-aliases": "^3.9.2",
